@@ -184,7 +184,12 @@ button:disabled {
 }
 
 .day-entry-panel {
-  min-height: 100%;
+  align-self: start;
+}
+
+.live-clock-stack {
+  display: grid;
+  gap: 12px;
 }
 
 .metric,
@@ -218,6 +223,47 @@ button:disabled {
   letter-spacing: 0;
 }
 
+.metric-progress {
+  position: relative;
+  display: grid;
+  padding-top: 5px;
+}
+
+.metric-progress-track {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f5;
+}
+
+.metric-progress-fill,
+.metric-progress-overflow {
+  display: block;
+  border-radius: inherit;
+}
+
+.metric-progress-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.metric-progress-overflow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--warning);
+}
+
+.metric-progress-warning .metric-progress-fill {
+  background: #c39239;
+}
+
+.metric-progress-vacation .metric-progress-fill {
+  background: #4d7890;
+}
+
 .metric p {
   margin: 0;
 }
@@ -248,6 +294,20 @@ button:disabled {
 
 .date-row {
   align-items: flex-end;
+}
+
+.day-entry-panel .date-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  gap: 18px;
+}
+
+.day-entry-panel .date-row label {
+  min-width: 0;
+}
+
+.day-entry-panel .button-row {
+  justify-content: flex-start;
 }
 
 .week-table {
@@ -286,6 +346,11 @@ button:disabled {
   gap: 18px;
 }
 
+.panel.day-entry-panel {
+  gap: 28px;
+  padding: 28px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -294,26 +359,6 @@ button:disabled {
 
 .day-entry-grid {
   align-items: end;
-}
-
-.break-field {
-  align-self: end;
-  justify-self: start;
-  width: auto;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.break-field input {
-  width: 64px;
-  min-height: 30px;
-  border-color: #e4e8ef;
-  background: #f8fafb;
-  padding: 5px 7px;
-  color: #435064;
-  font-size: 0.82rem;
 }
 
 .field {
@@ -335,6 +380,26 @@ button:disabled {
   padding: 11px 12px;
   outline: none;
   transition: border-color 160ms ease, background 160ms ease;
+}
+
+.field.break-field {
+  align-self: end;
+  justify-self: start;
+  width: auto;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.field.break-field input {
+  width: 64px;
+  min-height: 30px;
+  border-color: #e4e8ef;
+  background: #f8fafb;
+  padding: 5px 7px;
+  color: #435064;
+  font-size: 0.82rem;
 }
 
 .field input[aria-invalid="true"] {
@@ -368,8 +433,12 @@ button:disabled {
 .live-clock-panel {
   display: grid;
   gap: 14px;
-  min-height: 100%;
   align-content: start;
+}
+
+.break-panel {
+  padding: 14px 16px;
+  box-shadow: none;
 }
 
 .live-clock-face {
@@ -629,5 +698,18 @@ button:disabled {
   .date-row,
   .button-row {
     flex-wrap: wrap;
+  }
+
+  .day-entry-panel .date-row {
+    display: flex;
+  }
+
+  .day-entry-panel .date-row label {
+    flex-basis: 100%;
+    order: -1;
+  }
+
+  .day-entry-panel .date-row .secondary-button {
+    flex: 1 1 140px;
   }
 }

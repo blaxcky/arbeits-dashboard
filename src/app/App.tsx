@@ -97,6 +97,23 @@ function Dashboard({ data }: { data: WorkData }) {
   const vacation = settings ? calculateVacation(settings.vacationEntitlementMinutes, settings.vacationUsedMinutes, settings.dailyTargetMinutes) : null;
   const requiredConsumption = settings && vacation ? calculateRequiredYearConsumption(vacation.remainingMinutes, flex, settings.flexLimitMinutes) : 0;
   const setupMissing = settings ? [settings.flexStartMinutes === null ? "Gleitzeitstartwert" : null, settings.vacationEntitlementMinutes === null ? "Urlaubsanspruch" : null].filter(Boolean) : [];
+  const weeklyTargetMinutes = settings?.weeklyTargetMinutes ?? 2400;
+  const weekDeltaToTarget = week.workedMinutes - weeklyTargetMinutes;
+  const flexLimitMinutes = settings?.flexLimitMinutes ?? 6000;
+  const flexDistanceToLimit = flexLimitMinutes - flex;
+  const vacationEntitlementMinutes = vacation?.entitlementMinutes ?? 0;
+  const breakField = (
+    <Field label="Pause in Minuten" className="break-field">
+      <input
+        type="number"
+        min="0"
+        max="720"
+        value={form.breakMinutes}
+        onChange={(event) => setForm({ ...form, breakMinutes: event.target.value })}
+        onBlur={(event) => void handleBreakBlur(event.target.value)}
+      />
+    </Field>
+  );
 
   useEffect(() => {
     setForm(entryToForm(entry, selectedDate, settings));
@@ -193,17 +210,40 @@ function Dashboard({ data }: { data: WorkData }) {
                 onBlur={(event) => void handleTimeBlur("endTime", event.target.value)}
               />
             </Field>
-            <Field label="Pause in Minuten" className="break-field"><input type="number" min="0" max="720" value={form.breakMinutes} onChange={(event) => setForm({ ...form, breakMinutes: event.target.value })} onBlur={(event) => void handleBreakBlur(event.target.value)} /></Field>
           </div>
           <div className="button-row">
             <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Löschen</button>
           </div>
         </form>
-        <LiveDayClock day={day} targetMinutes={previewEntry.targetMinutes} />
+        <div className="live-clock-stack">
+          <LiveDayClock day={day} targetMinutes={previewEntry.targetMinutes} />
+          <div className="panel break-panel">{breakField}</div>
+        </div>
         <div className="dashboard-side-grid">
-          <Metric title="Woche" value={formatMinutes(week.workedMinutes)} detail={`${formatSignedMinutes(week.deltaMinutes)} zur Wochenbilanz`} />
-          <Metric title="Gleitzeit" value={formatSignedMinutes(flex)} detail={`Grenze ${settings ? formatDecimalHours(settings.flexLimitMinutes) : "100,0 h"}`} tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"} />
-          <Metric title="Resturlaub" value={vacation ? formatDays(vacation.remainingMinutes, settings?.dailyTargetMinutes) : "0,0 Tage"} detail={vacation ? formatMinutes(vacation.remainingMinutes) : "Noch nicht eingerichtet"} icon={<CalendarCheck size={22} />} />
+          <Metric
+            title="Woche"
+            value={formatMinutes(week.workedMinutes)}
+            detail={weekDeltaToTarget >= 0 ? `${formatMinutes(weekDeltaToTarget)} über Wochensoll` : `noch ${formatMinutes(Math.abs(weekDeltaToTarget))} bis Wochensoll`}
+            progress={{ value: week.workedMinutes / weeklyTargetMinutes }}
+          />
+          <Metric
+            title="Gleitzeit"
+            value={formatSignedMinutes(flex)}
+            detail={flexDistanceToLimit >= 0 ? `noch ${formatMinutes(flexDistanceToLimit)} bis Grenze` : `${formatMinutes(Math.abs(flexDistanceToLimit))} über Grenze`}
+            tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"}
+            progress={{
+              value: flexLimitMinutes > 0 ? flex / flexLimitMinutes : 0,
+              overflow: flexLimitMinutes > 0 && flex > flexLimitMinutes ? (flex - flexLimitMinutes) / flexLimitMinutes : 0,
+              tone: flex > flexLimitMinutes ? "warning" : "default"
+            }}
+          />
+          <Metric
+            title="Resturlaub"
+            value={vacation ? formatDays(vacation.remainingMinutes, settings?.dailyTargetMinutes) : "0,0 Tage"}
+            detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}
+            icon={<CalendarCheck size={22} />}
+            progress={{ value: vacationEntitlementMinutes > 0 ? (vacation?.remainingMinutes ?? 0) / vacationEntitlementMinutes : 0, tone: "vacation" }}
+          />
           <Metric title="Dieses Jahr verbrauchen" value={formatMinutes(requiredConsumption)} detail="Resturlaub plus Gleitzeit über Grenze" />
         </div>
       </div>
@@ -227,12 +267,12 @@ function SettingsView({ data }: { data: WorkData }) {
 
   async function saveSettings() {
     await data.saveSettings({
-      dailyTargetMinutes: clampNumber(form.dailyTargetMinutes, 1, 900),
-      weeklyTargetMinutes: clampNumber(form.weeklyTargetMinutes, 1, 4000),
-      flexLimitMinutes: clampNumber(form.flexLimitMinutes, 0, 20000),
-      flexStartMinutes: form.flexStartMinutes === "" ? null : Number(form.flexStartMinutes),
-      vacationEntitlementMinutes: form.vacationEntitlementMinutes === "" ? null : Number(form.vacationEntitlementMinutes),
-      vacationUsedMinutes: clampNumber(form.vacationUsedMinutes, 0, 20000)
+      dailyTargetMinutes: clampHoursToMinutes(form.dailyTargetMinutes, 1, 900),
+      weeklyTargetMinutes: clampHoursToMinutes(form.weeklyTargetMinutes, 1, 4000),
+      flexLimitMinutes: clampHoursToMinutes(form.flexLimitMinutes, 0, 20000),
+      flexStartMinutes: form.flexStartMinutes === "" ? null : hoursToMinutes(form.flexStartMinutes),
+      vacationEntitlementMinutes: form.vacationEntitlementMinutes === "" ? null : hoursToMinutes(form.vacationEntitlementMinutes),
+      vacationUsedMinutes: clampHoursToMinutes(form.vacationUsedMinutes, 0, 20000)
     });
     setNotice("Einstellungen gespeichert.");
   }
@@ -254,12 +294,12 @@ function SettingsView({ data }: { data: WorkData }) {
         <div className="panel form-panel">
           <span className="section-label">Arbeitszeit</span>
           <div className="form-grid">
-            <Field label="Sollzeit pro Tag (Minuten)"><input type="number" value={form.dailyTargetMinutes} onChange={(event) => setForm({ ...form, dailyTargetMinutes: event.target.value })} /></Field>
-            <Field label="Wochenarbeitszeit (Minuten)"><input type="number" value={form.weeklyTargetMinutes} onChange={(event) => setForm({ ...form, weeklyTargetMinutes: event.target.value })} /></Field>
-            <Field label="Gleitzeitgrenze (Minuten)"><input type="number" value={form.flexLimitMinutes} onChange={(event) => setForm({ ...form, flexLimitMinutes: event.target.value })} /></Field>
-            <Field label="Gleitzeitstartwert (Minuten)"><input type="number" value={form.flexStartMinutes} onChange={(event) => setForm({ ...form, flexStartMinutes: event.target.value })} placeholder="leer" /></Field>
-            <Field label="Urlaubsanspruch (Minuten)"><input type="number" value={form.vacationEntitlementMinutes} onChange={(event) => setForm({ ...form, vacationEntitlementMinutes: event.target.value })} placeholder="leer" /></Field>
-            <Field label="Verbrauchter Urlaub (Minuten)"><input type="number" value={form.vacationUsedMinutes} onChange={(event) => setForm({ ...form, vacationUsedMinutes: event.target.value })} /></Field>
+            <Field label="Sollzeit pro Tag (Stunden)"><input type="number" step="0.25" value={form.dailyTargetMinutes} onChange={(event) => setForm({ ...form, dailyTargetMinutes: event.target.value })} /></Field>
+            <Field label="Wochenarbeitszeit (Stunden)"><input type="number" step="0.25" value={form.weeklyTargetMinutes} onChange={(event) => setForm({ ...form, weeklyTargetMinutes: event.target.value })} /></Field>
+            <Field label="Gleitzeitgrenze (Stunden)"><input type="number" step="0.25" value={form.flexLimitMinutes} onChange={(event) => setForm({ ...form, flexLimitMinutes: event.target.value })} /></Field>
+            <Field label="Gleitzeitstartwert (Stunden)"><input type="number" step="0.25" value={form.flexStartMinutes} onChange={(event) => setForm({ ...form, flexStartMinutes: event.target.value })} placeholder="leer" /></Field>
+            <Field label="Urlaubsanspruch (Stunden)"><input type="number" step="0.25" value={form.vacationEntitlementMinutes} onChange={(event) => setForm({ ...form, vacationEntitlementMinutes: event.target.value })} placeholder="leer" /></Field>
+            <Field label="Verbrauchter Urlaub (Stunden)"><input type="number" step="0.25" value={form.vacationUsedMinutes} onChange={(event) => setForm({ ...form, vacationUsedMinutes: event.target.value })} /></Field>
           </div>
           <button className="primary-button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
         </div>
@@ -392,11 +432,28 @@ function Header({ eyebrow, title, description }: { eyebrow: string; title: strin
   );
 }
 
-function Metric({ title, value, detail, icon, tone = "default" }: { title: string; value: string; detail: string; icon?: React.ReactNode; tone?: "default" | "warning" | "danger" }) {
+type MetricProgress = {
+  value: number;
+  overflow?: number;
+  tone?: "default" | "warning" | "vacation";
+};
+
+function Metric({ title, value, detail, icon, tone = "default", progress }: { title: string; value: string; detail: string; icon?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress }) {
+  const progressValue = progress ? clampProgress(progress.value) : 0;
+  const overflowValue = progress?.overflow ? clampProgress(progress.overflow) : 0;
+
   return (
     <article className={`metric metric-${tone}`}>
       <div className="metric-title">{icon}{title}</div>
       <strong>{value}</strong>
+      {progress ? (
+        <div className={`metric-progress metric-progress-${progress.tone ?? "default"}`} aria-label={`${title}: ${Math.round(progressValue * 100)} Prozent`}>
+          {overflowValue > 0 ? <span className="metric-progress-overflow" style={{ width: `${overflowValue * 100}%` }} /> : null}
+          <span className="metric-progress-track">
+            <span className="metric-progress-fill" style={{ width: `${progressValue * 100}%` }} />
+          </span>
+        </div>
+      ) : null}
       <p>{detail}</p>
     </article>
   );
@@ -484,12 +541,12 @@ function entryToForm(entry: TimeEntry | undefined, selectedDate: string, setting
 
 function settingsToForm(settings: Settings | null) {
   return {
-    dailyTargetMinutes: String(settings?.dailyTargetMinutes ?? 480),
-    weeklyTargetMinutes: String(settings?.weeklyTargetMinutes ?? 2400),
-    flexLimitMinutes: String(settings?.flexLimitMinutes ?? 6000),
-    flexStartMinutes: settings?.flexStartMinutes === null || settings?.flexStartMinutes === undefined ? "" : String(settings.flexStartMinutes),
-    vacationEntitlementMinutes: settings?.vacationEntitlementMinutes === null || settings?.vacationEntitlementMinutes === undefined ? "" : String(settings.vacationEntitlementMinutes),
-    vacationUsedMinutes: String(settings?.vacationUsedMinutes ?? 0)
+    dailyTargetMinutes: minutesToHourInput(settings?.dailyTargetMinutes ?? 480),
+    weeklyTargetMinutes: minutesToHourInput(settings?.weeklyTargetMinutes ?? 2400),
+    flexLimitMinutes: minutesToHourInput(settings?.flexLimitMinutes ?? 6000),
+    flexStartMinutes: settings?.flexStartMinutes === null || settings?.flexStartMinutes === undefined ? "" : minutesToHourInput(settings.flexStartMinutes),
+    vacationEntitlementMinutes: settings?.vacationEntitlementMinutes === null || settings?.vacationEntitlementMinutes === undefined ? "" : minutesToHourInput(settings.vacationEntitlementMinutes),
+    vacationUsedMinutes: minutesToHourInput(settings?.vacationUsedMinutes ?? 0)
   };
 }
 
@@ -497,6 +554,26 @@ function clampNumber(value: string, min: number, max: number): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return min;
   return Math.min(Math.max(Math.round(numeric), min), max);
+}
+
+function hoursToMinutes(value: string): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.round(numeric * 60);
+}
+
+function clampHoursToMinutes(value: string, minMinutes: number, maxMinutes: number): number {
+  return Math.min(Math.max(hoursToMinutes(value), minMinutes), maxMinutes);
+}
+
+function minutesToHourInput(minutes: number): string {
+  const hours = minutes / 60;
+  return Number.isInteger(hours) ? String(hours) : String(Number(hours.toFixed(2)));
+}
+
+function clampProgress(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(value, 0), 1);
 }
 
 function ringProgress(minutes: number, targetMinutes: number): number {
