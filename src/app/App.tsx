@@ -82,11 +82,12 @@ function Dashboard({ data }: { data: WorkData }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const entry = data.entriesByDate.get(selectedDate);
   const [form, setForm] = useState(() => entryToForm(entry, selectedDate, settings));
+  const [timeErrors, setTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
   const [message, setMessage] = useState<string | null>(null);
   const previewEntry = {
     date: selectedDate,
-    startTime: form.startTime || undefined,
-    endTime: form.endTime || undefined,
+    startTime: previewTime(form.startTime),
+    endTime: previewTime(form.endTime),
     breakMinutes: Number(form.breakMinutes) || 0,
     targetMinutes: Number(form.targetMinutes) || settings?.dailyTargetMinutes || 480
   };
@@ -99,19 +100,44 @@ function Dashboard({ data }: { data: WorkData }) {
 
   useEffect(() => {
     setForm(entryToForm(entry, selectedDate, settings));
+    setTimeErrors({});
   }, [entry, selectedDate, settings]);
 
-  async function save() {
+  async function autoSave(draft: ReturnType<typeof entryToForm>, createWhenEmpty = true) {
+    const startTime = timeForSave(draft.startTime, entry?.startTime);
+    const endTime = timeForSave(draft.endTime, entry?.endTime);
+    if (!entry && !createWhenEmpty && !startTime && !endTime) return;
     setMessage(null);
     await data.saveTimeEntry({
       date: selectedDate,
-      startTime: form.startTime || undefined,
-      endTime: form.endTime || undefined,
-      breakMinutes: clampNumber(form.breakMinutes, 0, 720),
-      targetMinutes: clampNumber(form.targetMinutes, 0, 900),
-      note: form.note
+      startTime,
+      endTime,
+      breakMinutes: clampNumber(draft.breakMinutes, 0, 720),
+      targetMinutes: clampNumber(draft.targetMinutes, 0, 900),
+      note: entry?.note ?? ""
     });
-    setMessage("Zeiteintrag gespeichert.");
+    setMessage("Zeiteintrag automatisch gespeichert.");
+  }
+
+  async function handleTimeBlur(field: "startTime" | "endTime", value: string) {
+    const normalized = normalizeTimeInput(value);
+    if (normalized === null) {
+      setTimeErrors((current) => ({ ...current, [field]: "Bitte als HH:MM eingeben, z.B. 07:30." }));
+      return;
+    }
+
+    const draft = { ...form, [field]: normalized };
+    setForm(draft);
+    setTimeErrors((current) => ({ ...current, [field]: undefined }));
+    await autoSave(draft, normalized !== "");
+  }
+
+  async function handleNumberBlur(field: "breakMinutes" | "targetMinutes", value: string) {
+    const max = field === "breakMinutes" ? 720 : 900;
+    const normalized = String(clampNumber(value, 0, max));
+    const draft = { ...form, [field]: normalized };
+    setForm(draft);
+    await autoSave(draft);
   }
 
   async function remove() {
@@ -133,7 +159,7 @@ function Dashboard({ data }: { data: WorkData }) {
         />
       ) : null}
       <div className="dashboard-workflow-grid">
-        <form className="panel form-panel day-entry-panel" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+        <form className="panel form-panel day-entry-panel" onSubmit={(event) => event.preventDefault()}>
           <div className="panel-heading">
             <span className="section-label">Tageserfassung</span>
             <strong>{formatDateKey(selectedDate)}</strong>
@@ -147,14 +173,32 @@ function Dashboard({ data }: { data: WorkData }) {
             <button type="button" className="secondary-button" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>Weiter</button>
           </div>
           <div className="form-grid">
-            <Field label="Dienstbeginn"><input type="time" value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} /></Field>
-            <Field label="Dienstende"><input type="time" value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} /></Field>
-            <Field label="Pause in Minuten"><input type="number" min="0" max="720" value={form.breakMinutes} onChange={(event) => setForm({ ...form, breakMinutes: event.target.value })} /></Field>
-            <Field label="Sollzeit in Minuten"><input type="number" min="0" max="900" value={form.targetMinutes} onChange={(event) => setForm({ ...form, targetMinutes: event.target.value })} /></Field>
+            <Field label="Dienstbeginn" error={timeErrors.startTime}>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="07:30"
+                value={form.startTime}
+                aria-invalid={Boolean(timeErrors.startTime)}
+                onChange={(event) => setForm({ ...form, startTime: event.target.value })}
+                onBlur={(event) => void handleTimeBlur("startTime", event.target.value)}
+              />
+            </Field>
+            <Field label="Dienstende" error={timeErrors.endTime}>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="15:30"
+                value={form.endTime}
+                aria-invalid={Boolean(timeErrors.endTime)}
+                onChange={(event) => setForm({ ...form, endTime: event.target.value })}
+                onBlur={(event) => void handleTimeBlur("endTime", event.target.value)}
+              />
+            </Field>
+            <Field label="Pause in Minuten"><input type="number" min="0" max="720" value={form.breakMinutes} onChange={(event) => setForm({ ...form, breakMinutes: event.target.value })} onBlur={(event) => void handleNumberBlur("breakMinutes", event.target.value)} /></Field>
+            <Field label="Sollzeit in Minuten"><input type="number" min="0" max="900" value={form.targetMinutes} onChange={(event) => setForm({ ...form, targetMinutes: event.target.value })} onBlur={(event) => void handleNumberBlur("targetMinutes", event.target.value)} /></Field>
           </div>
-          <Field label="Notiz"><textarea rows={4} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
           <div className="button-row">
-            <button className="primary-button" type="submit">Speichern</button>
             <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Loeschen</button>
           </div>
         </form>
@@ -379,8 +423,8 @@ function Notice({ title, text, action, tone = "success" }: { title: string; text
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="field"><span>{label}</span>{children}</label>;
+function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+  return <label className="field"><span>{label}</span>{children}{error ? <small className="field-error">{error}</small> : null}</label>;
 }
 
 function SkeletonRows() {
@@ -413,6 +457,32 @@ function clampNumber(value: string, min: number, max: number): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return min;
   return Math.min(Math.max(Math.round(numeric), min), max);
+}
+
+function normalizeTimeInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return "";
+
+  const colonMatch = /^(\d{1,2}):(\d{1,2})$/.exec(trimmed);
+  const compactMatch = /^(\d{3,4})$/.exec(trimmed);
+  if (!colonMatch && !compactMatch) return null;
+
+  const hours = colonMatch ? Number(colonMatch[1]) : Number(trimmed.slice(0, -2));
+  const minutes = colonMatch ? Number(colonMatch[2]) : Number(trimmed.slice(-2));
+  if (hours > 23 || minutes > 59) return null;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function previewTime(value: string): string | undefined {
+  const normalized = normalizeTimeInput(value);
+  return normalized === null || normalized === "" ? undefined : normalized;
+}
+
+function timeForSave(value: string, fallback?: string): string | undefined {
+  const normalized = normalizeTimeInput(value);
+  if (normalized === null) return fallback;
+  return normalized || undefined;
 }
 
 function statusLabel(status: ReturnType<typeof calculateDay>["status"]): string {

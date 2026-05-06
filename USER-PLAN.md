@@ -210,7 +210,7 @@ Ein Zeiteintrag enthaelt:
 - [ ] Dienstende
 - [ ] Pause in Minuten
 - [ ] Sollzeit in Minuten
-- [ ] Notiz
+- [ ] Notiz bleibt im Datenmodell fuer Backup- und Kompatibilitaet erhalten, wird aber im Tagesformular nicht angezeigt.
 - [ ] createdAt
 - [ ] updatedAt
 
@@ -218,9 +218,12 @@ Umsetzung:
 
 - [ ] Tagesformular prominent im Dashboard fuer ein waehlbares Datum bauen.
 - [ ] Standarddatum auf heute setzen.
-- [ ] Beginn, Ende, Pause, Sollzeit und Notiz manuell editierbar machen.
+- [ ] Beginn und Ende als reine Tastatur-Zeitfelder ohne nativen Uhr-Picker umsetzen.
+- [ ] Eingaben wie `7:30`, `07:30`, `730` und `0730` beim Verlassen des Felds zu `HH:MM` normalisieren.
+- [ ] Beginn, Ende, Pause und Sollzeit manuell editierbar machen; Notiz nicht mehr im Dashboard anzeigen.
 - [ ] Pro Datum vorhandenen Eintrag laden.
-- [ ] Speichern erstellt oder aktualisiert den Eintrag.
+- [ ] Aenderungen an Beginn, Ende, Pause und Sollzeit beim Verlassen des jeweiligen Felds automatisch speichern.
+- [ ] Kein manueller Speichern-Button im Tagesformular.
 - [ ] Loeschen fuer den aktuellen Tages-Eintrag anbieten.
 - [ ] Validierung fuer Uhrzeiten und Pausenwerte anzeigen.
 

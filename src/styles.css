@@ -313,6 +313,18 @@ button:disabled {
   transition: border-color 160ms ease, background 160ms ease;
 }
 
+.field input[aria-invalid="true"] {
+  border-color: var(--danger);
+  background: #fff6f4;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .date-row label {
   display: grid;
   flex: 1 1 180px;
