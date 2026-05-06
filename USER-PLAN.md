@@ -41,7 +41,7 @@ Es gibt keine serverseitige Speicherung, keine Cloud-Synchronisierung, keine ext
 
 - [ ] Hash-Routing einrichten.
 - [ ] Route `#/` fuer Dashboard anlegen.
-- [ ] Route `#/zeit` fuer Zeiterfassung anlegen.
+- [ ] Zeiterfassung als Hauptworkflow direkt im Dashboard bereitstellen, ohne eigene Route.
 - [ ] Route `#/reisekosten` als Roadmap-/Platzhalterbereich anlegen.
 - [ ] Route `#/aufgaben` als Roadmap-/Platzhalterbereich anlegen.
 - [ ] Route `#/einstellungen` fuer Einstellungen anlegen.
@@ -114,7 +114,6 @@ Regeln:
 - [ ] Mobile/kleine Viewports mit kompakter Navigation unterstuetzen.
 - [ ] Hauptbereiche in der Sidebar anzeigen:
   - [ ] Dashboard
-  - [ ] Zeiterfassung
   - [ ] Reisekosten
   - [ ] Aufgaben
   - [ ] Einstellungen
@@ -193,11 +192,11 @@ Diese Stores muessen nicht voll genutzt werden, duerfen aber im Backup-Format vo
 - [ ] Hinweis bei fehlendem Gleitzeitstartwert anzeigen.
 - [ ] Roadmap-Module Reisekosten und Aufgaben als nicht aktive Bereiche kennzeichnen.
 
-## 8. Zeiterfassung V1
+## 8. Dashboard-Zeiterfassung V1
 
 ### 8.1 Zweck
 
-Die Zeiterfassung ersetzt die bisherige Excel-Loesung fuer Arbeitszeiten, Gleitzeit, Plus-/Minusstunden und Urlaubsausblick.
+Die Zeiterfassung ersetzt die bisherige Excel-Loesung fuer Arbeitszeiten, Gleitzeit, Plus-/Minusstunden und Urlaubsausblick. In V1 ist sie kein eigener Navigationsbereich, sondern der dominante Arbeitsbereich im Dashboard.
 
 ### 8.2 Tageserfassung
 
@@ -217,7 +216,7 @@ Ein Zeiteintrag enthaelt:
 
 Umsetzung:
 
-- [ ] Tagesformular fuer ein waehlbares Datum bauen.
+- [ ] Tagesformular prominent im Dashboard fuer ein waehlbares Datum bauen.
 - [ ] Standarddatum auf heute setzen.
 - [ ] Beginn, Ende, Pause, Sollzeit und Notiz manuell editierbar machen.
 - [ ] Pro Datum vorhandenen Eintrag laden.
@@ -263,7 +262,7 @@ Aufgaben:
 
 ### 8.5 Live-Anzeige
 
-Die Tagesansicht zeigt live:
+Die Live-Auswertung neben dem Tagesformular zeigt:
 
 - [ ] Netto-Arbeitszeit heute.
 - [ ] Restzeit bis Soll.
@@ -415,7 +414,7 @@ Umsetzung:
 - [ ] Einstellungsbereich in sinnvolle Abschnitte teilen.
 - [ ] Speichern pro Abschnitt oder klarer globaler Speichermechanik festlegen.
 - [ ] Validierung fuer Minuten-/Stundenwerte anzeigen.
-- [ ] Aenderungen sofort in Dashboard und Zeiterfassung widerspiegeln.
+- [ ] Aenderungen sofort im Dashboard widerspiegeln.
 
 ## 12. Backup, Export und Import
 
@@ -703,11 +702,10 @@ Spaetere Erweiterungen:
 - [ ] Jahresverbrauchsberechnung implementieren.
 - [ ] Unit-Tests fuer alle Rechenregeln schreiben.
 
-### Phase 4 - Zeiterfassung
+### Phase 4 - Dashboard-Zeiterfassung
 
-- [ ] Tagesansicht bauen.
-- [ ] Tagesformular anbinden.
-- [ ] Live-Anzeige bauen.
+- [ ] Tagesformular als primaeren Dashboard-Bereich bauen.
+- [ ] Live-Anzeige neben dem Tagesformular bauen.
 - [ ] Speichern, Aktualisieren und Loeschen implementieren.
 - [ ] Wochenuebersicht bauen.
 - [ ] Wochennavigation einbauen.
@@ -718,7 +716,7 @@ Spaetere Erweiterungen:
 
 - [ ] Dashboard-Grundlayout bauen.
 - [ ] Setup-Hinweise anzeigen.
-- [ ] Heute-Kachel anbinden.
+- [ ] Tagesformular und Live-Auswertung als Hauptbereich anbinden.
 - [ ] Wochen-Kachel anbinden.
 - [ ] Gleitzeit-Kachel anbinden.
 - [ ] Urlaub-Kachel anbinden.
@@ -775,7 +773,7 @@ Spaetere Erweiterungen:
 - [ ] Offline-Verhalten pruefen.
 - [ ] Backup-Export und Import manuell pruefen.
 - [ ] Erststart manuell pruefen.
-- [ ] Zeiterfassung fuer Beispielwoche manuell pruefen.
+- [ ] Dashboard-Zeiterfassung fuer Beispielwoche manuell pruefen.
 - [ ] UI auf Desktop und kleinem Viewport pruefen.
 - [ ] Offene Punkte dokumentieren.
 
@@ -818,15 +816,15 @@ Spaetere Erweiterungen:
 - [x] Vite/React/TypeScript-Projekt erstellt.
 - [x] Basiskonfiguration fuer TypeScript, Vite, Vitest und PWA erstellt.
 - [x] GitHub-Pages-Base-Pfad `/arbeits-dashboard/` konfiguriert.
-- [x] Hash-Routing fuer Dashboard, Zeiterfassung, Reisekosten, Aufgaben und Einstellungen umgesetzt.
+- [x] Hash-Routing fuer Dashboard, Reisekosten, Aufgaben und Einstellungen umgesetzt.
 - [x] App-Shell mit Sidebar und Arbeitsflaeche umgesetzt.
 - [x] Helles, ruhiges Dashboard-UI mit responsiven CSS-Regeln umgesetzt.
 - [x] Dexie-Datenbank mit Stores fuer Einstellungen, Zeiteintraege, Gleitzeitkorrekturen, Urlaub und App-Metadaten umgesetzt.
 - [x] Standardwerte und Erststart-Setup-Hinweise umgesetzt.
 - [x] Pure Berechnungslogik fuer Tageszeit, Pause, Woche, Gleitzeit, Urlaub und Jahresverbrauch umgesetzt.
 - [x] Unit-Tests fuer zentrale Zeit-, Wochen-, Gleitzeit- und Urlaubsberechnungen geschrieben.
-- [x] Dashboard mit Heute-, Wochen-, Gleitzeit-, Urlaub- und Jahresverbrauchs-Kennzahlen umgesetzt.
-- [x] Manuelle Tages-Zeiterfassung mit Erstellen, Bearbeiten, Loeschen und Live-Vorschau umgesetzt.
+- [x] Dashboard mit Tagesformular, Live-Auswertung, Wochen-, Gleitzeit-, Urlaub- und Jahresverbrauchs-Kennzahlen umgesetzt.
+- [x] Manuelle Tages-Zeiterfassung im Dashboard mit Erstellen, Bearbeiten, Loeschen und Live-Vorschau umgesetzt.
 - [x] Wochenuebersicht mit Montag als Wochenstart umgesetzt.
 - [x] Einstellungen fuer Sollzeit, Wochenzeit, Gleitzeitgrenze, Startwert und Urlaub umgesetzt.
 - [x] Gleitzeitkorrekturen mit Liste, Speicherung und Entfernen umgesetzt.
@@ -844,7 +842,7 @@ Spaetere Erweiterungen:
 ### Noch manuell zu pruefen
 
 - [ ] App im Browser unter `http://127.0.0.1:5174/arbeits-dashboard/` visuell pruefen.
-- [ ] Zeiterfassung fuer eine Beispielwoche im Browser durchklicken.
+- [ ] Dashboard-Zeiterfassung fuer eine Beispielwoche im Browser durchklicken.
 - [ ] Backup-Export im Browser herunterladen und Import-Vorschau testen.
 - [ ] Lokale Datenloeschung mit Testdaten pruefen.
 - [ ] PWA-Installation und Offline-Start im Browser pruefen.

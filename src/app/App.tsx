@@ -3,7 +3,6 @@ import {
   Briefcase,
   CalendarCheck,
   ClipboardText,
-  Clock,
   Database,
   DownloadSimple,
   Gear,
@@ -30,7 +29,6 @@ import { useWorkData } from "./useWorkData";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: House },
-  { to: "/zeit", label: "Zeiterfassung", icon: Clock },
   { to: "/reisekosten", label: "Reisekosten", icon: Briefcase },
   { to: "/aufgaben", label: "Aufgaben", icon: ListChecks },
   { to: "/einstellungen", label: "Einstellungen", icon: Gear }
@@ -67,7 +65,6 @@ export function App() {
           {data.error ? <Notice tone="danger" title="Datenfehler" text={data.error} /> : null}
           <Routes>
             <Route path="/" element={<Dashboard data={data} />} />
-            <Route path="/zeit" element={<TimeView data={data} />} />
             <Route path="/reisekosten" element={<RoadmapView title="Reisekosten" icon={<Briefcase size={28} />} items={["Reisen erfassen", "Fahrtkostenarten", "Diaeten", "Nachweise", "Jahresuebersicht"]} />} />
             <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Faelligkeiten", "Prioritaeten", "Tags", "Filter und Suche"]} />} />
             <Route path="/einstellungen" element={<SettingsView data={data} />} />
@@ -82,59 +79,27 @@ type WorkData = ReturnType<typeof useWorkData>;
 
 function Dashboard({ data }: { data: WorkData }) {
   const settings = data.settings;
-  const today = todayKey(data.clock);
-  const todayEntry = data.entriesByDate.get(today);
-  const day = calculateDay(todayEntry, data.clock);
-  const week = calculateWeek(data.timeEntries, today, data.clock);
-  const flex = settings ? calculateFlexBalance(settings.flexStartMinutes ?? 0, data.timeEntries, data.flexCorrections) : 0;
-  const vacation = settings ? calculateVacation(settings.vacationEntitlementMinutes, settings.vacationUsedMinutes, settings.dailyTargetMinutes) : null;
-  const requiredConsumption = settings && vacation ? calculateRequiredYearConsumption(vacation.remainingMinutes, flex, settings.flexLimitMinutes) : 0;
-  const setupMissing = settings ? [settings.flexStartMinutes === null ? "Gleitzeitstartwert" : null, settings.vacationEntitlementMinutes === null ? "Urlaubsanspruch" : null].filter(Boolean) : [];
-
-  return (
-    <section className="page-stack">
-      <Header eyebrow="Heute" title="Arbeitsuebersicht" description="Zeit, Woche, Gleitzeit und Urlaub an einem Ort." />
-      {data.loading ? <SkeletonRows /> : null}
-      {setupMissing.length ? (
-        <Notice
-          tone="warning"
-          title="Einrichtung offen"
-          text={`${setupMissing.join(" und ")} fehlen noch. Die App bleibt nutzbar, rechnet aber mit neutralen Werten.`}
-          action={<Link to="/einstellungen">Einstellungen oeffnen</Link>}
-        />
-      ) : null}
-      <div className="dashboard-grid">
-        <Metric title="Heute gearbeitet" value={formatMinutes(day.netMinutes)} detail={day.targetEndTime ? `Soll erreicht um ${day.targetEndTime}` : "Dienstbeginn fehlt"} icon={<Clock size={22} />} />
-        <Metric title="Tagesstand" value={formatSignedMinutes(day.deltaMinutes)} detail={day.hasEnd ? "mit eingetragenem Dienstende" : "Live mit aktueller Uhrzeit"} tone={day.deltaMinutes < 0 ? "danger" : "default"} />
-        <Metric title="Woche" value={formatMinutes(week.workedMinutes)} detail={`${formatSignedMinutes(week.deltaMinutes)} zur Wochenbilanz`} />
-        <Metric title="Gleitzeit" value={formatSignedMinutes(flex)} detail={`Grenze ${settings ? formatDecimalHours(settings.flexLimitMinutes) : "100,0 h"}`} tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"} />
-        <Metric title="Resturlaub" value={vacation ? formatDays(vacation.remainingMinutes, settings?.dailyTargetMinutes) : "0,0 Tage"} detail={vacation ? formatMinutes(vacation.remainingMinutes) : "Noch nicht eingerichtet"} icon={<CalendarCheck size={22} />} />
-        <Metric title="Dieses Jahr verbrauchen" value={formatMinutes(requiredConsumption)} detail="Resturlaub plus Gleitzeit ueber Grenze" />
-      </div>
-      <WeekTable week={week} />
-    </section>
-  );
-}
-
-function TimeView({ data }: { data: WorkData }) {
-  const settings = data.settings;
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const entry = data.entriesByDate.get(selectedDate);
   const [form, setForm] = useState(() => entryToForm(entry, selectedDate, settings));
   const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    setForm(entryToForm(entry, selectedDate, settings));
-  }, [entry, selectedDate, settings]);
-
-  const preview = calculateDay({
+  const previewEntry = {
     date: selectedDate,
     startTime: form.startTime || undefined,
     endTime: form.endTime || undefined,
     breakMinutes: Number(form.breakMinutes) || 0,
     targetMinutes: Number(form.targetMinutes) || settings?.dailyTargetMinutes || 480
-  }, data.clock);
+  };
+  const day = calculateDay(previewEntry, data.clock);
   const week = calculateWeek(data.timeEntries, selectedDate, data.clock);
+  const flex = settings ? calculateFlexBalance(settings.flexStartMinutes ?? 0, data.timeEntries, data.flexCorrections) : 0;
+  const vacation = settings ? calculateVacation(settings.vacationEntitlementMinutes, settings.vacationUsedMinutes, settings.dailyTargetMinutes) : null;
+  const requiredConsumption = settings && vacation ? calculateRequiredYearConsumption(vacation.remainingMinutes, flex, settings.flexLimitMinutes) : 0;
+  const setupMissing = settings ? [settings.flexStartMinutes === null ? "Gleitzeitstartwert" : null, settings.vacationEntitlementMinutes === null ? "Urlaubsanspruch" : null].filter(Boolean) : [];
+
+  useEffect(() => {
+    setForm(entryToForm(entry, selectedDate, settings));
+  }, [entry, selectedDate, settings]);
 
   async function save() {
     setMessage(null);
@@ -156,10 +121,23 @@ function TimeView({ data }: { data: WorkData }) {
 
   return (
     <section className="page-stack">
-      <Header eyebrow="Zeiterfassung" title={formatDateKey(selectedDate)} description="Ein Eintrag pro Datum, manuell gepflegt und live berechnet." />
-      {message ? <Notice tone="success" title="Gespeichert" text={message} /> : null}
-      <div className="split-grid">
-        <form className="panel form-panel" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+      <Header eyebrow="Dashboard" title="Zeiterfassung" description="Tagesdaten manuell pflegen, Live-Stand pruefen und Woche, Gleitzeit sowie Urlaub im Blick behalten." />
+      {data.loading ? <SkeletonRows /> : null}
+      {message ? <Notice tone="success" title="Status" text={message} /> : null}
+      {setupMissing.length ? (
+        <Notice
+          tone="warning"
+          title="Einrichtung offen"
+          text={`${setupMissing.join(" und ")} fehlen noch. Die App bleibt nutzbar, rechnet aber mit neutralen Werten.`}
+          action={<Link to="/einstellungen">Einstellungen oeffnen</Link>}
+        />
+      ) : null}
+      <div className="dashboard-workflow-grid">
+        <form className="panel form-panel day-entry-panel" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+          <div className="panel-heading">
+            <span className="section-label">Tageserfassung</span>
+            <strong>{formatDateKey(selectedDate)}</strong>
+          </div>
           <div className="date-row">
             <button type="button" className="secondary-button" onClick={() => setSelectedDate(addDays(selectedDate, -1))}>Zurueck</button>
             <label>
@@ -180,16 +158,22 @@ function TimeView({ data }: { data: WorkData }) {
             <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Loeschen</button>
           </div>
         </form>
-        <aside className="panel live-panel">
-          <span className="section-label">Live</span>
-          <strong>{formatMinutes(preview.netMinutes)}</strong>
-          <p>{preview.hasStart ? `Soll-Ende ${preview.targetEndTime}, Tagesstand ${formatSignedMinutes(preview.deltaMinutes)}` : "Dienstbeginn fehlt."}</p>
+        <aside className="panel live-panel dashboard-live-panel">
+          <span className="section-label">Live-Auswertung</span>
+          <strong>{formatMinutes(day.netMinutes)}</strong>
+          <p>{day.hasStart ? `Soll-Ende ${day.targetEndTime}, Tagesstand ${formatSignedMinutes(day.deltaMinutes)}` : "Dienstbeginn fehlt."}</p>
           <dl className="detail-list">
-            <div><dt>Status</dt><dd>{statusLabel(preview.status)}</dd></div>
-            <div><dt>Verwendetes Ende</dt><dd>{preview.effectiveEndTime ?? "offen"}</dd></div>
+            <div><dt>Status</dt><dd>{statusLabel(day.status)}</dd></div>
+            <div><dt>Verwendetes Ende</dt><dd>{day.effectiveEndTime ?? "offen"}</dd></div>
             <div><dt>Inklusivpause</dt><dd>30 Minuten</dd></div>
           </dl>
         </aside>
+        <div className="dashboard-side-grid">
+          <Metric title="Woche" value={formatMinutes(week.workedMinutes)} detail={`${formatSignedMinutes(week.deltaMinutes)} zur Wochenbilanz`} />
+          <Metric title="Gleitzeit" value={formatSignedMinutes(flex)} detail={`Grenze ${settings ? formatDecimalHours(settings.flexLimitMinutes) : "100,0 h"}`} tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"} />
+          <Metric title="Resturlaub" value={vacation ? formatDays(vacation.remainingMinutes, settings?.dailyTargetMinutes) : "0,0 Tage"} detail={vacation ? formatMinutes(vacation.remainingMinutes) : "Noch nicht eingerichtet"} icon={<CalendarCheck size={22} />} />
+          <Metric title="Dieses Jahr verbrauchen" value={formatMinutes(requiredConsumption)} detail="Resturlaub plus Gleitzeit ueber Grenze" />
+        </div>
       </div>
       <WeekTable week={week} />
     </section>

@@ -170,10 +170,25 @@ button:disabled {
   line-height: 1.55;
 }
 
-.dashboard-grid {
+.dashboard-workflow-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.75fr) minmax(0, 0.8fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.dashboard-side-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.day-entry-panel {
+  min-height: 100%;
+}
+
+.dashboard-live-panel {
+  min-height: 100%;
 }
 
 .metric,
@@ -186,11 +201,11 @@ button:disabled {
 }
 
 .metric {
-  min-height: 150px;
-  padding: 20px;
+  min-height: 132px;
+  padding: 18px;
   display: grid;
   align-content: space-between;
-  gap: 14px;
+  gap: 10px;
 }
 
 .metric-title {
@@ -203,7 +218,7 @@ button:disabled {
 
 .metric strong {
   font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
-  font-size: clamp(1.75rem, 3vw, 2.6rem);
+  font-size: clamp(1.45rem, 2.4vw, 2.15rem);
   letter-spacing: 0;
 }
 
@@ -298,6 +313,15 @@ button:disabled {
   transition: border-color 160ms ease, background 160ms ease;
 }
 
+.date-row label {
+  display: grid;
+  flex: 1 1 180px;
+  gap: 7px;
+  color: #303b4b;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .field input:focus,
 .field textarea:focus,
 .date-row input:focus {
@@ -312,7 +336,7 @@ button:disabled {
 
 .live-panel strong {
   font-family: "Geist Mono", ui-monospace, monospace;
-  font-size: 3rem;
+  font-size: clamp(2.4rem, 4vw, 3.6rem);
 }
 
 .detail-list {
@@ -473,7 +497,7 @@ button:disabled {
     padding: 20px;
   }
 
-  .dashboard-grid,
+  .dashboard-workflow-grid,
   .split-grid,
   .settings-grid,
   .form-grid {
