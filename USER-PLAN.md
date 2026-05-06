@@ -810,3 +810,43 @@ Spaetere Erweiterungen:
 - [ ] Optionalen Start/Stop-Modus fuer Zeiterfassung pruefen.
 - [ ] Konkrete Urlaubstage oder Abwesenheitskalender pruefen.
 - [ ] Komfortfunktionen fuer Google Maps und OEBB pruefen.
+
+## 23. Bearbeitungsstand 2026-05-06
+
+### Erledigt
+
+- [x] Vite/React/TypeScript-Projekt erstellt.
+- [x] Basiskonfiguration fuer TypeScript, Vite, Vitest und PWA erstellt.
+- [x] GitHub-Pages-Base-Pfad `/arbeits-dashboard/` konfiguriert.
+- [x] Hash-Routing fuer Dashboard, Zeiterfassung, Reisekosten, Aufgaben und Einstellungen umgesetzt.
+- [x] App-Shell mit Sidebar und Arbeitsflaeche umgesetzt.
+- [x] Helles, ruhiges Dashboard-UI mit responsiven CSS-Regeln umgesetzt.
+- [x] Dexie-Datenbank mit Stores fuer Einstellungen, Zeiteintraege, Gleitzeitkorrekturen, Urlaub und App-Metadaten umgesetzt.
+- [x] Standardwerte und Erststart-Setup-Hinweise umgesetzt.
+- [x] Pure Berechnungslogik fuer Tageszeit, Pause, Woche, Gleitzeit, Urlaub und Jahresverbrauch umgesetzt.
+- [x] Unit-Tests fuer zentrale Zeit-, Wochen-, Gleitzeit- und Urlaubsberechnungen geschrieben.
+- [x] Dashboard mit Heute-, Wochen-, Gleitzeit-, Urlaub- und Jahresverbrauchs-Kennzahlen umgesetzt.
+- [x] Manuelle Tages-Zeiterfassung mit Erstellen, Bearbeiten, Loeschen und Live-Vorschau umgesetzt.
+- [x] Wochenuebersicht mit Montag als Wochenstart umgesetzt.
+- [x] Einstellungen fuer Sollzeit, Wochenzeit, Gleitzeitgrenze, Startwert und Urlaub umgesetzt.
+- [x] Gleitzeitkorrekturen mit Liste, Speicherung und Entfernen umgesetzt.
+- [x] Backup-Export als ZIP mit `manifest.json` und `data.json` umgesetzt.
+- [x] Strikter Backup-Import mit Vorschau und vollstaendigem Ersetzen umgesetzt.
+- [x] Cache-/Service-Worker-Reset ohne IndexedDB-Loeschung umgesetzt.
+- [x] Separate lokale Datenloeschung mit Warnung umgesetzt.
+- [x] PWA-Manifest, App-Icons und Service-Worker-Generierung umgesetzt.
+- [x] GitHub-Actions-Deployment fuer GitHub Pages erstellt.
+- [x] Roadmap-Platzhalter fuer Reisekosten und Aufgaben umgesetzt.
+- [x] `npm test` erfolgreich ausgefuehrt.
+- [x] `npm run build` erfolgreich ausgefuehrt.
+- [x] Lokaler Vite-Server auf Port 5174 gestartet.
+
+### Noch manuell zu pruefen
+
+- [ ] App im Browser unter `http://127.0.0.1:5174/arbeits-dashboard/` visuell pruefen.
+- [ ] Zeiterfassung fuer eine Beispielwoche im Browser durchklicken.
+- [ ] Backup-Export im Browser herunterladen und Import-Vorschau testen.
+- [ ] Lokale Datenloeschung mit Testdaten pruefen.
+- [ ] PWA-Installation und Offline-Start im Browser pruefen.
+- [ ] Update-Hinweis mit spaeterer Version pruefen.
+- [ ] GitHub-Pages-Workflow nach erstem Push in GitHub pruefen.
