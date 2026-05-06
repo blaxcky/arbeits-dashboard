@@ -116,7 +116,6 @@ function Dashboard({ data }: { data: WorkData }) {
       targetMinutes: clampNumber(draft.targetMinutes, 0, 900),
       note: entry?.note ?? ""
     });
-    setMessage("Zeiteintrag automatisch gespeichert.");
   }
 
   async function handleTimeBlur(field: "startTime" | "endTime", value: string) {
