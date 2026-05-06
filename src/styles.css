@@ -297,16 +297,23 @@ button:disabled {
 }
 
 .break-field {
+  align-self: end;
   justify-self: start;
   width: auto;
-  font-size: 0.84rem;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .break-field input {
-  width: 88px;
-  min-height: 38px;
-  padding: 7px 9px;
-  font-size: 0.92rem;
+  width: 64px;
+  min-height: 30px;
+  border-color: #e4e8ef;
+  background: #f8fafb;
+  padding: 5px 7px;
+  color: #435064;
+  font-size: 0.82rem;
 }
 
 .field {
