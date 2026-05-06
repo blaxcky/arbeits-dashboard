@@ -58,15 +58,15 @@ export function App() {
           </nav>
           <div className="privacy-note">
             <Database size={18} />
-            <span>Arbeitsdaten bleiben in IndexedDB auf diesem Geraet.</span>
+            <span>Arbeitsdaten bleiben in IndexedDB auf diesem Gerät.</span>
           </div>
         </aside>
         <main className="workspace">
           {data.error ? <Notice tone="danger" title="Datenfehler" text={data.error} /> : null}
           <Routes>
             <Route path="/" element={<Dashboard data={data} />} />
-            <Route path="/reisekosten" element={<RoadmapView title="Reisekosten" icon={<Briefcase size={28} />} items={["Reisen erfassen", "Fahrtkostenarten", "Diaeten", "Nachweise", "Jahresuebersicht"]} />} />
-            <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Faelligkeiten", "Prioritaeten", "Tags", "Filter und Suche"]} />} />
+            <Route path="/reisekosten" element={<RoadmapView title="Reisekosten" icon={<Briefcase size={28} />} items={["Reisen erfassen", "Fahrtkostenarten", "Diäten", "Nachweise", "Jahresübersicht"]} />} />
+            <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Fälligkeiten", "Prioritäten", "Tags", "Filter und Suche"]} />} />
             <Route path="/einstellungen" element={<SettingsView data={data} />} />
           </Routes>
         </main>
@@ -142,12 +142,12 @@ function Dashboard({ data }: { data: WorkData }) {
 
   async function remove() {
     await data.removeTimeEntry(selectedDate);
-    setMessage("Zeiteintrag geloescht.");
+    setMessage("Zeiteintrag gelöscht.");
   }
 
   return (
     <section className="page-stack">
-      <Header eyebrow="Dashboard" title="Zeiterfassung" description="Tagesdaten manuell pflegen, Live-Stand pruefen und Woche, Gleitzeit sowie Urlaub im Blick behalten." />
+      <Header eyebrow="Dashboard" title="Zeiterfassung" description="Tagesdaten manuell pflegen, Live-Stand prüfen und Woche, Gleitzeit sowie Urlaub im Blick behalten." />
       {data.loading ? <SkeletonRows /> : null}
       {message ? <Notice tone="success" title="Status" text={message} /> : null}
       {setupMissing.length ? (
@@ -155,7 +155,7 @@ function Dashboard({ data }: { data: WorkData }) {
           tone="warning"
           title="Einrichtung offen"
           text={`${setupMissing.join(" und ")} fehlen noch. Die App bleibt nutzbar, rechnet aber mit neutralen Werten.`}
-          action={<Link to="/einstellungen">Einstellungen oeffnen</Link>}
+          action={<Link to="/einstellungen">Einstellungen öffnen</Link>}
         />
       ) : null}
       <div className="dashboard-workflow-grid">
@@ -165,7 +165,7 @@ function Dashboard({ data }: { data: WorkData }) {
             <strong>{formatDateKey(selectedDate)}</strong>
           </div>
           <div className="date-row">
-            <button type="button" className="secondary-button" onClick={() => setSelectedDate(addDays(selectedDate, -1))}>Zurueck</button>
+            <button type="button" className="secondary-button" onClick={() => setSelectedDate(addDays(selectedDate, -1))}>Zurück</button>
             <label>
               Datum
               <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
@@ -199,7 +199,7 @@ function Dashboard({ data }: { data: WorkData }) {
             <Field label="Sollzeit in Minuten"><input type="number" min="0" max="900" value={form.targetMinutes} onChange={(event) => setForm({ ...form, targetMinutes: event.target.value })} onBlur={(event) => void handleNumberBlur("targetMinutes", event.target.value)} /></Field>
           </div>
           <div className="button-row">
-            <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Loeschen</button>
+            <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Löschen</button>
           </div>
         </form>
         <aside className="panel live-panel dashboard-live-panel">
@@ -216,7 +216,7 @@ function Dashboard({ data }: { data: WorkData }) {
           <Metric title="Woche" value={formatMinutes(week.workedMinutes)} detail={`${formatSignedMinutes(week.deltaMinutes)} zur Wochenbilanz`} />
           <Metric title="Gleitzeit" value={formatSignedMinutes(flex)} detail={`Grenze ${settings ? formatDecimalHours(settings.flexLimitMinutes) : "100,0 h"}`} tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"} />
           <Metric title="Resturlaub" value={vacation ? formatDays(vacation.remainingMinutes, settings?.dailyTargetMinutes) : "0,0 Tage"} detail={vacation ? formatMinutes(vacation.remainingMinutes) : "Noch nicht eingerichtet"} icon={<CalendarCheck size={22} />} />
-          <Metric title="Dieses Jahr verbrauchen" value={formatMinutes(requiredConsumption)} detail="Resturlaub plus Gleitzeit ueber Grenze" />
+          <Metric title="Dieses Jahr verbrauchen" value={formatMinutes(requiredConsumption)} detail="Resturlaub plus Gleitzeit über Grenze" />
         </div>
       </div>
       <WeekTable week={week} />
@@ -251,7 +251,7 @@ function SettingsView({ data }: { data: WorkData }) {
 
   async function handleImport(file: File, replace: boolean) {
     const payload = replace ? await importBackup(file) : await inspectBackup(file);
-    setImportPreview(`Backup vom ${new Date(payload.manifest.exportedAt).toLocaleString("de-AT")} mit ${payload.data.timeEntries.length} Zeiteintraegen und ${payload.data.flexCorrections.length} Korrekturen.`);
+    setImportPreview(`Backup vom ${new Date(payload.manifest.exportedAt).toLocaleString("de-AT")} mit ${payload.data.timeEntries.length} Zeiteinträgen und ${payload.data.flexCorrections.length} Korrekturen.`);
     if (replace) {
       await data.refresh();
       setNotice("Backup importiert und lokale Daten ersetzt.");
@@ -260,7 +260,7 @@ function SettingsView({ data }: { data: WorkData }) {
 
   return (
     <section className="page-stack">
-      <Header eyebrow="Einstellungen" title="Lokale Steuerzentrale" description="Arbeitszeit, Urlaub, Backup, PWA-Cache und Datenloeschung." />
+      <Header eyebrow="Einstellungen" title="Lokale Steuerzentrale" description="Arbeitszeit, Urlaub, Backup, PWA-Cache und Datenlöschung." />
       {notice ? <Notice tone="success" title="Status" text={notice} /> : null}
       <div className="settings-grid">
         <div className="panel form-panel">
@@ -294,7 +294,7 @@ function BackupPanel({ importRef, importPreview, onPreview, onReplace, onDone, r
           <DownloadSimple size={18} /> Exportieren
         </button>
         <button className="secondary-button" onClick={() => importRef.current?.click()}>
-          <UploadSimple size={18} /> Datei waehlen
+          <UploadSimple size={18} /> Datei wählen
         </button>
       </div>
       <input
@@ -332,7 +332,7 @@ function CorrectionsPanel({ data }: { data: WorkData }) {
           <div key={correction.id} className="correction-row">
             <span>{formatDateKey(correction.date)}</span>
             <strong>{formatSignedMinutes(correction.diffMinutes)}</strong>
-            <button className="icon-button" title="Korrektur loeschen" onClick={() => void data.removeCorrection(correction.id)}>Entfernen</button>
+            <button className="icon-button" title="Korrektur löschen" onClick={() => void data.removeCorrection(correction.id)}>Entfernen</button>
           </div>
         ))}
       </div>
@@ -344,12 +344,12 @@ function DangerPanel({ data, onDone }: { data: WorkData; onDone: (message: strin
   return (
     <div className="panel danger-panel">
       <span className="section-label">Reset</span>
-      <p className="muted">Cache und Service Worker koennen ohne Datenverlust entfernt werden. Die lokale Datenloeschung ist separat.</p>
+      <p className="muted">Cache und Service Worker können ohne Datenverlust entfernt werden. Die lokale Datenlöschung ist separat.</p>
       <div className="button-row">
-        <button className="secondary-button" onClick={async () => { await resetServiceWorkerAndCaches(); onDone("Cache und Service Worker wurden zurueckgesetzt."); window.location.reload(); }}>
-          <ArrowClockwise size={18} /> Cache zuruecksetzen
+        <button className="secondary-button" onClick={async () => { await resetServiceWorkerAndCaches(); onDone("Cache und Service Worker wurden zurückgesetzt."); window.location.reload(); }}>
+          <ArrowClockwise size={18} /> Cache zurücksetzen
         </button>
-        <button className="danger-button" onClick={async () => { if (window.confirm("Vorher Backup exportieren. Wirklich alle lokalen Arbeitsdaten loeschen?")) { await data.wipeData(); onDone("Lokale Daten geloescht."); } }}>Lokale Daten loeschen</button>
+        <button className="danger-button" onClick={async () => { if (window.confirm("Vorher Backup exportieren. Wirklich alle lokalen Arbeitsdaten löschen?")) { await data.wipeData(); onDone("Lokale Daten gelöscht."); } }}>Lokale Daten löschen</button>
       </div>
     </div>
   );

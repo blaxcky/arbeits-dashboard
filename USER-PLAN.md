@@ -2,27 +2,27 @@
 
 ## 1. Zielbild
 
-Das Work-Dashboard wird eine lokale, offlinefaehige und installierbare PWA fuer die Arbeit. Die App laeuft hauptsaechlich im Browser am Laptop oder PC und dient als zentrale Arbeitsuebersicht fuer Zeiterfassung, Gleitzeit, Urlaub, spaeter Reisekosten und Aufgaben.
+Das Work-Dashboard wird eine lokale, offlinefähige und installierbare PWA für die Arbeit. Die App läuft hauptsächlich im Browser am Laptop oder PC und dient als zentrale Arbeitsübersicht für Zeiterfassung, Gleitzeit, Urlaub, später Reisekosten und Aufgaben.
 
 Der wichtigste Grundsatz ist Datenschutz:
 
-> Arbeitsdaten duerfen das Arbeitsgeraet nicht verlassen.
+> Arbeitsdaten dürfen das Arbeitsgerät nicht verlassen.
 
 Es gibt keine serverseitige Speicherung, keine Cloud-Synchronisierung, keine externe Datenbank, keine Analytics und keine extern geladenen Kern-Assets. Alle fachlichen Daten werden lokal im Browser gespeichert.
 
 ## 2. Verbindliche V1-Entscheidungen
 
 - [ ] Greenfield-App mit Vite, React und TypeScript aufbauen.
-- [ ] PWA installierbar und offlinefaehig machen.
-- [ ] Fachliche Daten in IndexedDB ueber Dexie.js speichern.
+- [ ] PWA installierbar und offlinefähig machen.
+- [ ] Fachliche Daten in IndexedDB über Dexie.js speichern.
 - [ ] Hash-Routing verwenden, damit GitHub Pages und Offline-Nutzung robust funktionieren.
 - [ ] Vite-Base-Pfad auf `/arbeits-dashboard/` setzen.
 - [ ] GitHub Pages Deployment per GitHub Actions vorbereiten.
-- [ ] App beim Erststart direkt im Dashboard oeffnen.
+- [ ] App beim Erststart direkt im Dashboard öffnen.
 - [ ] Dashboard in V1 auf Zeiterfassung, Woche, Gleitzeit, Urlaub und Setup-Hinweise fokussieren.
-- [ ] Zeiterfassung in V1 primaer manuell bedienen.
-- [ ] Urlaub in V1 als Summenwerte in Stunden fuehren, nicht als Urlaubstags-Kalender.
-- [ ] Backup-Import in V1 strikt validieren und nur nach Vorschau vollstaendig ersetzen.
+- [ ] Zeiterfassung in V1 primär manuell bedienen.
+- [ ] Urlaub in V1 als Summenwerte in Stunden führen, nicht als Urlaubstags-Kalender.
+- [ ] Backup-Import in V1 strikt validieren und nur nach Vorschau vollständig ersetzen.
 - [ ] Reisekosten, Nachweise und Todo in V1 nur architektonisch vorbereiten und als Roadmap dokumentieren.
 
 ## 3. Technische Basis
@@ -32,20 +32,20 @@ Es gibt keine serverseitige Speicherung, keine Cloud-Synchronisierung, keine ext
 - [ ] Vite als Build-Tool einrichten.
 - [ ] React als UI-Framework einrichten.
 - [ ] TypeScript strikt genug konfigurieren, damit Fachlogik und Datenmodelle sauber typisiert sind.
-- [ ] Dexie.js fuer IndexedDB einrichten.
-- [ ] ZIP-Unterstuetzung fuer Backup-Export und Import einplanen.
-- [ ] Test-Setup fuer Unit-Tests einrichten.
-- [ ] PWA-Plugin oder eigene Service-Worker-Integration auswaehlen und konfigurieren.
+- [ ] Dexie.js für IndexedDB einrichten.
+- [ ] ZIP-Unterstützung für Backup-Export und Import einplanen.
+- [ ] Test-Setup für Unit-Tests einrichten.
+- [ ] PWA-Plugin oder eigene Service-Worker-Integration auswählen und konfigurieren.
 
 ### 3.2 Routing
 
 - [ ] Hash-Routing einrichten.
-- [ ] Route `#/` fuer Dashboard anlegen.
+- [ ] Route `#/` für Dashboard anlegen.
 - [ ] Zeiterfassung als Hauptworkflow direkt im Dashboard bereitstellen, ohne eigene Route.
 - [ ] Route `#/reisekosten` als Roadmap-/Platzhalterbereich anlegen.
 - [ ] Route `#/aufgaben` als Roadmap-/Platzhalterbereich anlegen.
-- [ ] Route `#/einstellungen` fuer Einstellungen anlegen.
-- [ ] Unbekannte Routen auf Dashboard oder eine einfache Fehleransicht fuehren.
+- [ ] Route `#/einstellungen` für Einstellungen anlegen.
+- [ ] Unbekannte Routen auf Dashboard oder eine einfache Fehleransicht führen.
 
 ### 3.3 Projektstruktur
 
@@ -86,32 +86,32 @@ Aufgaben:
 ### 4.1 Kernregeln
 
 - [ ] Keine Arbeitsdaten an externe Dienste senden.
-- [ ] Keine fachlichen Daten ausserhalb des Browsers speichern.
-- [ ] Keine externen Skripte oder Assets fuer den Kernbetrieb laden.
+- [ ] Keine fachlichen Daten außerhalb des Browsers speichern.
+- [ ] Keine externen Skripte oder Assets für den Kernbetrieb laden.
 - [ ] Keine API-Keys im Quellcode ablegen.
-- [ ] LocalStorage nur fuer einfache UI-Zustaende oder nicht-kritische Praeferenzen verwenden.
-- [ ] Arbeitsdaten, Zeitdaten, Reiseeintraege, Backups, Nachweise und spaetere Dateien in IndexedDB speichern.
+- [ ] LocalStorage nur für einfache UI-Zustände oder nicht-kritische Präferenzen verwenden.
+- [ ] Arbeitsdaten, Zeitdaten, Reiseeinträge, Backups, Nachweise und spätere Dateien in IndexedDB speichern.
 
-### 4.2 Erlaubte spaetere Komfortaktionen
+### 4.2 Erlaubte spätere Komfortaktionen
 
-Diese Aktionen sind nur bewusst durch Nutzer ausgeloest erlaubt:
+Diese Aktionen sind nur bewusst durch Nutzer ausgelöst erlaubt:
 
-- [ ] Google-Maps-Link oeffnen.
+- [ ] Google-Maps-Link öffnen.
 - [ ] Google-Maps-API manuell abfragen.
-- [ ] OEBB-Link oder OEBB-Komfortfunktion oeffnen.
+- [ ] ÖBB-Link oder ÖBB-Komfortfunktion öffnen.
 
 Regeln:
 
-- [ ] Google-Maps-API-Key ausschliesslich lokal speichern.
-- [ ] OEBB-Komfortfunktion nicht fuer automatische Berechnungen verwenden.
-- [ ] Keine automatische Datenrueckgabe aus OEBB erwarten.
+- [ ] Google-Maps-API-Key ausschließlich lokal speichern.
+- [ ] ÖBB-Komfortfunktion nicht für automatische Berechnungen verwenden.
+- [ ] Keine automatische Datenrückgabe aus ÖBB erwarten.
 
 ## 5. UI und App-Struktur
 
 ### 5.1 Layout
 
-- [ ] Desktop-orientierte App-Shell mit linker Sidebar und rechter Arbeitsflaeche bauen.
-- [ ] Mobile/kleine Viewports mit kompakter Navigation unterstuetzen.
+- [ ] Desktop-orientierte App-Shell mit linker Sidebar und rechter Arbeitsfläche bauen.
+- [ ] Mobile/kleine Viewports mit kompakter Navigation unterstützen.
 - [ ] Hauptbereiche in der Sidebar anzeigen:
   - [ ] Dashboard
   - [ ] Reisekosten
@@ -122,13 +122,13 @@ Regeln:
 
 ### 5.2 Visuelle Richtung
 
-- [ ] Ruhige, helle Arbeitsoberflaeche umsetzen.
+- [ ] Ruhige, helle Arbeitsoberfläche umsetzen.
 - [ ] Hohe Lesbarkeit und klare Kontraste sicherstellen.
 - [ ] Dezente Akzentfarbe verwenden.
-- [ ] Keine grellen Verlaeufe oder dekorativen Effekte einsetzen.
-- [ ] Datenorientierte, kompakte Darstellung fuer wiederholte Arbeit verwenden.
-- [ ] Formulare mit klaren Labels, Hilfetexten und Fehlerzustaenden bauen.
-- [ ] Leere Zustaende, Ladezustaende und Warnungen explizit gestalten.
+- [ ] Keine grellen Verläufe oder dekorativen Effekte einsetzen.
+- [ ] Datenorientierte, kompakte Darstellung für wiederholte Arbeit verwenden.
+- [ ] Formulare mit klaren Labels, Hilfetexten und Fehlerzuständen bauen.
+- [ ] Leere Zustände, Ladezustände und Warnungen explizit gestalten.
 
 ## 6. Lokale Datenbank
 
@@ -142,19 +142,19 @@ Regeln:
 
 ### 6.2 Dexie-Stores V1
 
-- [ ] Store `settings` fuer allgemeine Einstellungen anlegen.
-- [ ] Store `timeEntries` fuer Zeiteintraege anlegen.
-- [ ] Store `flexCorrections` fuer Gleitzeitkorrekturen anlegen.
-- [ ] Store `vacationSummary` fuer Urlaubs-Summenwerte anlegen.
-- [ ] Store `appMeta` fuer Schema-Version, Setup-Status und interne Metadaten anlegen.
+- [ ] Store `settings` für allgemeine Einstellungen anlegen.
+- [ ] Store `timeEntries` für Zeiteinträge anlegen.
+- [ ] Store `flexCorrections` für Gleitzeitkorrekturen anlegen.
+- [ ] Store `vacationSummary` für Urlaubs-Summenwerte anlegen.
+- [ ] Store `appMeta` für Schema-Version, Setup-Status und interne Metadaten anlegen.
 
-### 6.3 Vorbereitete spaetere Stores
+### 6.3 Vorbereitete spätere Stores
 
-Diese Stores muessen nicht voll genutzt werden, duerfen aber im Backup-Format vorbereitet werden:
+Diese Stores müssen nicht voll genutzt werden, dürfen aber im Backup-Format vorbereitet werden:
 
-- [ ] `trips` fuer Reisekosten.
-- [ ] `todos` fuer Aufgaben.
-- [ ] `files` fuer Nachweise und Dateien.
+- [ ] `trips` für Reisekosten.
+- [ ] `todos` für Aufgaben.
+- [ ] `files` für Nachweise und Dateien.
 
 ### 6.4 Migrationsregeln
 
@@ -167,7 +167,7 @@ Diese Stores muessen nicht voll genutzt werden, duerfen aber im Backup-Format vo
 
 ### 7.1 Erststart-Verhalten
 
-- [ ] App beim ersten Start direkt im Dashboard oeffnen.
+- [ ] App beim ersten Start direkt im Dashboard öffnen.
 - [ ] Fehlende Sollzeit, Gleitzeitstartwerte oder Urlaubswerte als Setup-Hinweise anzeigen.
 - [ ] Setup-Hinweise auf passende Einstellungen verlinken.
 - [ ] Dashboard trotzdem nutzbar lassen, auch wenn noch nicht alles eingerichtet ist.
@@ -180,14 +180,14 @@ Diese Stores muessen nicht voll genutzt werden, duerfen aber im Backup-Format vo
 - [ ] Aktuelles Tages-Plus oder Tages-Minus anzeigen.
 - [ ] Wochensumme anzeigen.
 - [ ] Gleitzeitstand anzeigen.
-- [ ] Warnung bei Ueberschreiten der Gleitzeitgrenze anzeigen.
+- [ ] Warnung bei Überschreiten der Gleitzeitgrenze anzeigen.
 - [ ] Offenen Urlaub in Stunden und Tagen anzeigen.
 - [ ] Summe anzeigen, die im aktuellen Jahr noch verbraucht werden muss.
 
-### 7.3 Dashboard-Zustaende
+### 7.3 Dashboard-Zustände
 
 - [ ] Hinweis bei fehlendem Dienstbeginn anzeigen.
-- [ ] Hinweis bei unvollstaendigem Arbeitstag anzeigen.
+- [ ] Hinweis bei unvollständigem Arbeitstag anzeigen.
 - [ ] Hinweis bei fehlender Urlaubseinrichtung anzeigen.
 - [ ] Hinweis bei fehlendem Gleitzeitstartwert anzeigen.
 - [ ] Roadmap-Module Reisekosten und Aufgaben als nicht aktive Bereiche kennzeichnen.
@@ -196,13 +196,13 @@ Diese Stores muessen nicht voll genutzt werden, duerfen aber im Backup-Format vo
 
 ### 8.1 Zweck
 
-Die Zeiterfassung ersetzt die bisherige Excel-Loesung fuer Arbeitszeiten, Gleitzeit, Plus-/Minusstunden und Urlaubsausblick. In V1 ist sie kein eigener Navigationsbereich, sondern der dominante Arbeitsbereich im Dashboard.
+Die Zeiterfassung ersetzt die bisherige Excel-Lösung für Arbeitszeiten, Gleitzeit, Plus-/Minusstunden und Urlaubsausblick. In V1 ist sie kein eigener Navigationsbereich, sondern der dominante Arbeitsbereich im Dashboard.
 
 ### 8.2 Tageserfassung
 
-V1 unterstuetzt einen Zeiteintrag pro Datum.
+V1 unterstützt einen Zeiteintrag pro Datum.
 
-Ein Zeiteintrag enthaelt:
+Ein Zeiteintrag enthält:
 
 - [ ] ID
 - [ ] Datum
@@ -210,22 +210,22 @@ Ein Zeiteintrag enthaelt:
 - [ ] Dienstende
 - [ ] Pause in Minuten
 - [ ] Sollzeit in Minuten
-- [ ] Notiz bleibt im Datenmodell fuer Backup- und Kompatibilitaet erhalten, wird aber im Tagesformular nicht angezeigt.
+- [ ] Notiz bleibt im Datenmodell für Backup- und Kompatibilität erhalten, wird aber im Tagesformular nicht angezeigt.
 - [ ] createdAt
 - [ ] updatedAt
 
 Umsetzung:
 
-- [ ] Tagesformular prominent im Dashboard fuer ein waehlbares Datum bauen.
+- [ ] Tagesformular prominent im Dashboard für ein wählbares Datum bauen.
 - [ ] Standarddatum auf heute setzen.
 - [ ] Beginn und Ende als reine Tastatur-Zeitfelder ohne nativen Uhr-Picker umsetzen.
 - [ ] Eingaben wie `7:30`, `07:30`, `730` und `0730` beim Verlassen des Felds zu `HH:MM` normalisieren.
 - [ ] Beginn, Ende, Pause und Sollzeit manuell editierbar machen; Notiz nicht mehr im Dashboard anzeigen.
 - [ ] Pro Datum vorhandenen Eintrag laden.
-- [ ] Aenderungen an Beginn, Ende, Pause und Sollzeit beim Verlassen des jeweiligen Felds automatisch speichern.
+- [ ] Änderungen an Beginn, Ende, Pause und Sollzeit beim Verlassen des jeweiligen Felds automatisch speichern.
 - [ ] Kein manueller Speichern-Button im Tagesformular.
-- [ ] Loeschen fuer den aktuellen Tages-Eintrag anbieten.
-- [ ] Validierung fuer Uhrzeiten und Pausenwerte anzeigen.
+- [ ] Löschen für den aktuellen Tages-Eintrag anbieten.
+- [ ] Validierung für Uhrzeiten und Pausenwerte anzeigen.
 
 ### 8.3 Berechnete Tageswerte
 
@@ -241,7 +241,7 @@ Umsetzung:
 
 Die verbindliche V1-Regel lautet:
 
-> 30 Minuten Pause sind im Solltag enthalten. Nur Pause ueber 30 Minuten verlaengert das Soll-Ende.
+> 30 Minuten Pause sind im Solltag enthalten. Nur Pause über 30 Minuten verlängert das Soll-Ende.
 
 Beispiel:
 
@@ -258,10 +258,10 @@ Soll-Ende = Dienstbeginn + Sollzeit + max(Pause - 30 Minuten, 0)
 
 Aufgaben:
 
-- [ ] 30-Minuten-Inklusivpause in Tagesberechnung beruecksichtigen.
-- [ ] Pausen ueber 30 Minuten als verlaengernd behandeln.
-- [ ] Ist-Zeit fuer Plus/Minus so berechnen, dass die inkludierte Pause nicht doppelt negativ wirkt.
-- [ ] Edge Cases fuer Pause 0, 30 und ueber 30 Minuten testen.
+- [ ] 30-Minuten-Inklusivpause in Tagesberechnung berücksichtigen.
+- [ ] Pausen über 30 Minuten als verlängernd behandeln.
+- [ ] Ist-Zeit für Plus/Minus so berechnen, dass die inkludierte Pause nicht doppelt negativ wirkt.
+- [ ] Edge Cases für Pause 0, 30 und über 30 Minuten testen.
 
 ### 8.5 Live-Anzeige
 
@@ -273,20 +273,20 @@ Die Live-Auswertung neben dem Tagesformular zeigt:
 - [ ] aktuelles Plus.
 - [ ] aktuelles Minus.
 - [ ] Hinweis bei fehlendem Dienstbeginn.
-- [ ] Hinweis bei unvollstaendigem Arbeitstag.
+- [ ] Hinweis bei unvollständigem Arbeitstag.
 
 Regeln:
 
 - [ ] Wenn Dienstende eingetragen ist, dieses Dienstende verwenden.
-- [ ] Wenn Dienstende fehlt, aktuelle Uhrzeit fuer Live-Anzeige verwenden.
-- [ ] Live-Werte regelmaessig aktualisieren.
-- [ ] Live-Anzeige darf gespeicherte Daten nicht automatisch veraendern.
+- [ ] Wenn Dienstende fehlt, aktuelle Uhrzeit für Live-Anzeige verwenden.
+- [ ] Live-Werte regelmäßig aktualisieren.
+- [ ] Live-Anzeige darf gespeicherte Daten nicht automatisch verändern.
 
-### 8.6 Wochenuebersicht
+### 8.6 Wochenübersicht
 
-Die Wochenuebersicht zeigt:
+Die Wochenübersicht zeigt:
 
-- [ ] Zeiteintraege pro Tag.
+- [ ] Zeiteinträge pro Tag.
 - [ ] Plus/Minus pro Tag.
 - [ ] Wochensumme.
 - [ ] Plusstunden dieser Woche.
@@ -307,7 +307,7 @@ Gleitzeitstand = Startwert + Summe Tagesdifferenzen + Summe Korrekturen
 Aufgaben:
 
 - [ ] Gleitzeitstartwert in Einstellungen pflegen.
-- [ ] Tagesdifferenzen aus gespeicherten Zeiteintraegen summieren.
+- [ ] Tagesdifferenzen aus gespeicherten Zeiteinträgen summieren.
 - [ ] Korrekturen einbeziehen.
 - [ ] Gesamtstand in Stunden und Minuten anzeigen.
 - [ ] Berechnung testbar in eigener Funktion halten.
@@ -328,21 +328,21 @@ Umsetzung:
 
 - [ ] Korrekturformular im Einstellungsbereich bauen.
 - [ ] Liste der Korrekturen anzeigen.
-- [ ] Korrekturen loeschen oder stornieren koennen.
+- [ ] Korrekturen löschen oder stornieren können.
 - [ ] Auswirkungen auf Gleitzeitstand sofort sichtbar machen.
 
 ### 9.3 Gleitzeitgrenze
 
 - [ ] Gleitzeitgrenze einstellbar machen.
 - [ ] Standardwert 100 Stunden setzen.
-- [ ] Warnung anzeigen, wenn Gleitzeitstand ueber Grenze liegt.
-- [ ] Stunden ueber Grenze als noch zu verbrauchenden Zeitausgleich anzeigen.
+- [ ] Warnung anzeigen, wenn Gleitzeitstand über Grenze liegt.
+- [ ] Stunden über Grenze als noch zu verbrauchenden Zeitausgleich anzeigen.
 
 ## 10. Urlaub und Zeitausgleich
 
 ### 10.1 Urlaub
 
-Urlaub wird intern in Stunden gespeichert und zusaetzlich in Tagen angezeigt.
+Urlaub wird intern in Stunden gespeichert und zusätzlich in Tagen angezeigt.
 
 Standardumrechnung:
 
@@ -355,7 +355,7 @@ Aufgaben:
 - [ ] Urlaubsanspruch in Stunden speichern.
 - [ ] Verbrauchte Urlaubsstunden speichern.
 - [ ] Resturlaub berechnen.
-- [ ] Werte zusaetzlich in Tagen anzeigen.
+- [ ] Werte zusätzlich in Tagen anzeigen.
 - [ ] Einrichtungshinweis anzeigen, bis der Anspruch gepflegt wurde.
 - [ ] Keine konkreten Urlaubstage in V1 verwalten.
 
@@ -377,27 +377,27 @@ Standardumrechnung:
 Besonders wichtig ist die Summe, die im aktuellen Jahr noch verbraucht werden muss:
 
 ```text
-offener Urlaub + Stunden ueber erlaubter Gleitzeitgrenze
+offener Urlaub + Stunden über erlaubter Gleitzeitgrenze
 ```
 
 Aufgaben:
 
 - [ ] Offenen Urlaub berechnen.
-- [ ] Stunden ueber Gleitzeitgrenze berechnen.
+- [ ] Stunden über Gleitzeitgrenze berechnen.
 - [ ] Summe im Dashboard anzeigen.
-- [ ] Summe in Einstellungen oder Urlaubskachel nachvollziehbar erklaeren.
+- [ ] Summe in Einstellungen oder Urlaubskachel nachvollziehbar erklären.
 
 ## 11. Einstellungen V1
 
-Der Einstellungsbereich enthaelt mindestens:
+Der Einstellungsbereich enthält mindestens:
 
 - [ ] App-Version.
 - [ ] Speicherstatus.
 - [ ] Backup exportieren.
 - [ ] Backup importieren.
-- [ ] Cache und Service Worker zuruecksetzen.
-- [ ] Lokale Daten loeschen mit starker Warnung.
-- [ ] Taegliche Soll-Arbeitszeit.
+- [ ] Cache und Service Worker zurücksetzen.
+- [ ] Lokale Daten löschen mit starker Warnung.
+- [ ] Tägliche Soll-Arbeitszeit.
 - [ ] Wochenarbeitszeit.
 - [ ] Gleitzeitgrenze.
 - [ ] Gleitzeitstartwert.
@@ -416,8 +416,8 @@ Umsetzung:
 
 - [ ] Einstellungsbereich in sinnvolle Abschnitte teilen.
 - [ ] Speichern pro Abschnitt oder klarer globaler Speichermechanik festlegen.
-- [ ] Validierung fuer Minuten-/Stundenwerte anzeigen.
-- [ ] Aenderungen sofort im Dashboard widerspiegeln.
+- [ ] Validierung für Minuten-/Stundenwerte anzeigen.
+- [ ] Änderungen sofort im Dashboard widerspiegeln.
 
 ## 12. Backup, Export und Import
 
@@ -436,42 +436,42 @@ backup.zip
     |-- ticket-1.pdf
 ```
 
-V1 nutzt dieselbe Struktur bereits fuer Daten ohne Dateien. Dadurch ist das Format fuer spaetere Nachweise, Screenshots und Belege vorbereitet.
+V1 nutzt dieselbe Struktur bereits für Daten ohne Dateien. Dadurch ist das Format für spätere Nachweise, Screenshots und Belege vorbereitet.
 
 ### 12.2 Export
 
-Der Export enthaelt:
+Der Export enthält:
 
 - [ ] Manifest mit App-Name.
 - [ ] Manifest mit Backup-Schema-Version.
 - [ ] Manifest mit Export-Zeitpunkt.
 - [ ] Einstellungen.
-- [ ] Zeiteintraege.
+- [ ] Zeiteinträge.
 - [ ] Gleitzeitstartwert.
 - [ ] Gleitzeitkorrekturen.
 - [ ] Urlaubswerte.
-- [ ] Leere oder vorbereitete Felder fuer spaetere Reisekosten, Todos und Dateien.
+- [ ] Leere oder vorbereitete Felder für spätere Reisekosten, Todos und Dateien.
 
 Aufgaben:
 
 - [ ] ZIP-Datei lokal im Browser erzeugen.
 - [ ] Dateiname mit Datum/Uhrzeit erzeugen.
-- [ ] Export ohne Netzwerkverbindung ermoeglichen.
+- [ ] Export ohne Netzwerkverbindung ermöglichen.
 - [ ] Exportfehler sichtbar anzeigen.
 
 ### 12.3 Import
 
 Import-Verhalten:
 
-- [ ] Backup-Datei auswaehlen.
-- [ ] ZIP-Struktur pruefen.
-- [ ] Manifest pruefen.
-- [ ] Daten pruefen.
-- [ ] Schema-Hauptversion pruefen.
+- [ ] Backup-Datei auswählen.
+- [ ] ZIP-Struktur prüfen.
+- [ ] Manifest prüfen.
+- [ ] Daten prüfen.
+- [ ] Schema-Hauptversion prüfen.
 - [ ] Zusammenfassung anzeigen.
-- [ ] Erst nach ausdruecklicher Bestaetigung lokale Datenbank ersetzen.
+- [ ] Erst nach ausdrücklicher Bestätigung lokale Datenbank ersetzen.
 
-V1 implementiert keinen Merge-Import. Das Standardverhalten ist vollstaendiges Ersetzen nach Vorschau.
+V1 implementiert keinen Merge-Import. Das Standardverhalten ist vollständiges Ersetzen nach Vorschau.
 
 Regeln:
 
@@ -481,10 +481,10 @@ Regeln:
 - [ ] Vor dem Ersetzen klare Warnung anzeigen.
 - [ ] Nach Import App-Daten neu laden.
 
-### 12.4 Verschluesselung
+### 12.4 Verschlüsselung
 
-- [ ] Backups in V1 unverschluesselt lassen.
-- [ ] Verschluesselung als spaetere Erweiterung dokumentieren.
+- [ ] Backups in V1 unverschlüsselt lassen.
+- [ ] Verschlüsselung als spätere Erweiterung dokumentieren.
 
 ## 13. PWA, Updates und Reset
 
@@ -510,102 +510,102 @@ Update-Verhalten:
 
 Reset-Funktionen:
 
-- [ ] Cache und Service Worker zuruecksetzen.
+- [ ] Cache und Service Worker zurücksetzen.
 - [ ] App neu laden.
-- [ ] IndexedDB und Arbeitsdaten dabei nicht loeschen.
+- [ ] IndexedDB und Arbeitsdaten dabei nicht löschen.
 
-Datenloeschung:
+Datenlöschung:
 
 - [ ] Separate Funktion im Einstellungsbereich anbieten.
 - [ ] Deutliche Warnung anzeigen.
 - [ ] Vorab Backup empfehlen.
-- [ ] Endgueltige Bestaetigung verlangen.
+- [ ] Endgültige Bestätigung verlangen.
 
 ## 14. Roadmap Reisekosten
 
-Das Reisekostenmodul wird spaeter als eigenstaendiges Modul innerhalb derselben App umgesetzt.
+Das Reisekostenmodul wird später als eigenständiges Modul innerhalb derselben App umgesetzt.
 
 Geplante Funktionen:
 
-- [ ] Reise erstellen, bearbeiten und loeschen.
+- [ ] Reise erstellen, bearbeiten und löschen.
 - [ ] Datum, Zeit von, Zeit bis und Dauer.
 - [ ] Grund, Ort und Zieladresse.
 - [ ] Fahrtkostenart.
 - [ ] Einfache Strecke in Kilometern.
-- [ ] Diaeten.
+- [ ] Diäten.
 - [ ] Sonstige Kosten.
 - [ ] Nachweise und Screenshots.
 - [ ] Erledigt-Status.
-- [ ] Jahresuebersichten.
+- [ ] Jahresübersichten.
 - [ ] Differenzwerbungskosten.
 
 Fahrtkostenarten:
 
 - [ ] Kilometergeld.
-- [ ] Befoerderungszuschuss normal.
-- [ ] Befoerderungszuschuss Oeffis.
+- [ ] Beförderungszuschuss normal.
+- [ ] Beförderungszuschuss Öffis.
 - [ ] Dienstauto.
 - [ ] Sonstige Kosten oder freier Betrag.
 
 Architekturregel:
 
 - [ ] Fahrtkostenlogik regelbasiert und modular aufbauen.
-- [ ] Saetze und Regeln spaeter wartbar aenderbar halten.
+- [ ] Sätze und Regeln später wartbar änderbar halten.
 - [ ] Reisekostenberechnungen nicht in UI-Komponenten verstreuen.
 
 ## 15. Roadmap Nachweise und Dateien
 
-Dateien und Screenshots werden spaeter lokal in IndexedDB gespeichert und Reiseeintraegen zugeordnet.
+Dateien und Screenshots werden später lokal in IndexedDB gespeichert und Reiseeinträgen zugeordnet.
 
-Nachweise muessen:
+Nachweise müssen:
 
 - [ ] lokal gespeichert werden.
 - [ ] einer Reise zugeordnet sein.
-- [ ] angezeigt werden koennen.
-- [ ] heruntergeladen werden koennen.
+- [ ] angezeigt werden können.
+- [ ] heruntergeladen werden können.
 - [ ] im Backup enthalten sein.
 - [ ] nach Import wiederhergestellt werden.
 
-Moegliche Nachweistypen:
+Mögliche Nachweistypen:
 
 - [ ] Dienstauto-Nachweis.
-- [ ] OEBB-Verbindungskosten.
+- [ ] ÖBB-Verbindungskosten.
 - [ ] Parkticket.
 - [ ] Zugticket.
 - [ ] Sonstiger Beleg.
 
 ## 16. Roadmap Komfortfunktionen
 
-Spaetere Komfortfunktionen:
+Spätere Komfortfunktionen:
 
 - [ ] Google-Maps-Link aus Startadresse und Zieladresse erzeugen.
 - [ ] Sonderzeichen, Umlaute und Leerzeichen korrekt per URL-Encoding behandeln.
 - [ ] Google-Maps-API-Key lokal speichern.
-- [ ] Google-Maps-API-Abfrage nur manuell ausloesen.
-- [ ] OEBB-Komfortlink oder OEBB-Widget pro Reise erzeugen.
-- [ ] Mehrere OEBB-Abfahrtsorte unterstuetzen.
-- [ ] Keine automatische Datenuebernahme aus OEBB.
+- [ ] Google-Maps-API-Abfrage nur manuell auslösen.
+- [ ] ÖBB-Komfortlink oder ÖBB-Widget pro Reise erzeugen.
+- [ ] Mehrere ÖBB-Abfahrtsorte unterstützen.
+- [ ] Keine automatische Datenübernahme aus ÖBB.
 
 ## 17. Roadmap Todo-Modul
 
-Das Todo-Modul wird als einfaches, spaeter erweiterbares Aufgabenmodul geplant.
+Das Todo-Modul wird als einfaches, später erweiterbares Aufgabenmodul geplant.
 
 Grundfunktionen:
 
 - [ ] Aufgabe erstellen.
 - [ ] Aufgabe bearbeiten.
-- [ ] Aufgabe loeschen.
+- [ ] Aufgabe löschen.
 - [ ] Aufgabe abhaken.
 - [ ] Offene Aufgaben anzeigen.
 - [ ] Erledigte Aufgaben anzeigen.
-- [ ] Faelligkeitsdatum.
-- [ ] Prioritaet.
+- [ ] Fälligkeitsdatum.
+- [ ] Priorität.
 - [ ] Tags oder Kategorien.
 - [ ] Notizen.
 - [ ] Filter.
 - [ ] Suche.
 
-Spaetere Erweiterungen:
+Spätere Erweiterungen:
 
 - [ ] Wiederkehrende Aufgaben.
 - [ ] Erinnerungen.
@@ -625,7 +625,7 @@ Spaetere Erweiterungen:
 - [ ] PWA-Service getrennt halten.
 - [ ] Dateiverwaltung getrennt halten.
 - [ ] Berechnungslogik nicht direkt in UI-Komponenten verstreuen.
-- [ ] Regeln fuer Zeiterfassung, Gleitzeit, Urlaub, Reisekosten, Diaeten und Differenzwerbungskosten in eigene testbare Funktionen legen.
+- [ ] Regeln für Zeiterfassung, Gleitzeit, Urlaub, Reisekosten, Diäten und Differenzwerbungskosten in eigene testbare Funktionen legen.
 
 ## 19. Testplan V1
 
@@ -638,10 +638,10 @@ Spaetere Erweiterungen:
 - [ ] Berechnung mit eingetragenem Dienstende testen.
 - [ ] Tagesplus testen.
 - [ ] Tagesminus testen.
-- [ ] Wochenuebersicht testen.
+- [ ] Wochenübersicht testen.
 - [ ] ISO-Wochenstart Montag testen.
 - [ ] Gleitzeitstand aus Startwert, Tagen und Korrekturen testen.
-- [ ] Warnung bei Ueberschreiten der Gleitzeitgrenze testen.
+- [ ] Warnung bei Überschreiten der Gleitzeitgrenze testen.
 - [ ] Urlaubsumrechnung Stunden/Tage testen.
 - [ ] Zu verbrauchende Jahressumme testen.
 
@@ -668,28 +668,28 @@ Spaetere Erweiterungen:
 - [ ] Erststart mit leerer Datenbank testen.
 - [ ] Dashboard mit fehlenden Einstellungen testen.
 - [ ] Dashboard mit voll eingerichteten Einstellungen testen.
-- [ ] Tagesformular erstellen, bearbeiten und loeschen testen.
+- [ ] Tagesformular erstellen, bearbeiten und löschen testen.
 - [ ] Wochenwechsel testen.
 - [ ] Einstellungen speichern testen.
-- [ ] Datenloesch-Warnung testen.
+- [ ] Datenlösch-Warnung testen.
 
 ## 20. Umsetzungsschritte
 
 ### Phase 1 - Projektfundament
 
 - [ ] Vite/React/TypeScript-Projekt erstellen.
-- [ ] Basiskonfiguration fuer TypeScript, Vite und Tests erstellen.
+- [ ] Basiskonfiguration für TypeScript, Vite und Tests erstellen.
 - [ ] App-Shell mit Routing aufbauen.
-- [ ] Grundlayout mit Sidebar und Arbeitsflaeche umsetzen.
+- [ ] Grundlayout mit Sidebar und Arbeitsfläche umsetzen.
 - [ ] Basisstyles und UI-Tokens definieren.
 - [ ] GitHub-Pages-Base-Pfad konfigurieren.
-- [ ] Erste Build- und Test-Kommandos pruefen.
+- [ ] Erste Build- und Test-Kommandos prüfen.
 
 ### Phase 2 - Datenbasis
 
 - [ ] Dexie einrichten.
-- [ ] Datenmodelle fuer V1 definieren.
-- [ ] Stores fuer Einstellungen, Zeiteintraege, Gleitzeitkorrekturen, Urlaub und App-Metadaten anlegen.
+- [ ] Datenmodelle für V1 definieren.
+- [ ] Stores für Einstellungen, Zeiteinträge, Gleitzeitkorrekturen, Urlaub und App-Metadaten anlegen.
 - [ ] Standardwerte und Setup-Erkennung implementieren.
 - [ ] Datenzugriffsfunktionen erstellen.
 - [ ] Erste Datenbanktests schreiben.
@@ -703,16 +703,16 @@ Spaetere Erweiterungen:
 - [ ] Gleitzeitberechnung implementieren.
 - [ ] Urlaubsumrechnung implementieren.
 - [ ] Jahresverbrauchsberechnung implementieren.
-- [ ] Unit-Tests fuer alle Rechenregeln schreiben.
+- [ ] Unit-Tests für alle Rechenregeln schreiben.
 
 ### Phase 4 - Dashboard-Zeiterfassung
 
-- [ ] Tagesformular als primaeren Dashboard-Bereich bauen.
+- [ ] Tagesformular als primären Dashboard-Bereich bauen.
 - [ ] Live-Anzeige neben dem Tagesformular bauen.
-- [ ] Speichern, Aktualisieren und Loeschen implementieren.
-- [ ] Wochenuebersicht bauen.
+- [ ] Speichern, Aktualisieren und Löschen implementieren.
+- [ ] Wochenübersicht bauen.
 - [ ] Wochennavigation einbauen.
-- [ ] Fehler- und Leerzustaende gestalten.
+- [ ] Fehler- und Leerzustände gestalten.
 - [ ] UI-Szenarien testen.
 
 ### Phase 5 - Dashboard
@@ -723,8 +723,8 @@ Spaetere Erweiterungen:
 - [ ] Wochen-Kachel anbinden.
 - [ ] Gleitzeit-Kachel anbinden.
 - [ ] Urlaub-Kachel anbinden.
-- [ ] Warnungen fuer Gleitzeitgrenze anzeigen.
-- [ ] Roadmap-Kacheln fuer Reisekosten und Aufgaben anzeigen.
+- [ ] Warnungen für Gleitzeitgrenze anzeigen.
+- [ ] Roadmap-Kacheln für Reisekosten und Aufgaben anzeigen.
 
 ### Phase 6 - Einstellungen
 
@@ -735,7 +735,7 @@ Spaetere Erweiterungen:
 - [ ] Urlaubswerte implementieren.
 - [ ] Speicherstatus anzeigen.
 - [ ] App-Version anzeigen.
-- [ ] Lokale Datenloeschung mit Warnung implementieren.
+- [ ] Lokale Datenlöschung mit Warnung implementieren.
 
 ### Phase 7 - Backup und Import
 
@@ -746,7 +746,7 @@ Spaetere Erweiterungen:
 - [ ] Import-Service implementieren.
 - [ ] Strikte Validierung implementieren.
 - [ ] Import-Vorschau bauen.
-- [ ] Ersetzen der lokalen Datenbank nach Bestaetigung implementieren.
+- [ ] Ersetzen der lokalen Datenbank nach Bestätigung implementieren.
 - [ ] Backup-Tests schreiben.
 
 ### Phase 8 - PWA und Deployment
@@ -766,18 +766,18 @@ Spaetere Erweiterungen:
 - [ ] Reisekosten-Platzhalterseite erstellen.
 - [ ] Aufgaben-Platzhalterseite erstellen.
 - [ ] Roadmap-Inhalte knapp anzeigen.
-- [ ] Keine unfertigen Eingabeformulare fuer Roadmap-Module anbieten.
-- [ ] Backup-Format fuer spaetere Daten vorbereitet lassen.
+- [ ] Keine unfertigen Eingabeformulare für Roadmap-Module anbieten.
+- [ ] Backup-Format für spätere Daten vorbereitet lassen.
 
 ### Phase 10 - Abschluss V1
 
-- [ ] Alle Unit-Tests ausfuehren.
-- [ ] Build ausfuehren.
-- [ ] Offline-Verhalten pruefen.
-- [ ] Backup-Export und Import manuell pruefen.
-- [ ] Erststart manuell pruefen.
-- [ ] Dashboard-Zeiterfassung fuer Beispielwoche manuell pruefen.
-- [ ] UI auf Desktop und kleinem Viewport pruefen.
+- [ ] Alle Unit-Tests ausführen.
+- [ ] Build ausführen.
+- [ ] Offline-Verhalten prüfen.
+- [ ] Backup-Export und Import manuell prüfen.
+- [ ] Erststart manuell prüfen.
+- [ ] Dashboard-Zeiterfassung für Beispielwoche manuell prüfen.
+- [ ] UI auf Desktop und kleinem Viewport prüfen.
 - [ ] Offene Punkte dokumentieren.
 
 ## 21. Akzeptanzkriterien V1
@@ -785,21 +785,21 @@ Spaetere Erweiterungen:
 - [ ] App startet lokal im Browser ohne Server-Backend.
 - [ ] App ist installierbar und nach erstem Laden offline nutzbar.
 - [ ] Dashboard startet beim Erststart und zeigt sinnvolle Setup-Hinweise.
-- [ ] Zeiteintrag fuer heute kann manuell erstellt, gespeichert, geaendert und geloescht werden.
+- [ ] Zeiteintrag für heute kann manuell erstellt, gespeichert, geändert und gelöscht werden.
 - [ ] Live-Anzeige rechnet ohne Dienstende mit aktueller Uhrzeit.
-- [ ] Eingetragenes Dienstende ueberschreibt Live-Zeit.
-- [ ] 30-Minuten-Inklusivpause wird korrekt beruecksichtigt.
-- [ ] Wochenuebersicht berechnet Wochensummen korrekt ab Montag.
-- [ ] Gleitzeitstand beruecksichtigt Startwert, Tagesdifferenzen und Korrekturen.
-- [ ] Gleitzeitwarnung erscheint ueber der eingestellten Grenze.
+- [ ] Eingetragenes Dienstende überschreibt Live-Zeit.
+- [ ] 30-Minuten-Inklusivpause wird korrekt berücksichtigt.
+- [ ] Wochenübersicht berechnet Wochensummen korrekt ab Montag.
+- [ ] Gleitzeitstand berücksichtigt Startwert, Tagesdifferenzen und Korrekturen.
+- [ ] Gleitzeitwarnung erscheint über der eingestellten Grenze.
 - [ ] Urlaubswerte werden in Stunden und Tagen angezeigt.
 - [ ] Zu verbrauchende Jahressumme wird angezeigt.
 - [ ] Einstellungen bleiben lokal erhalten.
 - [ ] Backup-Export erzeugt eine ZIP-Datei mit Manifest und Daten.
-- [ ] Backup-Import zeigt eine Vorschau und ersetzt erst nach Bestaetigung.
+- [ ] Backup-Import zeigt eine Vorschau und ersetzt erst nach Bestätigung.
 - [ ] Inkompatible oder fehlerhafte Backups werden abgelehnt.
-- [ ] Cache-/Service-Worker-Reset loescht keine Arbeitsdaten.
-- [ ] Lokale Datenloeschung ist separat, deutlich gewarnt und bestaetigungspflichtig.
+- [ ] Cache-/Service-Worker-Reset löscht keine Arbeitsdaten.
+- [ ] Lokale Datenlöschung ist separat, deutlich gewarnt und bestätigungspflichtig.
 - [ ] GitHub-Pages-Build verwendet `/arbeits-dashboard/` korrekt.
 
 ## 22. Offene Punkte nach V1
@@ -807,47 +807,47 @@ Spaetere Erweiterungen:
 - [ ] Reisekosten detailliert spezifizieren.
 - [ ] Nachweise und Dateien detailliert spezifizieren.
 - [ ] Todo-Modul detailliert spezifizieren.
-- [ ] Verschluesselte Backups pruefen.
-- [ ] Optionalen Start/Stop-Modus fuer Zeiterfassung pruefen.
-- [ ] Konkrete Urlaubstage oder Abwesenheitskalender pruefen.
-- [ ] Komfortfunktionen fuer Google Maps und OEBB pruefen.
+- [ ] Verschlüsselte Backups prüfen.
+- [ ] Optionalen Start/Stop-Modus für Zeiterfassung prüfen.
+- [ ] Konkrete Urlaubstage oder Abwesenheitskalender prüfen.
+- [ ] Komfortfunktionen für Google Maps und ÖBB prüfen.
 
 ## 23. Bearbeitungsstand 2026-05-06
 
 ### Erledigt
 
 - [x] Vite/React/TypeScript-Projekt erstellt.
-- [x] Basiskonfiguration fuer TypeScript, Vite, Vitest und PWA erstellt.
+- [x] Basiskonfiguration für TypeScript, Vite, Vitest und PWA erstellt.
 - [x] GitHub-Pages-Base-Pfad `/arbeits-dashboard/` konfiguriert.
-- [x] Hash-Routing fuer Dashboard, Reisekosten, Aufgaben und Einstellungen umgesetzt.
-- [x] App-Shell mit Sidebar und Arbeitsflaeche umgesetzt.
+- [x] Hash-Routing für Dashboard, Reisekosten, Aufgaben und Einstellungen umgesetzt.
+- [x] App-Shell mit Sidebar und Arbeitsfläche umgesetzt.
 - [x] Helles, ruhiges Dashboard-UI mit responsiven CSS-Regeln umgesetzt.
-- [x] Dexie-Datenbank mit Stores fuer Einstellungen, Zeiteintraege, Gleitzeitkorrekturen, Urlaub und App-Metadaten umgesetzt.
+- [x] Dexie-Datenbank mit Stores für Einstellungen, Zeiteinträge, Gleitzeitkorrekturen, Urlaub und App-Metadaten umgesetzt.
 - [x] Standardwerte und Erststart-Setup-Hinweise umgesetzt.
-- [x] Pure Berechnungslogik fuer Tageszeit, Pause, Woche, Gleitzeit, Urlaub und Jahresverbrauch umgesetzt.
-- [x] Unit-Tests fuer zentrale Zeit-, Wochen-, Gleitzeit- und Urlaubsberechnungen geschrieben.
+- [x] Pure Berechnungslogik für Tageszeit, Pause, Woche, Gleitzeit, Urlaub und Jahresverbrauch umgesetzt.
+- [x] Unit-Tests für zentrale Zeit-, Wochen-, Gleitzeit- und Urlaubsberechnungen geschrieben.
 - [x] Dashboard mit Tagesformular, Live-Auswertung, Wochen-, Gleitzeit-, Urlaub- und Jahresverbrauchs-Kennzahlen umgesetzt.
-- [x] Manuelle Tages-Zeiterfassung im Dashboard mit Erstellen, Bearbeiten, Loeschen und Live-Vorschau umgesetzt.
-- [x] Wochenuebersicht mit Montag als Wochenstart umgesetzt.
-- [x] Einstellungen fuer Sollzeit, Wochenzeit, Gleitzeitgrenze, Startwert und Urlaub umgesetzt.
+- [x] Manuelle Tages-Zeiterfassung im Dashboard mit Erstellen, Bearbeiten, Löschen und Live-Vorschau umgesetzt.
+- [x] Wochenübersicht mit Montag als Wochenstart umgesetzt.
+- [x] Einstellungen für Sollzeit, Wochenzeit, Gleitzeitgrenze, Startwert und Urlaub umgesetzt.
 - [x] Gleitzeitkorrekturen mit Liste, Speicherung und Entfernen umgesetzt.
 - [x] Backup-Export als ZIP mit `manifest.json` und `data.json` umgesetzt.
-- [x] Strikter Backup-Import mit Vorschau und vollstaendigem Ersetzen umgesetzt.
-- [x] Cache-/Service-Worker-Reset ohne IndexedDB-Loeschung umgesetzt.
-- [x] Separate lokale Datenloeschung mit Warnung umgesetzt.
+- [x] Strikter Backup-Import mit Vorschau und vollständigem Ersetzen umgesetzt.
+- [x] Cache-/Service-Worker-Reset ohne IndexedDB-Löschung umgesetzt.
+- [x] Separate lokale Datenlöschung mit Warnung umgesetzt.
 - [x] PWA-Manifest, App-Icons und Service-Worker-Generierung umgesetzt.
-- [x] GitHub-Actions-Deployment fuer GitHub Pages erstellt.
-- [x] Roadmap-Platzhalter fuer Reisekosten und Aufgaben umgesetzt.
-- [x] `npm test` erfolgreich ausgefuehrt.
-- [x] `npm run build` erfolgreich ausgefuehrt.
+- [x] GitHub-Actions-Deployment für GitHub Pages erstellt.
+- [x] Roadmap-Platzhalter für Reisekosten und Aufgaben umgesetzt.
+- [x] `npm test` erfolgreich ausgeführt.
+- [x] `npm run build` erfolgreich ausgeführt.
 - [x] Lokaler Vite-Server auf Port 5174 gestartet.
 
-### Noch manuell zu pruefen
+### Noch manuell zu prüfen
 
-- [ ] App im Browser unter `http://127.0.0.1:5174/arbeits-dashboard/` visuell pruefen.
-- [ ] Dashboard-Zeiterfassung fuer eine Beispielwoche im Browser durchklicken.
+- [ ] App im Browser unter `http://127.0.0.1:5174/arbeits-dashboard/` visuell prüfen.
+- [ ] Dashboard-Zeiterfassung für eine Beispielwoche im Browser durchklicken.
 - [ ] Backup-Export im Browser herunterladen und Import-Vorschau testen.
-- [ ] Lokale Datenloeschung mit Testdaten pruefen.
-- [ ] PWA-Installation und Offline-Start im Browser pruefen.
-- [ ] Update-Hinweis mit spaeterer Version pruefen.
-- [ ] GitHub-Pages-Workflow nach erstem Push in GitHub pruefen.
+- [ ] Lokale Datenlöschung mit Testdaten prüfen.
+- [ ] PWA-Installation und Offline-Start im Browser prüfen.
+- [ ] Update-Hinweis mit späterer Version prüfen.
+- [ ] GitHub-Pages-Workflow nach erstem Push in GitHub prüfen.

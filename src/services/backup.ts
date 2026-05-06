@@ -62,15 +62,15 @@ export async function importBackup(file: File): Promise<BackupPayload> {
 }
 
 function validateManifest(value: unknown): asserts value is BackupManifest {
-  if (!isObject(value)) throw new Error("Manifest ist ungueltig.");
-  if (value.appName !== APP_NAME) throw new Error("Backup gehoert nicht zu dieser App.");
-  if (value.schemaVersion !== BACKUP_SCHEMA_VERSION) throw new Error("Backup-Schema wird nicht unterstuetzt.");
+  if (!isObject(value)) throw new Error("Manifest ist ungültig.");
+  if (value.appName !== APP_NAME) throw new Error("Backup gehört nicht zu dieser App.");
+  if (value.schemaVersion !== BACKUP_SCHEMA_VERSION) throw new Error("Backup-Schema wird nicht unterstützt.");
   if (typeof value.exportedAt !== "string") throw new Error("Export-Zeitpunkt fehlt.");
 }
 
 function validateData(value: unknown): asserts value is BackupData {
-  if (!isObject(value)) throw new Error("Daten sind ungueltig.");
-  if (!Array.isArray(value.timeEntries)) throw new Error("Zeiteintraege fehlen.");
+  if (!isObject(value)) throw new Error("Daten sind ungültig.");
+  if (!Array.isArray(value.timeEntries)) throw new Error("Zeiteinträge fehlen.");
   if (!Array.isArray(value.flexCorrections)) throw new Error("Gleitzeitkorrekturen fehlen.");
   if (!("settings" in value)) throw new Error("Einstellungen fehlen.");
   if (!("vacationSummary" in value)) throw new Error("Urlaubswerte fehlen.");
