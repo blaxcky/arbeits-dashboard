@@ -250,6 +250,10 @@ button:disabled {
   gap: 12px;
 }
 
+.date-row {
+  align-items: flex-end;
+}
+
 .week-table {
   display: grid;
   margin-top: 16px;
@@ -290,6 +294,19 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.day-entry-grid {
+  align-items: end;
+}
+
+.break-field {
+  width: min(180px, 100%);
+}
+
+.break-field input {
+  min-height: 48px;
+  padding: 9px 11px;
 }
 
 .field {

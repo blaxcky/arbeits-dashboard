@@ -170,7 +170,7 @@ function Dashboard({ data }: { data: WorkData }) {
             </label>
             <button type="button" className="secondary-button" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>Weiter</button>
           </div>
-          <div className="form-grid">
+          <div className="form-grid day-entry-grid">
             <Field label="Dienstbeginn" error={timeErrors.startTime}>
               <input
                 type="text"
@@ -193,7 +193,7 @@ function Dashboard({ data }: { data: WorkData }) {
                 onBlur={(event) => void handleTimeBlur("endTime", event.target.value)}
               />
             </Field>
-            <Field label="Pause in Minuten"><input type="number" min="0" max="720" value={form.breakMinutes} onChange={(event) => setForm({ ...form, breakMinutes: event.target.value })} onBlur={(event) => void handleBreakBlur(event.target.value)} /></Field>
+            <Field label="Pause in Minuten" className="break-field"><input type="number" min="0" max="720" value={form.breakMinutes} onChange={(event) => setForm({ ...form, breakMinutes: event.target.value })} onBlur={(event) => void handleBreakBlur(event.target.value)} /></Field>
           </div>
           <div className="button-row">
             <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Löschen</button>
@@ -420,8 +420,8 @@ function Notice({ title, text, action, tone = "success" }: { title: string; text
   );
 }
 
-function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
-  return <label className="field"><span>{label}</span>{children}{error ? <small className="field-error">{error}</small> : null}</label>;
+function Field({ label, children, error, className = "" }: { label: string; children: React.ReactNode; error?: string; className?: string }) {
+  return <label className={`field ${className}`.trim()}><span>{label}</span>{children}{error ? <small className="field-error">{error}</small> : null}</label>;
 }
 
 function SkeletonRows() {
