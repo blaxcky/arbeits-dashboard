@@ -220,9 +220,9 @@ Umsetzung:
 - [ ] Standarddatum auf heute setzen.
 - [ ] Beginn und Ende als reine Tastatur-Zeitfelder ohne nativen Uhr-Picker umsetzen.
 - [ ] Eingaben wie `7:30`, `07:30`, `730` und `0730` beim Verlassen des Felds zu `HH:MM` normalisieren.
-- [ ] Beginn, Ende, Pause und Sollzeit manuell editierbar machen; Notiz nicht mehr im Dashboard anzeigen.
+- [ ] Beginn, Ende und Pause manuell editierbar machen; Sollzeit kommt aus den Einstellungen und Notiz wird nicht mehr im Dashboard angezeigt.
 - [ ] Pro Datum vorhandenen Eintrag laden.
-- [ ] Änderungen an Beginn, Ende, Pause und Sollzeit beim Verlassen des jeweiligen Felds automatisch speichern.
+- [ ] Änderungen an Beginn, Ende und Pause beim Verlassen des jeweiligen Felds automatisch speichern.
 - [ ] Kein manueller Speichern-Button im Tagesformular.
 - [ ] Löschen für den aktuellen Tages-Eintrag anbieten.
 - [ ] Validierung für Uhrzeiten und Pausenwerte anzeigen.

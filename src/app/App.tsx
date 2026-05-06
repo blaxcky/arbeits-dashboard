@@ -131,10 +131,9 @@ function Dashboard({ data }: { data: WorkData }) {
     await autoSave(draft, normalized !== "");
   }
 
-  async function handleNumberBlur(field: "breakMinutes" | "targetMinutes", value: string) {
-    const max = field === "breakMinutes" ? 720 : 900;
-    const normalized = String(clampNumber(value, 0, max));
-    const draft = { ...form, [field]: normalized };
+  async function handleBreakBlur(value: string) {
+    const normalized = String(clampNumber(value, 0, 720));
+    const draft = { ...form, breakMinutes: normalized };
     setForm(draft);
     await autoSave(draft);
   }
@@ -194,8 +193,7 @@ function Dashboard({ data }: { data: WorkData }) {
                 onBlur={(event) => void handleTimeBlur("endTime", event.target.value)}
               />
             </Field>
-            <Field label="Pause in Minuten"><input type="number" min="0" max="720" value={form.breakMinutes} onChange={(event) => setForm({ ...form, breakMinutes: event.target.value })} onBlur={(event) => void handleNumberBlur("breakMinutes", event.target.value)} /></Field>
-            <Field label="Sollzeit in Minuten"><input type="number" min="0" max="900" value={form.targetMinutes} onChange={(event) => setForm({ ...form, targetMinutes: event.target.value })} onBlur={(event) => void handleNumberBlur("targetMinutes", event.target.value)} /></Field>
+            <Field label="Pause in Minuten"><input type="number" min="0" max="720" value={form.breakMinutes} onChange={(event) => setForm({ ...form, breakMinutes: event.target.value })} onBlur={(event) => void handleBreakBlur(event.target.value)} /></Field>
           </div>
           <div className="button-row">
             <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Löschen</button>
