@@ -187,10 +187,6 @@ button:disabled {
   min-height: 100%;
 }
 
-.dashboard-live-panel {
-  min-height: 100%;
-}
-
 .metric,
 .panel,
 .notice {
@@ -362,27 +358,108 @@ button:disabled {
   background: #fff;
 }
 
-.live-panel {
+.live-clock-panel {
   display: grid;
-  gap: 16px;
+  gap: 14px;
+  min-height: 100%;
+  align-content: start;
 }
 
-.live-panel strong {
+.live-clock-face {
+  position: relative;
+  width: min(100%, 260px);
+  aspect-ratio: 1;
+  margin: 4px auto 0;
+}
+
+.live-clock-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.live-clock-track,
+.live-clock-ring {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.live-clock-track-main {
+  stroke: #e6ecef;
+  stroke-width: 14;
+}
+
+.live-clock-track-overtime {
+  stroke: #f2ead8;
+  stroke-width: 8;
+}
+
+.live-clock-ring {
+  transition: stroke-dashoffset 420ms ease;
+}
+
+.live-clock-ring-main {
+  stroke: var(--accent);
+  stroke-width: 14;
+}
+
+.live-clock-ring-overtime {
+  stroke: var(--warning);
+  stroke-width: 8;
+}
+
+.live-clock-center {
+  position: absolute;
+  inset: 20%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
+  text-align: center;
+}
+
+.live-clock-center strong {
   font-family: "Geist Mono", ui-monospace, monospace;
-  font-size: clamp(2.4rem, 4vw, 3.6rem);
+  font-size: clamp(1.55rem, 2.4vw, 2.05rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.live-clock-center span {
+  min-height: 1.2em;
+  color: var(--accent-dark);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.live-clock-missing-start .live-clock-center span {
+  color: var(--muted);
+}
+
+.live-clock-plus .live-clock-center span,
+.live-clock-has-overtime .live-clock-center span {
+  color: var(--warning);
+}
+
+.live-clock-details {
+  font-size: 0.92rem;
 }
 
 .detail-list {
   display: grid;
-  gap: 10px;
+  gap: 0;
   margin: 0;
 }
 
 .detail-list div {
   display: flex;
   justify-content: space-between;
+  gap: 14px;
   border-top: 1px solid #eef1f5;
   padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .detail-list dt {
@@ -392,6 +469,7 @@ button:disabled {
 .detail-list dd {
   margin: 0;
   font-weight: 700;
+  text-align: right;
 }
 
 .primary-button,

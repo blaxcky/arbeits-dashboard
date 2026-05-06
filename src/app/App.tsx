@@ -199,16 +199,7 @@ function Dashboard({ data }: { data: WorkData }) {
             <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Löschen</button>
           </div>
         </form>
-        <aside className="panel live-panel dashboard-live-panel">
-          <span className="section-label">Live-Auswertung</span>
-          <strong>{formatMinutes(day.netMinutes)}</strong>
-          <p>{day.hasStart ? `Soll-Ende ${day.targetEndTime}, Tagesstand ${formatSignedMinutes(day.deltaMinutes)}` : "Dienstbeginn fehlt."}</p>
-          <dl className="detail-list">
-            <div><dt>Status</dt><dd>{statusLabel(day.status)}</dd></div>
-            <div><dt>Verwendetes Ende</dt><dd>{day.effectiveEndTime ?? "offen"}</dd></div>
-            <div><dt>Inklusivpause</dt><dd>30 Minuten</dd></div>
-          </dl>
-        </aside>
+        <LiveDayClock day={day} targetMinutes={previewEntry.targetMinutes} />
         <div className="dashboard-side-grid">
           <Metric title="Woche" value={formatMinutes(week.workedMinutes)} detail={`${formatSignedMinutes(week.deltaMinutes)} zur Wochenbilanz`} />
           <Metric title="Gleitzeit" value={formatSignedMinutes(flex)} detail={`Grenze ${settings ? formatDecimalHours(settings.flexLimitMinutes) : "100,0 h"}`} tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"} />
@@ -411,6 +402,58 @@ function Metric({ title, value, detail, icon, tone = "default" }: { title: strin
   );
 }
 
+function LiveDayClock({ day, targetMinutes }: { day: ReturnType<typeof calculateDay>; targetMinutes: number }) {
+  const mainProgress = day.hasStart ? ringProgress(day.netMinutes, targetMinutes) : 0;
+  const overtimeProgress = day.deltaMinutes > 0 ? ringProgress(day.deltaMinutes, targetMinutes) : 0;
+  const centerStatus = liveClockStatus(day);
+  const ariaLabel = day.hasStart
+    ? `Live-Auswertung: ${formatMinutes(day.netMinutes)} gearbeitet, Tagesstand ${formatSignedMinutes(day.deltaMinutes)}.`
+    : "Live-Auswertung: Dienstbeginn fehlt.";
+
+  return (
+    <aside className={`panel live-clock-panel live-clock-${day.status}${overtimeProgress > 0 ? " live-clock-has-overtime" : ""}`} aria-label={ariaLabel}>
+      <span className="section-label">Live-Auswertung</span>
+      <div className="live-clock-face">
+        <svg className="live-clock-svg" viewBox="0 0 200 200" role="img" aria-hidden="true">
+          <circle className="live-clock-track live-clock-track-main" cx="100" cy="100" r="70" pathLength="100" />
+          <circle
+            className="live-clock-ring live-clock-ring-main"
+            cx="100"
+            cy="100"
+            r="70"
+            pathLength="100"
+            strokeDasharray="100"
+            strokeDashoffset={100 - mainProgress * 100}
+          />
+          {overtimeProgress > 0 ? (
+            <>
+              <circle className="live-clock-track live-clock-track-overtime" cx="100" cy="100" r="86" pathLength="100" />
+              <circle
+                className="live-clock-ring live-clock-ring-overtime"
+                cx="100"
+                cy="100"
+                r="86"
+                pathLength="100"
+                strokeDasharray="100"
+                strokeDashoffset={100 - overtimeProgress * 100}
+              />
+            </>
+          ) : null}
+        </svg>
+        <div className="live-clock-center">
+          <strong>{formatMinutes(day.netMinutes)}</strong>
+          <span>{centerStatus}</span>
+        </div>
+      </div>
+      <dl className="detail-list live-clock-details">
+        <div><dt>Soll-Ende</dt><dd>{day.hasStart ? day.targetEndTime : "-"}</dd></div>
+        <div><dt>Verwendetes Ende</dt><dd>{day.hasStart ? day.effectiveEndTime ?? "offen" : "-"}</dd></div>
+        <div><dt>Tagesstand</dt><dd>{day.hasStart ? formatSignedMinutes(day.deltaMinutes) : "-"}</dd></div>
+      </dl>
+    </aside>
+  );
+}
+
 function Notice({ title, text, action, tone = "success" }: { title: string; text: string; action?: React.ReactNode; tone?: "success" | "warning" | "danger" }) {
   return (
     <div className={`notice notice-${tone}`}>
@@ -456,6 +499,28 @@ function clampNumber(value: string, min: number, max: number): number {
   return Math.min(Math.max(Math.round(numeric), min), max);
 }
 
+function ringProgress(minutes: number, targetMinutes: number): number {
+  if (targetMinutes <= 0) return 0;
+  return Math.min(Math.max(minutes / targetMinutes, 0), 1);
+}
+
+function liveClockStatus(day: ReturnType<typeof calculateDay>): string {
+  if (!day.hasStart) return "Start fehlt";
+  if (day.deltaMinutes > 0) return formatCompactSignedMinutes(day.deltaMinutes);
+  if (day.deltaMinutes === 0) return "erfüllt";
+  if (day.status === "running") return "läuft";
+  return formatCompactSignedMinutes(day.deltaMinutes);
+}
+
+function formatCompactSignedMinutes(minutes: number): string {
+  const sign = minutes > 0 ? "+" : "-";
+  const absolute = Math.abs(Math.round(minutes));
+  if (absolute < 60) return `${sign} ${absolute} min`;
+  const hours = Math.floor(absolute / 60);
+  const rest = absolute % 60;
+  return rest === 0 ? `${sign} ${hours} h` : `${sign} ${hours} h ${rest} min`;
+}
+
 function normalizeTimeInput(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed === "") return "";
@@ -480,15 +545,4 @@ function timeForSave(value: string, fallback?: string): string | undefined {
   const normalized = normalizeTimeInput(value);
   if (normalized === null) return fallback;
   return normalized || undefined;
-}
-
-function statusLabel(status: ReturnType<typeof calculateDay>["status"]): string {
-  const labels = {
-    "missing-start": "Dienstbeginn fehlt",
-    running: "Laufender Tag",
-    plus: "Plus",
-    minus: "Minus",
-    balanced: "Ausgeglichen"
-  };
-  return labels[status];
 }
