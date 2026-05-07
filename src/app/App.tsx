@@ -875,17 +875,36 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
             </section>
           </div>
-          <dl className="detail-list trip-preview">
-            <div><dt>Dauer</dt><dd>{formatMinutes(previewDurationMinutes)}</dd></div>
-            <div><dt>Fahrtkosten</dt><dd>{formatEuroCents(previewTravelCostCents)}</dd></div>
-            <div><dt>Diäten Arbeitgeber</dt><dd>{formatEuroCents(previewTripCosts.perDiemCents)}</dd></div>
-            <div><dt>Diäten steuerlich</dt><dd>{formatEuroCents(previewTaxPerDiemCents)}</dd></div>
-            <div><dt>Steuerpfl. Öffi-BEZU</dt><dd>{formatEuroCents(previewTaxableTransportSubsidyCents)}</dd></div>
-            <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(previewPerDiemDifferentialCents)}</dd></div>
-            <div><dt>Differenz Fahrtkosten</dt><dd>{formatEuroCents(previewTransportDifferentialCents)}</dd></div>
-            <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(previewDifferentialCents)}</dd></div>
-            <div><dt>Gesamt</dt><dd>{formatEuroCents(calculateTripTotalCents(previewTripCosts))}</dd></div>
-          </dl>
+          <section className="trip-preview" aria-label="Kennzahlen-Vorschau">
+            <div className="trip-preview-group trip-preview-group-primary">
+              <span className="trip-preview-title">Reise</span>
+              <dl className="trip-preview-list">
+                <div><dt>Dauer</dt><dd>{formatMinutes(previewDurationMinutes)}</dd></div>
+                {previewTripCosts.oneWayKilometers > 0 ? (
+                  <div><dt>Kilometer gesamt</dt><dd>{(previewTripCosts.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
+                ) : null}
+                <div className="trip-preview-total"><dt>Gesamt</dt><dd>{formatEuroCents(calculateTripTotalCents(previewTripCosts))}</dd></div>
+              </dl>
+            </div>
+            <div className="trip-preview-group">
+              <span className="trip-preview-title">Kosten</span>
+              <dl className="trip-preview-list">
+                <div><dt>Fahrtkosten</dt><dd>{formatEuroCents(previewTravelCostCents)}</dd></div>
+                <div><dt>Diäten Arbeitgeber</dt><dd>{formatEuroCents(previewTripCosts.perDiemCents)}</dd></div>
+                <div><dt>Sonstige Kosten</dt><dd>{formatEuroCents(previewTripCosts.otherCostsCents)}</dd></div>
+              </dl>
+            </div>
+            <div className="trip-preview-group trip-preview-group-tax">
+              <span className="trip-preview-title">Steuer & Differenz</span>
+              <dl className="trip-preview-list">
+                <div><dt>Diäten steuerlich</dt><dd>{formatEuroCents(previewTaxPerDiemCents)}</dd></div>
+                <div><dt>Steuerpfl. Öffi-BEZU</dt><dd>{formatEuroCents(previewTaxableTransportSubsidyCents)}</dd></div>
+                <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(previewPerDiemDifferentialCents)}</dd></div>
+                <div><dt>Differenz Fahrtkosten</dt><dd>{formatEuroCents(previewTransportDifferentialCents)}</dd></div>
+                <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(previewDifferentialCents)}</dd></div>
+              </dl>
+            </div>
+          </section>
           <div className="trip-helper-grid">
             {mapsUrl ? (
               <div className="button-row trip-map-actions">
