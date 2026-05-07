@@ -13,7 +13,7 @@ import {
   UploadSimple,
   Warning
 } from "@phosphor-icons/react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import type { Settings, TimeEntry, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
@@ -601,6 +601,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [tripTimeErrors, setTripTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
   const [mapPreviewOpen, setMapPreviewOpen] = useState(false);
   const [largeMapPreviewOpen, setLargeMapPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<TripFile | null>(null);
   const previewStartTime = previewTime(form.startTime) ?? "";
   const previewEndTime = previewTime(form.endTime) ?? "";
   const previewDurationMinutes = calculateTripDurationMinutes(previewStartTime, previewEndTime);
@@ -634,6 +635,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     });
     return grouped;
   }, [data.files]);
+  const currentTripFiles = editingTrip ? filesByTripId.get(editingTrip.id) ?? [] : [];
 
   useEffect(() => {
     if (editingTrip) setForm(tripToForm(editingTrip));
@@ -646,6 +648,23 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   useEffect(() => {
     if (!mapsEmbedUrl) setLargeMapPreviewOpen(false);
   }, [mapsEmbedUrl]);
+
+  useEffect(() => {
+    if (!previewFile) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewFile(null);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewFile]);
+
+  useEffect(() => {
+    if (previewFile && !data.files.some((file) => file.id === previewFile.id)) {
+      setPreviewFile(null);
+    }
+  }, [data.files, previewFile]);
 
   function updateTripField(field: keyof ReturnType<typeof tripToForm>, value: string | boolean) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -726,11 +745,9 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     window.open(mapsUrl, "_blank", "noopener,noreferrer");
   }
 
-  async function uploadTripScreenshot(trip: Trip, fileList: FileList | null) {
-    const file = fileList?.[0];
-    if (!file) return;
+  async function saveTripScreenshot(trip: Trip, file: File) {
     if (!file.type.startsWith("image/")) {
-      showToast("Bitte ein Bild als Screenshot auswählen.");
+      showToast("Bitte ein Bild als Screenshot einfügen oder auswählen.");
       return;
     }
 
@@ -738,13 +755,50 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     await data.saveTripFile({
       tripId: trip.id,
       type: evidenceTypeForTrip(trip),
-      fileName: file.name,
+      fileName: file.name || `screenshot-${new Date().toISOString().replace(/[:.]/g, "-")}.png`,
       mimeType: file.type,
       size: file.size,
       dataUrl,
       description: evidenceDescriptionForTrip(trip)
     });
     showToast("Screenshot gespeichert.");
+  }
+
+  async function uploadTripScreenshot(trip: Trip | undefined, fileList: FileList | null) {
+    if (!trip) {
+      showToast("Reise zuerst speichern, dann Screenshots hinzufügen.");
+      return;
+    }
+    const file = fileList?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Bitte ein Bild als Screenshot einfügen oder auswählen.");
+      return;
+    }
+
+    await saveTripScreenshot(trip, file);
+  }
+
+  async function pasteTripScreenshot(event: ClipboardEvent<HTMLElement>) {
+    if (!editingTrip) {
+      showToast("Reise zuerst speichern, dann Screenshots hinzufügen.");
+      return;
+    }
+
+    const imageItem = [...event.clipboardData.items].find((item) => item.type.startsWith("image/"));
+    if (!imageItem) {
+      showToast("Bitte ein Bild als Screenshot einfügen oder auswählen.");
+      return;
+    }
+
+    event.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) {
+      showToast("Bitte ein Bild als Screenshot einfügen oder auswählen.");
+      return;
+    }
+
+    await saveTripScreenshot(editingTrip, file);
   }
 
   function downloadTripFile(file: TripFile) {
@@ -757,6 +811,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   async function removeTripFile(file: TripFile) {
     if (!window.confirm(`Screenshot "${file.fileName}" löschen?`)) return;
     await data.removeTripFile(file.id);
+    if (previewFile?.id === file.id) setPreviewFile(null);
     showToast("Screenshot gelöscht.");
   }
 
@@ -863,6 +918,52 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               />
             </div>
           ) : null}
+          <section
+            className={`trip-form-evidence ${editingTrip ? "" : "trip-form-evidence-disabled"}`.trim()}
+            aria-labelledby="trip-form-evidence-title"
+            tabIndex={editingTrip ? 0 : -1}
+            onPaste={(event) => void pasteTripScreenshot(event)}
+          >
+            <div className="trip-evidence-heading">
+              <div>
+                <span id="trip-form-evidence-title" className="section-label">Screenshots / Nachweise</span>
+                <p className="muted">{editingTrip ? "Bereich fokussieren und Screenshot mit Strg+V oder Cmd+V einfügen." : "Reise zuerst speichern, dann Screenshots hinzufügen."}</p>
+              </div>
+              {editingTrip ? (
+                <label className="secondary-button file-upload-button">
+                  <UploadSimple size={17} />
+                  Datei auswählen
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      void uploadTripScreenshot(editingTrip, event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+              ) : null}
+            </div>
+            {editingTrip && currentTripFiles.length === 0 ? <span className="muted">Noch kein Screenshot gespeichert.</span> : null}
+            {currentTripFiles.map((file) => (
+              <div key={file.id} className="trip-evidence-item">
+                <button className="trip-evidence-preview-button" type="button" onClick={() => setPreviewFile(file)}>
+                  <img src={file.dataUrl} alt="" />
+                  <span>
+                    <strong>{file.fileName}</strong>
+                    <small>{tripFileTypeLabel(file.type)} · {formatFileSize(file.size)}</small>
+                  </span>
+                </button>
+                <div className="trip-evidence-actions">
+                  <button className="secondary-button" type="button" onClick={() => downloadTripFile(file)}>
+                    <DownloadSimple size={17} />
+                    Herunterladen
+                  </button>
+                  <button className="danger-button" type="button" onClick={() => void removeTripFile(file)}>Löschen</button>
+                </div>
+              </div>
+            ))}
+          </section>
           <label className="check-row"><input type="checkbox" checked={form.done} onChange={(event) => updateTripField("done", event.target.checked)} /> Erledigt</label>
           <button className="primary-button" onClick={() => void saveTrip()}>{editingId ? "Änderungen speichern" : "Reise speichern"}</button>
         </div>
@@ -952,46 +1053,39 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 <button className="secondary-button" onClick={() => editTrip(trip)}>Bearbeiten</button>
                 <button className="danger-button" onClick={() => void removeTrip(trip.id)}>Löschen</button>
               </div>
-              <div className="trip-evidence-row">
-                <div className="trip-evidence-heading">
-                  <span className="section-label">Screenshots</span>
-                  <label className="secondary-button file-upload-button">
-                    <UploadSimple size={17} />
-                    Screenshot speichern
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(event) => {
-                        void uploadTripScreenshot(trip, event.target.files);
-                        event.target.value = "";
-                      }}
-                    />
-                  </label>
-                </div>
-                {(filesByTripId.get(trip.id) ?? []).length === 0 ? <span className="muted">Noch kein Screenshot gespeichert.</span> : null}
-                {(filesByTripId.get(trip.id) ?? []).map((file) => (
-                  <div key={file.id} className="trip-evidence-item">
-                    <a href={file.dataUrl} target="_blank" rel="noreferrer">
-                      <img src={file.dataUrl} alt="" />
-                      <span>
-                        <strong>{file.fileName}</strong>
-                        <small>{tripFileTypeLabel(file.type)} · {formatFileSize(file.size)}</small>
-                      </span>
-                    </a>
-                    <div className="trip-evidence-actions">
-                      <button className="secondary-button" type="button" onClick={() => downloadTripFile(file)}>
-                        <DownloadSimple size={17} />
-                        Herunterladen
-                      </button>
-                      <button className="danger-button" type="button" onClick={() => void removeTripFile(file)}>Löschen</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </article>
           ))}
         </div>
       </div>
+      {previewFile ? (
+        <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="trip-file-preview-title" onClick={() => setPreviewFile(null)}>
+          <div className="trip-file-modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="panel-heading">
+              <div>
+                <span id="trip-file-preview-title" className="section-label">Screenshot-Vorschau</span>
+                <strong>{previewFile.fileName}</strong>
+              </div>
+              <button className="icon-button" type="button" title="Vorschau schließen" aria-label="Vorschau schließen" onClick={() => setPreviewFile(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="trip-file-preview-frame">
+              <img src={previewFile.dataUrl} alt={previewFile.fileName} />
+            </div>
+            <div className="trip-file-preview-meta">
+              <span>{tripFileTypeLabel(previewFile.type)}</span>
+              <span>{formatFileSize(previewFile.size)}</span>
+            </div>
+            <div className="trip-evidence-actions">
+              <button className="secondary-button" type="button" onClick={() => downloadTripFile(previewFile)}>
+                <DownloadSimple size={17} />
+                Herunterladen
+              </button>
+              <button className="danger-button" type="button" onClick={() => void removeTripFile(previewFile)}>Löschen</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

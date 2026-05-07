@@ -1092,12 +1092,31 @@ button:disabled {
   gap: 8px;
 }
 
-.trip-evidence-row {
-  grid-column: 1 / -1;
+.trip-evidence-row,
+.trip-form-evidence {
   display: grid;
   gap: 10px;
   padding-top: 12px;
   border-top: 1px solid #eef1f5;
+}
+
+.trip-form-evidence {
+  margin-top: 14px;
+  border: 1px dashed #c8d4df;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfd;
+  outline: none;
+}
+
+.trip-form-evidence:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47, 111, 115, 0.16);
+}
+
+.trip-form-evidence-disabled {
+  border-style: solid;
+  background: #f7f8fa;
 }
 
 .trip-evidence-heading {
@@ -1106,6 +1125,11 @@ button:disabled {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.trip-evidence-heading p {
+  margin: 5px 0 0;
+  font-size: 0.88rem;
 }
 
 .file-upload-button {
@@ -1132,7 +1156,8 @@ button:disabled {
   padding: 10px;
 }
 
-.trip-evidence-item a {
+.trip-evidence-item a,
+.trip-evidence-preview-button {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr);
   gap: 12px;
@@ -1140,6 +1165,15 @@ button:disabled {
   min-width: 0;
   color: inherit;
   text-decoration: none;
+}
+
+.trip-evidence-preview-button {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  cursor: zoom-in;
 }
 
 .trip-evidence-item img {
@@ -1174,6 +1208,68 @@ button:disabled {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.trip-file-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(17, 24, 39, 0.62);
+}
+
+.trip-file-modal-card {
+  width: min(1040px, 100%);
+  max-height: calc(100dvh - 48px);
+  display: grid;
+  gap: 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 28px 70px -24px rgba(17, 24, 39, 0.55);
+}
+
+.trip-file-modal-card .panel-heading {
+  align-items: flex-start;
+}
+
+.trip-file-modal-card .panel-heading strong {
+  display: block;
+  max-width: min(720px, 72vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-file-preview-frame {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  max-height: 68dvh;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f3f5f8;
+}
+
+.trip-file-preview-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: 68dvh;
+  object-fit: contain;
+}
+
+.trip-file-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .skeleton-stack {
