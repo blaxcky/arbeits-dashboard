@@ -45,7 +45,7 @@ Es gibt keine serverseitige Speicherung, keine Cloud-Synchronisierung, keine ext
 - [ ] Route `#/reisekosten` als Roadmap-/Platzhalterbereich anlegen.
 - [ ] Route `#/aufgaben` als Roadmap-/Platzhalterbereich anlegen.
 - [ ] Route `#/einstellungen` für Einstellungen anlegen.
-- [ ] Unbekannte Routen auf Dashboard oder eine einfache Fehleransicht führen.
+- [x] Unbekannte Routen auf Dashboard oder eine einfache Fehleransicht führen.
 
 ### 3.3 Projektstruktur
 
@@ -152,7 +152,7 @@ Regeln:
 
 Diese Stores müssen nicht voll genutzt werden, dürfen aber im Backup-Format vorbereitet werden:
 
-- [ ] `trips` für Reisekosten.
+- [x] `trips` für Reisekosten.
 - [ ] `todos` für Aufgaben.
 - [ ] `files` für Nachweise und Dateien.
 
@@ -178,7 +178,7 @@ Diese Stores müssen nicht voll genutzt werden, dürfen aber im Backup-Format vo
 - [ ] Restzeit bis Soll anzeigen.
 - [ ] Uhrzeit anzeigen, wann Soll erreicht wird.
 - [ ] Aktuelles Tages-Plus oder Tages-Minus anzeigen.
-- [ ] Wochensumme anzeigen.
+- [x] Wochensumme anzeigen.
 - [ ] Gleitzeitstand anzeigen.
 - [ ] Warnung bei Überschreiten der Gleitzeitgrenze anzeigen.
 - [ ] Offenen Urlaub in Stunden und Tagen anzeigen.
@@ -225,7 +225,7 @@ Umsetzung:
 - [ ] Änderungen an Beginn, Ende und Pause beim Verlassen des jeweiligen Felds automatisch speichern.
 - [ ] Kein manueller Speichern-Button im Tagesformular.
 - [ ] Löschen für den aktuellen Tages-Eintrag anbieten.
-- [ ] Validierung für Uhrzeiten und Pausenwerte anzeigen.
+- [x] Validierung für Uhrzeiten und Pausenwerte anzeigen.
 
 ### 8.3 Berechnete Tageswerte
 
@@ -288,11 +288,11 @@ Die Wochenübersicht zeigt:
 
 - [ ] Zeiteinträge pro Tag.
 - [ ] Plus/Minus pro Tag.
-- [ ] Wochensumme.
-- [ ] Plusstunden dieser Woche.
-- [ ] Minusstunden dieser Woche.
-- [ ] Navigation zwischen Wochen.
-- [ ] Woche beginnt Montag.
+- [x] Wochensumme.
+- [x] Plusstunden dieser Woche.
+- [x] Minusstunden dieser Woche.
+- [x] Navigation zwischen Wochen.
+- [x] Woche beginnt Montag.
 
 ## 9. Gleitzeit
 
@@ -391,8 +391,8 @@ Aufgaben:
 
 Der Einstellungsbereich enthält mindestens:
 
-- [ ] App-Version.
-- [ ] Speicherstatus.
+- [x] App-Version.
+- [x] Speicherstatus.
 - [ ] Backup exportieren.
 - [ ] Backup importieren.
 - [ ] Cache und Service Worker zurücksetzen.
@@ -416,8 +416,39 @@ Umsetzung:
 
 - [ ] Einstellungsbereich in sinnvolle Abschnitte teilen.
 - [ ] Speichern pro Abschnitt oder klarer globaler Speichermechanik festlegen.
-- [ ] Validierung für Minuten-/Stundenwerte anzeigen.
+- [x] Validierung für Minuten-/Stundenwerte anzeigen.
 - [ ] Änderungen sofort im Dashboard widerspiegeln.
+
+### 11.1 Spätere Reisekosten-Einstellungen
+
+Diese Werte sollen nicht dauerhaft hart im Code bleiben, sondern später im Einstellungsbereich wartbar werden:
+
+- [ ] Kilometergeldsatz, aktueller Wert: 0,50 EUR pro Kilometer.
+- [ ] Regeln für normalen Beförderungszuschuss.
+- [ ] Regeln für erhöhten Beförderungszuschuss bei öffentlichen Verkehrsmitteln.
+- [ ] Maximalbetrag normaler Beförderungszuschuss, aktueller Wert: 69,30 EUR je Wegstrecke.
+- [ ] Maximalbetrag erhöhter Beförderungszuschuss, aktueller Wert: 109,00 EUR je Wegstrecke.
+- [ ] Jahresgrenze für Beförderungszuschüsse, aktueller Wert: 2.450,00 EUR.
+- [ ] Arbeitgeber-Diätensätze.
+- [ ] Steuerliche Diätensätze für Differenzwerbungskosten.
+- [ ] Google-Maps-Startadresse.
+- [ ] Google-Maps-API-Key ausschließlich lokal speichern.
+- [ ] Ein oder mehrere ÖBB-Abfahrtsorte.
+- [ ] Nachweistypen und Standardwerte für sonstige Reisekosten.
+
+Standard-Startadresse für Google Maps:
+
+```text
+Finanzamt Österreich - Dienststelle Bruck Eisenstadt Oberwart
+Neusiedler Str. 46
+7001 Eisenstadt
+```
+
+Beispiel-ÖBB-Abfahrtsort:
+
+```text
+Draßburg Bahnhst
+```
 
 ## 12. Backup, Export und Import
 
@@ -447,26 +478,35 @@ Der Export enthält:
 - [ ] Manifest mit Export-Zeitpunkt.
 - [ ] Einstellungen.
 - [ ] Zeiteinträge.
+- [x] Reiseeinträge.
+- [ ] Todo-Daten.
 - [ ] Gleitzeitstartwert.
 - [ ] Gleitzeitkorrekturen.
 - [ ] Urlaubswerte.
-- [ ] Leere oder vorbereitete Felder für spätere Reisekosten, Todos und Dateien.
+- [ ] Screenshots.
+- [ ] Nachweise.
+- [ ] Belege.
+- [ ] lokal gespeicherte Dateien.
+- [ ] lokal gespeicherte API-Einstellungen, soweit sinnvoll.
+- [ ] Modulkonfigurationen.
+- [x] Leere oder vorbereitete Felder für spätere Reisekosten, Todos und Dateien.
 
 Aufgaben:
 
 - [ ] ZIP-Datei lokal im Browser erzeugen.
 - [ ] Dateiname mit Datum/Uhrzeit erzeugen.
 - [ ] Export ohne Netzwerkverbindung ermöglichen.
-- [ ] Exportfehler sichtbar anzeigen.
+- [x] Exportfehler sichtbar anzeigen.
 
 ### 12.3 Import
 
 Import-Verhalten:
 
 - [ ] Backup-Datei auswählen.
-- [ ] ZIP-Struktur prüfen.
-- [ ] Manifest prüfen.
-- [ ] Daten prüfen.
+- [x] ZIP-Struktur prüfen.
+- [x] Manifest prüfen.
+- [x] Daten prüfen.
+- [ ] Dateien und Screenshots wiederherstellen.
 - [ ] Schema-Hauptversion prüfen.
 - [ ] Zusammenfassung anzeigen.
 - [ ] Erst nach ausdrücklicher Bestätigung lokale Datenbank ersetzen.
@@ -476,7 +516,7 @@ V1 implementiert keinen Merge-Import. Das Standardverhalten ist vollständiges E
 Regeln:
 
 - [ ] Unbekannte oder inkompatible Backup-Hauptversion ablehnen.
-- [ ] Fehlerhafte Pflichtfelder ablehnen.
+- [x] Fehlerhafte Pflichtfelder ablehnen.
 - [ ] Bekannte optionale Zukunftsfelder ignorieren, sofern sie die V1-Daten nicht betreffen.
 - [ ] Vor dem Ersetzen klare Warnung anzeigen.
 - [ ] Nach Import App-Daten neu laden.
@@ -527,31 +567,231 @@ Das Reisekostenmodul wird später als eigenständiges Modul innerhalb derselben 
 
 Geplante Funktionen:
 
-- [ ] Reise erstellen, bearbeiten und löschen.
-- [ ] Datum, Zeit von, Zeit bis und Dauer.
-- [ ] Grund, Ort und Zieladresse.
-- [ ] Fahrtkostenart.
-- [ ] Einfache Strecke in Kilometern.
-- [ ] Diäten.
-- [ ] Sonstige Kosten.
+- [x] Reise erstellen, bearbeiten und löschen.
+- [x] Datum, Zeit von, Zeit bis und Dauer.
+- [x] Grund, Ort und Zieladresse.
+- [x] Fahrtkostenart.
+- [x] Einfache Strecke in Kilometern.
+- [x] Diäten.
+- [x] Sonstige Kosten.
 - [ ] Nachweise und Screenshots.
-- [ ] Erledigt-Status.
-- [ ] Jahresübersichten.
-- [ ] Differenzwerbungskosten.
+- [x] Erledigt-Status.
+- [x] Jahresübersichten.
+- [ ] Differenzwerbungskosten vollständig berechnen und getrennt ausweisen.
+- [ ] Steuerpflichtige Anteile und bezahlte Steuer für Beförderungszuschüsse erfassen.
+- [ ] Notizen pro Reise erfassen.
 
 Fahrtkostenarten:
 
-- [ ] Kilometergeld.
-- [ ] Beförderungszuschuss normal.
-- [ ] Beförderungszuschuss Öffis.
-- [ ] Dienstauto.
-- [ ] Sonstige Kosten oder freier Betrag.
+- [x] Kilometergeld.
+- [x] Beförderungszuschuss normal.
+- [x] Beförderungszuschuss Öffis.
+- [x] Dienstauto.
+- [x] Sonstige Kosten oder freier Betrag.
 
 Architekturregel:
 
-- [ ] Fahrtkostenlogik regelbasiert und modular aufbauen.
-- [ ] Sätze und Regeln später wartbar änderbar halten.
-- [ ] Reisekostenberechnungen nicht in UI-Komponenten verstreuen.
+- [x] Fahrtkostenlogik regelbasiert und modular aufbauen.
+- [x] Sätze und Regeln später wartbar änderbar halten.
+- [x] Reisekostenberechnungen nicht in UI-Komponenten verstreuen.
+
+### 14.1 Reise-Datenmodell
+
+Ein Reiseeintrag soll fachlich folgende Daten abdecken:
+
+- [x] ID.
+- [x] Datum.
+- [x] Zeit von.
+- [x] Zeit bis.
+- [x] berechnete Dauer in Minuten.
+- [x] Grund der Reise.
+- [x] Startort.
+- [x] Ort oder Zieladresse der Reise.
+- [x] Fahrtkostenersatz-Art.
+- [x] einfache Strecke in Kilometern.
+- [x] Diäten laut Arbeitgeber.
+- [ ] steuerliche Diäten.
+- [ ] Differenzwerbungskosten Diäten.
+- [ ] Differenzwerbungskosten Fahrtkosten.
+- [ ] steuerpflichtiger Beförderungszuschuss.
+- [ ] bezahlte Steuer auf Beförderungszuschuss.
+- [x] sonstige Kosten.
+- [x] berechnete Summe.
+- [x] Erledigt-Status.
+- [ ] Nachweise und Screenshots.
+- [ ] Notizen.
+- [x] createdAt.
+- [x] updatedAt.
+
+Der Erledigt-Status muss mindestens offen/erledigt abbilden. Später mögliche Status sind offen, in Bearbeitung, eingereicht und erledigt.
+
+### 14.2 Kilometergeld
+
+Aktueller Satz:
+
+- [x] 0,50 EUR je Kilometer.
+
+Regeln:
+
+- [x] Eingetragen wird immer die einfache Wegstrecke.
+- [x] Hin- und Rückfahrt werden automatisch gerechnet.
+- [x] Berechnung: einfache Strecke x 2 x 0,50 EUR.
+- [ ] Nachweis hochladen können, dass kein Dienstauto frei war.
+
+Beispiel:
+
+```text
+einfache Strecke: 30 km
+Hin- und Rückfahrt: 60 km
+Kilometergeld: 60 x 0,50 EUR = 30 EUR
+```
+
+### 14.3 Normaler Beförderungszuschuss
+
+Der normale Beförderungszuschuss berechnet sich je Wegstrecke.
+
+Regeln:
+
+- [x] bis 8 km: 2,00 EUR je Wegstrecke.
+- [x] für die ersten 50 km: 0,26 EUR je km.
+- [x] für die weiteren 250 km: 0,13 EUR je km.
+- [x] für jeden weiteren km: 0,07 EUR je km.
+- [x] Maximalbetrag: 69,30 EUR je Wegstrecke.
+- [x] Hin- und Rückweg werden auf Basis der einfachen Strecke gerechnet.
+- [ ] Kürzeste Wegstrecke als fachliche Grundlage dokumentieren oder prüfen.
+- [ ] Jahresgrenze für Beförderungszuschüsse überwachen.
+
+Hinweis:
+
+> Der Ersatz der Kosten für Massenbeförderungsmittel ist damit grundsätzlich abgegolten. Kosten für Reise- oder Dienstgepäck bleiben davon unberührt.
+
+### 14.4 Erhöhter Beförderungszuschuss Öffis
+
+Wenn glaubhaft gemacht wird, dass für die Reisebewegung Massenbeförderungsmittel genutzt wurden, gelten erhöhte Beträge.
+
+Regeln:
+
+- [x] für die ersten 50 km: 0,50 EUR je km.
+- [x] für die weiteren 250 km: 0,20 EUR je km.
+- [x] für jeden weiteren km: 0,10 EUR je km.
+- [x] Maximalbetrag: 109,00 EUR je Wegstrecke.
+- [x] Diese Variante ist separat auswählbar.
+- [ ] Screenshot der Verbindungskosten von der ÖBB-Ticketseite hochladen können.
+- [ ] Steuerpflichtigen Anteil und bezahlte Steuer erfassen können, falls relevant.
+- [ ] Jahresgrenze für Beförderungszuschüsse überwachen.
+
+### 14.5 Jahresgrenze Beförderungszuschüsse
+
+Die Summe der Beförderungszuschüsse darf pro Kalenderjahr höchstens betragen:
+
+```text
+2.450,00 EUR
+```
+
+Die App soll anzeigen:
+
+- [ ] bisherige Summe der Beförderungszuschüsse im Jahr.
+- [ ] verbleibender Betrag bis zur Jahresgrenze.
+- [ ] Warnung bei Annäherung an die Grenze.
+- [ ] Warnung bei Erreichen oder Überschreiten der Grenze.
+
+### 14.6 Dienstauto
+
+Bei Nutzung eines Dienstautos gibt es keinen Fahrtkostenersatz.
+
+Regeln:
+
+- [x] Fahrtkostenersatz = 0 EUR.
+- [x] Diäten können trotzdem anfallen.
+- [x] Sonstige Kosten können zusätzlich eingetragen werden.
+- [ ] Belege für sonstige Kosten wie Parktickets hochladen können.
+
+### 14.7 Sonstige Kosten und freier Betrag
+
+Sonstige Kosten decken direkte oder belegbare Reisekosten ab.
+
+Beispiele:
+
+- Zugticketkosten.
+- Parkticket beim Dienstauto.
+- sonstige belegbare Reisekosten.
+
+Umsetzung:
+
+- [x] Freien Betrag eintragen.
+- [ ] Beschreibung pro sonstigem Kostenposten erfassen.
+- [ ] Beleg oder Screenshot zuordnen.
+- [ ] Notiz erfassen.
+
+### 14.8 Diäten Arbeitgeber
+
+Die Arbeitgeber-Diäten werden nach fixen Zeitgrenzen berechnet.
+
+Regeln:
+
+- [x] Reise länger als 5 Stunden: 10 EUR.
+- [x] Reise länger als 8 Stunden: 20 EUR.
+- [x] Reise länger als 12 Stunden: 30 EUR.
+- [x] sonst: 0 EUR.
+
+Die Excel-Logik entspricht sinngemäß:
+
+```text
+Wenn Dauer > 12 Stunden: 30 EUR
+Sonst wenn Dauer > 8 Stunden: 20 EUR
+Sonst wenn Dauer > 5 Stunden: 10 EUR
+Sonst: 0 EUR
+```
+
+Die Dauer wird automatisch aus Zeit von und Zeit bis berechnet.
+
+### 14.9 Steuerliche Diäten und Differenzwerbungskosten
+
+Für die Steuerbetrachtung soll zusätzlich der gesetzliche Vergleichswert berechnet werden:
+
+- [ ] 2,50 EUR pro angefangener Stunde.
+- [ ] maximal 30 EUR pro Tag.
+
+Berechnung:
+
+```text
+Differenzwerbungskosten Diäten = steuerlich möglicher Betrag - vom Arbeitgeber bezahlter Betrag
+```
+
+Beispiel:
+
+```text
+Arbeitgeber zahlt: 20 EUR
+steuerlicher Vergleichswert: 25 EUR
+Differenzwerbungskosten: 5 EUR
+```
+
+### 14.10 Differenzwerbungskosten Fahrtkosten
+
+Auch bei Beförderungszuschüssen können Differenzwerbungskosten entstehen.
+
+Berechnung:
+
+```text
+Differenzwerbungskosten Fahrtkosten = fiktives Kilometergeld - erhaltener Beförderungszuschuss
+```
+
+Zusätzlich muss berücksichtigt werden können:
+
+- [ ] ob der Beförderungszuschuss steuerpflichtig ausbezahlt wurde.
+- [ ] welcher Betrag steuerpflichtig war.
+- [ ] welche Steuer dafür bezahlt wurde.
+- [ ] ob dadurch eine höhere Differenz zum Kilometergeld entsteht.
+
+### 14.11 Jahresübersicht Differenzwerbungskosten
+
+Die Jahresübersicht soll für die Arbeitnehmerveranlagung vorbereiten:
+
+- [ ] Summe Differenzwerbungskosten aus Diäten.
+- [ ] Summe Differenzwerbungskosten aus Beförderungszuschüssen.
+- [ ] Gesamtsumme.
+- [ ] Liste betroffener Reisen.
+- [ ] Detailwerte pro Reise.
 
 ## 15. Roadmap Nachweise und Dateien
 
@@ -574,6 +814,66 @@ Mögliche Nachweistypen:
 - [ ] Zugticket.
 - [ ] Sonstiger Beleg.
 
+### 15.1 Nachweis bei Kilometergeld
+
+Für Kilometergeld muss nachgewiesen werden können, dass kein Dienstauto frei war.
+
+Aktueller Ablauf:
+
+- Screenshot von Kalendern machen.
+- Screenshot als Nachweis aufbewahren.
+- Screenshot bei Nachfragen oder im eigentlichen System hochladen.
+
+Die App soll pro Reise ermöglichen:
+
+- [ ] Screenshot hochladen.
+- [ ] Screenshot anzeigen.
+- [ ] Screenshot herunterladen.
+- [ ] Screenshot im Backup sichern.
+
+### 15.2 Nachweis beim erhöhten Beförderungszuschuss
+
+Beim Beförderungszuschuss für öffentliche Verkehrsmittel muss ein Screenshot der Verbindungskosten von der ÖBB-Ticketseite möglich sein.
+
+Grund:
+
+- Der Zuschuss kann teilweise steuerbar sein.
+- Die Verbindungskosten müssen zeitnah dokumentiert werden.
+- Der Screenshot kann später für das eigentliche System benötigt werden.
+
+Die App soll ermöglichen:
+
+- [ ] Screenshot zur Reise hochladen.
+- [ ] Screenshot lokal speichern.
+- [ ] Screenshot wieder herunterladen.
+- [ ] Screenshot im Backup sichern.
+
+### 15.3 Belege für sonstige Kosten
+
+Für sonstige Kosten wie Parktickets oder direkte Ticketkosten soll ebenfalls ein Beleg gespeichert werden können.
+
+Mögliche Daten:
+
+- [ ] Betrag.
+- [ ] Beschreibung.
+- [ ] Datei oder Screenshot.
+- [ ] Notiz.
+- [ ] Datum des Uploads.
+
+### 15.4 Datei-Datenmodell
+
+Ein Nachweis oder eine Datei soll enthalten:
+
+- [ ] ID.
+- [ ] Reise-ID.
+- [ ] Typ.
+- [ ] Dateiname.
+- [ ] MIME-Type.
+- [ ] Dateigröße.
+- [ ] Datei-Blob oder Backup-Dateipfad.
+- [ ] Beschreibung.
+- [ ] createdAt.
+
 ## 16. Roadmap Komfortfunktionen
 
 Spätere Komfortfunktionen:
@@ -585,6 +885,67 @@ Spätere Komfortfunktionen:
 - [ ] ÖBB-Komfortlink oder ÖBB-Widget pro Reise erzeugen.
 - [ ] Mehrere ÖBB-Abfahrtsorte unterstützen.
 - [ ] Keine automatische Datenübernahme aus ÖBB.
+
+### 16.1 Google Maps
+
+Die Kilometer werden derzeit mittels Google Maps ermittelt. Die App soll weiterhin manuelle Kilometereingabe unterstützen und zusätzlich Komfortfunktionen anbieten.
+
+Regeln:
+
+- [x] Eingetragen wird immer die einfache Wegstrecke.
+- [ ] Startadresse ist standardmäßig die Dienststelle und in den Einstellungen änderbar.
+- [ ] Google-Maps-Link aus Startadresse und Zieladresse erzeugen.
+- [ ] Sonderzeichen, Umlaute und Leerzeichen per URL-Encoding korrekt behandeln.
+- [ ] Google-Maps-API-Key lokal in der App speichern.
+- [ ] API-Key darf nicht im Quellcode stehen.
+- [ ] Kilometerabfrage nur manuell auslösen.
+- [ ] Keine automatische Massenabfrage.
+
+Beispielziel:
+
+```text
+Steinbruch II 2, 7141 Podersdorf am See
+```
+
+Beispiel-Link:
+
+```text
+https://www.google.com/maps/dir/Finanzamt+%C3%96sterreich+-+Dienststelle+Bruck+Eisenstadt+Oberwart,+Neusiedler+Str.+46,+7001+Eisenstadt/Steinbruch+II+2,+7141+Podersdorf+am+See
+```
+
+### 16.2 ÖBB-Komfortlink oder Widget
+
+Das ÖBB-Widget oder ein ÖBB-Komfortlink ist ausschließlich eine Komfortfunktion.
+
+Regeln:
+
+- [ ] Pro Reise automatisch mit hinterlegtem Abfahrtsort und Zieladresse erzeugen.
+- [ ] Zieladresse kommt aus der Reise.
+- [ ] Ein oder mehrere Abfahrtsorte aus den Einstellungen verwenden.
+- [ ] Verbindungssuche oder Ticketseite in neuem Tab öffnen.
+- [ ] Keine Preise automatisch übernehmen.
+- [ ] Keine Verbindungskosten automatisch ermitteln.
+- [ ] Keine Reisekosten, Diäten, Steuerwerte oder Differenzwerbungskosten aus dem Widget berechnen.
+
+Offizielles Widget-Beispiel:
+
+```html
+<script src="https://fahrplan.oebb.at/webapp/staticfiles/hafas-widget-core.1.0.0.js?language=de_DE"></script>
+<div
+  data-hfs-widget="true"
+  data-hfs-widget-cfg-colorscheme="light"
+  data-hfs-widget-tp="true"
+  data-hfs-widget-tp-postform="newtab"
+  data-hfs-widget-tp-displaymode="query"
+  data-hfs-widget-tp-autosearch="true"
+  data-hfs-widget-tp-dep="Draßburg Bahnhst"
+  data-hfs-widget-tp-arr="7141 Podersdorf am See, Steinbruch II 1">
+</div>
+```
+
+Planungssatz:
+
+> ÖBB-Widget = Komfort / Direktlink / Verbindungssuche. Eigene App-Logik = Berechnung / Speicherung / Nachweise / Steuerübersicht.
 
 ## 17. Roadmap Todo-Modul
 
@@ -626,6 +987,21 @@ Spätere Erweiterungen:
 - [ ] Dateiverwaltung getrennt halten.
 - [ ] Berechnungslogik nicht direkt in UI-Komponenten verstreuen.
 - [ ] Regeln für Zeiterfassung, Gleitzeit, Urlaub, Reisekosten, Diäten und Differenzwerbungskosten in eigene testbare Funktionen legen.
+- [ ] Fahrtkostenarten später weiter in eigene Regelmodule trennen.
+- [ ] Reisekosten-Regeln perspektivisch aus Einstellungen oder zentraler Regelkonfiguration lesen.
+
+Mögliche spätere Struktur:
+
+```text
+src/modules/expenses/
+|-- calculations.ts
+|-- rules/
+    |-- kilometerAllowance.ts
+    |-- standardTransportSubsidy.ts
+    |-- publicTransportSubsidy.ts
+    |-- companyCar.ts
+    |-- otherCosts.ts
+```
 
 ## 19. Testplan V1
 
@@ -644,6 +1020,14 @@ Spätere Erweiterungen:
 - [ ] Warnung bei Überschreiten der Gleitzeitgrenze testen.
 - [ ] Urlaubsumrechnung Stunden/Tage testen.
 - [ ] Zu verbrauchende Jahressumme testen.
+- [x] Kilometergeld mit Hin- und Rückweg testen.
+- [x] Normalen Beförderungszuschuss testen.
+- [x] Erhöhten Beförderungszuschuss Öffis testen.
+- [x] Arbeitgeber-Diäten mit 5-/8-/12-Stunden-Grenzen testen.
+- [ ] Steuerliche Diäten testen.
+- [ ] Differenzwerbungskosten Diäten testen.
+- [ ] Differenzwerbungskosten Fahrtkosten testen.
+- [ ] Beförderungszuschuss-Jahresgrenze testen.
 
 ### 19.2 Daten- und Backup-Tests
 
@@ -655,6 +1039,8 @@ Spätere Erweiterungen:
 - [ ] Backup-Import mit Ersetzen testen.
 - [ ] Inkompatibles Backup ablehnen.
 - [ ] Fehlerhaftes Backup ablehnen.
+- [ ] Reisekosten im Backup exportieren und importieren.
+- [ ] Nachweise und Dateien im Backup exportieren und importieren.
 
 ### 19.3 PWA- und Build-Tests
 
@@ -672,6 +1058,12 @@ Spätere Erweiterungen:
 - [ ] Wochenwechsel testen.
 - [ ] Einstellungen speichern testen.
 - [ ] Datenlösch-Warnung testen.
+- [ ] Reise erstellen, bearbeiten, löschen und erledigen.
+- [ ] Fahrtkostenart wechseln und Vorschau prüfen.
+- [ ] Diäten-Grenzwerte im Formular prüfen.
+- [ ] Jahresübersicht Reisekosten prüfen.
+- [ ] Warnung bei fehlendem Nachweis prüfen.
+- [ ] Warnung bei Beförderungszuschuss-Jahresgrenze prüfen.
 
 ## 20. Umsetzungsschritte
 
@@ -710,8 +1102,8 @@ Spätere Erweiterungen:
 - [ ] Tagesformular als primären Dashboard-Bereich bauen.
 - [ ] Live-Anzeige neben dem Tagesformular bauen.
 - [ ] Speichern, Aktualisieren und Löschen implementieren.
-- [ ] Wochenübersicht bauen.
-- [ ] Wochennavigation einbauen.
+- [x] Wochenübersicht bauen.
+- [x] Wochennavigation einbauen.
 - [ ] Fehler- und Leerzustände gestalten.
 - [ ] UI-Szenarien testen.
 
@@ -733,8 +1125,8 @@ Spätere Erweiterungen:
 - [ ] Gleitzeitgrenze und Startwert implementieren.
 - [ ] Gleitzeitkorrekturen implementieren.
 - [ ] Urlaubswerte implementieren.
-- [ ] Speicherstatus anzeigen.
-- [ ] App-Version anzeigen.
+- [x] Speicherstatus anzeigen.
+- [x] App-Version anzeigen.
 - [ ] Lokale Datenlöschung mit Warnung implementieren.
 
 ### Phase 7 - Backup und Import
@@ -767,7 +1159,24 @@ Spätere Erweiterungen:
 - [ ] Aufgaben-Platzhalterseite erstellen.
 - [ ] Roadmap-Inhalte knapp anzeigen.
 - [ ] Keine unfertigen Eingabeformulare für Roadmap-Module anbieten.
-- [ ] Backup-Format für spätere Daten vorbereitet lassen.
+- [x] Backup-Format für spätere Daten vorbereitet lassen.
+
+### Phase 9a - Reisekostenabrechnung
+
+- [x] Reiseeinträge erstellen, bearbeiten und löschen.
+- [x] Fahrtkostenarten auswählbar machen.
+- [x] Kilometergeld berechnen.
+- [x] Normalen Beförderungszuschuss berechnen.
+- [x] Erhöhten Beförderungszuschuss Öffis berechnen.
+- [x] Dienstauto mit 0 EUR Fahrtkostenersatz abbilden.
+- [x] Sonstige Kosten als freien Betrag abbilden.
+- [x] Arbeitgeber-Diäten automatisch berechnen.
+- [ ] Steuerliche Diäten automatisch berechnen.
+- [ ] Differenzwerbungskosten automatisch berechnen.
+- [ ] Beförderungszuschuss-Jahresgrenze überwachen.
+- [ ] Nachweise und Screenshots pro Reise speichern.
+- [ ] Google-Maps-Link pro Reise erzeugen.
+- [ ] ÖBB-Komfortlink oder Widget pro Reise erzeugen.
 
 ### Phase 10 - Abschluss V1
 
@@ -804,13 +1213,14 @@ Spätere Erweiterungen:
 
 ## 22. Offene Punkte nach V1
 
-- [ ] Reisekosten detailliert spezifizieren.
-- [ ] Nachweise und Dateien detailliert spezifizieren.
+- [x] Reisekosten detailliert spezifizieren.
+- [x] Nachweise und Dateien detailliert spezifizieren.
 - [ ] Todo-Modul detailliert spezifizieren.
 - [ ] Verschlüsselte Backups prüfen.
 - [ ] Optionalen Start/Stop-Modus für Zeiterfassung prüfen.
 - [ ] Konkrete Urlaubstage oder Abwesenheitskalender prüfen.
-- [ ] Komfortfunktionen für Google Maps und ÖBB prüfen.
+- [x] Komfortfunktionen für Google Maps und ÖBB spezifizieren.
+- [ ] Komfortfunktionen für Google Maps und ÖBB umsetzen.
 
 ## 23. Bearbeitungsstand 2026-05-06
 
@@ -838,6 +1248,16 @@ Spätere Erweiterungen:
 - [x] PWA-Manifest, App-Icons und Service-Worker-Generierung umgesetzt.
 - [x] GitHub-Actions-Deployment für GitHub Pages erstellt.
 - [x] Roadmap-Platzhalter für Reisekosten und Aufgaben umgesetzt.
+- [x] App-Version und Speicherstatus im Einstellungsbereich umgesetzt.
+- [x] Wochenübersicht um Vorwoche-/Folgewoche-Navigation sowie Plus-/Minus-Wochensummen erweitert.
+- [x] Unbekannte Hash-Routen leiten zurück auf das Dashboard.
+- [x] Pausenwerte im Dashboard werden validiert und als Feldfehler angezeigt.
+- [x] Stundenwerte in den Einstellungen werden vor dem Speichern validiert.
+- [x] Backup-Exportfehler werden im Einstellungsbereich sichtbar angezeigt.
+- [x] Backup-Import prüft ZIP-Struktur, Manifest, Daten und Pflichtfelder strenger.
+- [x] Reisekostenmodul mit Reise-CRUD, Fahrtkostenarten, Jahresübersicht und modularer Berechnung umgesetzt.
+- [x] Reisekosten berechnen Kilometergeld, Beförderungszuschüsse und Inlandsdiäten automatisch.
+- [x] Ursprünglichen Projektplan mit `USER-PLAN.md` abgeglichen und fachliche Reisekosten-Details ergänzt.
 - [x] `npm test` erfolgreich ausgeführt.
 - [x] `npm run build` erfolgreich ausgeführt.
 - [x] Lokaler Vite-Server auf Port 5174 gestartet.

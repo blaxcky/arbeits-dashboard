@@ -29,7 +29,8 @@ a {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -316,6 +317,30 @@ button:disabled {
   border-top: 1px solid var(--line);
 }
 
+.week-heading {
+  align-items: flex-start;
+}
+
+.week-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.week-summary strong {
+  color: #1f2937;
+}
+
+.week-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .week-row {
   display: grid;
   grid-template-columns: 1fr 1.3fr 0.7fr 0.7fr 0.8fr;
@@ -357,6 +382,10 @@ button:disabled {
   gap: 14px;
 }
 
+.field-wide {
+  grid-column: 1 / -1;
+}
+
 .day-entry-grid {
   align-items: end;
 }
@@ -370,6 +399,7 @@ button:disabled {
 }
 
 .field input,
+.field select,
 .field textarea,
 .date-row input {
   width: 100%;
@@ -380,6 +410,11 @@ button:disabled {
   padding: 11px 12px;
   outline: none;
   transition: border-color 160ms ease, background 160ms ease;
+}
+
+.field textarea {
+  resize: vertical;
+  line-height: 1.45;
 }
 
 .field.break-field {
@@ -424,10 +459,26 @@ button:disabled {
 }
 
 .field input:focus,
+.field select:focus,
 .field textarea:focus,
 .date-row input:focus {
   border-color: var(--accent);
   background: #fff;
+}
+
+.check-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #303b4b;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.check-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
 }
 
 .live-clock-panel {
@@ -647,6 +698,100 @@ button:disabled {
   line-height: 1.8;
 }
 
+.trip-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.trip-preview {
+  border-bottom: 1px solid #eef1f5;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+}
+
+.trip-preview div {
+  min-width: 0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.trip-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(220px, 0.8fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0;
+  border-top: 1px solid #eef1f5;
+}
+
+.trip-row strong,
+.trip-row span {
+  display: block;
+}
+
+.trip-row span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.trip-row-done {
+  opacity: 0.72;
+}
+
+.trip-row-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  text-align: right;
+}
+
+.trip-row-metrics small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+
+.trip-helper-grid {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 6px;
+}
+
+.inline-warning {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid #ecd7ac;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #76531d;
+  background: #fff8eb;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.limit-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf1f6;
+  margin: 14px 0;
+}
+
+.limit-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2f6f73;
+}
+
+.trip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .skeleton-stack {
   display: grid;
   gap: 12px;
@@ -693,6 +838,14 @@ button:disabled {
 
   .week-row {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .trip-row {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-row-metrics {
+    text-align: left;
   }
 
   .date-row,

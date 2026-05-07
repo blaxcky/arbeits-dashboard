@@ -4,14 +4,17 @@ import {
   deleteAllLocalData,
   deleteFlexCorrection,
   deleteTimeEntry,
+  deleteTrip,
   ensureDefaults,
   getTimeEntryByDate,
   listFlexCorrections,
   listTimeEntries,
+  listTrips,
   updateSettings,
-  upsertTimeEntry
+  upsertTimeEntry,
+  upsertTrip
 } from "../db/database";
-import type { FlexCorrection, Settings, TimeEntry } from "../db/schema";
+import type { FlexCorrection, Settings, TimeEntry, Trip } from "../db/schema";
 import { todayKey } from "../lib/dates";
 
 export interface WorkDataState {
@@ -20,6 +23,7 @@ export interface WorkDataState {
   settings: Settings | null;
   timeEntries: TimeEntry[];
   flexCorrections: FlexCorrection[];
+  trips: Trip[];
 }
 
 export function useWorkData() {
@@ -28,15 +32,16 @@ export function useWorkData() {
     error: null,
     settings: null,
     timeEntries: [],
-    flexCorrections: []
+    flexCorrections: [],
+    trips: []
   });
   const [clock, setClock] = useState(new Date());
 
   const refresh = useCallback(async () => {
     try {
       const settings = await ensureDefaults();
-      const [timeEntries, flexCorrections] = await Promise.all([listTimeEntries(), listFlexCorrections()]);
-      setState({ loading: false, error: null, settings, timeEntries, flexCorrections });
+      const [timeEntries, flexCorrections, trips] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips()]);
+      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips });
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Daten konnten nicht geladen werden." }));
     }
@@ -78,6 +83,14 @@ export function useWorkData() {
     },
     removeCorrection: async (id: string) => {
       await deleteFlexCorrection(id);
+      await refresh();
+    },
+    saveTrip: async (input: Omit<Trip, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
+      await upsertTrip(input);
+      await refresh();
+    },
+    removeTrip: async (id: string) => {
+      await deleteTrip(id);
       await refresh();
     },
     wipeData: async () => {

@@ -7,6 +7,7 @@ import {
   type FlexCorrection,
   type Settings,
   type TimeEntry,
+  type Trip,
   type VacationSummary,
   defaultSettings
 } from "./schema";
@@ -17,6 +18,7 @@ class WorkDashboardDb extends Dexie {
   flexCorrections!: Table<FlexCorrection, string>;
   vacationSummary!: Table<VacationSummary, string>;
   appMeta!: Table<AppMeta, string>;
+  trips!: Table<Trip, string>;
 
   constructor() {
     super("arbeits-dashboard");
@@ -26,6 +28,14 @@ class WorkDashboardDb extends Dexie {
       flexCorrections: "id, date, createdAt",
       vacationSummary: "id, year",
       appMeta: "id"
+    });
+    this.version(2).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType"
     });
   }
 }
@@ -122,6 +132,27 @@ export async function deleteFlexCorrection(id: string): Promise<void> {
   await db.flexCorrections.delete(id);
 }
 
+export async function listTrips(): Promise<Trip[]> {
+  return db.trips.orderBy("date").reverse().toArray();
+}
+
+export async function upsertTrip(input: Omit<Trip, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<Trip> {
+  const existing = input.id ? await db.trips.get(input.id) : undefined;
+  const now = new Date().toISOString();
+  const trip: Trip = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+  await db.trips.put(trip);
+  return trip;
+}
+
+export async function deleteTrip(id: string): Promise<void> {
+  await db.trips.delete(id);
+}
+
 export async function readAllData(): Promise<BackupData> {
   await ensureDefaults();
   return {
@@ -130,26 +161,27 @@ export async function readAllData(): Promise<BackupData> {
     flexCorrections: await db.flexCorrections.toArray(),
     vacationSummary: (await db.vacationSummary.get("current")) ?? null,
     appMeta: (await db.appMeta.get("main")) ?? null,
-    trips: [],
+    trips: await db.trips.toArray(),
     todos: [],
     files: []
   };
 }
 
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear()]);
     if (data.settings) await db.settings.put(data.settings);
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
     if (data.vacationSummary) await db.vacationSummary.put(data.vacationSummary);
     if (data.appMeta) await db.appMeta.put(data.appMeta);
+    await db.trips.bulkPut(data.trips);
   });
   await ensureDefaults();
 }
 
 export async function deleteAllLocalData(): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear()]);
   });
 }
