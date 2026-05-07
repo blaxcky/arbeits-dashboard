@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDays, formatWholeDays } from "./format";
+import { formatDays, formatWholeDays, minutesToHourInput, parseHoursToMinutes } from "./format";
 
 describe("format helpers", () => {
   it("formats whole vacation days without decimals", () => {
@@ -8,5 +8,13 @@ describe("format helpers", () => {
 
   it("formats required consumption as days with one decimal", () => {
     expect(formatDays(1640)).toBe("3,4 Tage");
+  });
+
+  it("parses decimal hours with comma into minutes", () => {
+    expect(parseHoursToMinutes("97,34")).toBe(5840);
+  });
+
+  it("formats minutes as compact hour input", () => {
+    expect(minutesToHourInput(5840)).toBe("97.33");
   });
 });

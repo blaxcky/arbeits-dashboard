@@ -11,6 +11,10 @@ export function formatSignedMinutes(minutes: number): string {
   return `${minutes > 0 ? "+" : "-"}${formatMinutes(Math.abs(minutes))}`;
 }
 
+export function formatAbsoluteMinutes(minutes: number): string {
+  return formatMinutes(Math.abs(minutes));
+}
+
 export function formatDecimalHours(minutes: number): string {
   return `${(minutes / 60).toLocaleString("de-AT", {
     minimumFractionDigits: 1,
@@ -36,4 +40,15 @@ export function formatClockFromMinutes(minutes: number): string {
   const hours = Math.floor(dayMinutes / 60);
   const rest = dayMinutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+}
+
+export function parseHoursToMinutes(value: string): number | null {
+  const numeric = Number(value.trim().replace(",", "."));
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(numeric * 60);
+}
+
+export function minutesToHourInput(minutes: number): string {
+  const hours = minutes / 60;
+  return Number.isInteger(hours) ? String(hours) : String(Number(hours.toFixed(2)));
 }

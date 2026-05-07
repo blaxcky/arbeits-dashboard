@@ -41,11 +41,13 @@ describe("time calculations", () => {
     const summary = calculateWeek(
       [
         { date: "2026-05-04", startTime: "07:00", endTime: "15:00", breakMinutes: 30, targetMinutes: 480 },
-        { date: "2026-05-05", startTime: "07:00", endTime: "16:00", breakMinutes: 30, targetMinutes: 480 }
+        { date: "2026-05-05", startTime: "07:00", endTime: "16:00", breakMinutes: 30, targetMinutes: 480 },
+        { date: "2026-05-09", startTime: "07:00", endTime: "16:00", breakMinutes: 30, targetMinutes: 480 }
       ],
       "2026-05-06"
     );
     expect(summary.weekStart).toBe("2026-05-04");
+    expect(summary.days).toHaveLength(5);
     expect(summary.workedMinutes).toBe(1020);
     expect(summary.plusMinutes).toBe(60);
   });

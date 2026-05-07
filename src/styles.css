@@ -352,6 +352,22 @@ button:disabled {
   font-family: "Geist Mono", ui-monospace, monospace;
 }
 
+.week-delta {
+  justify-self: end;
+}
+
+.week-delta-plus {
+  color: #2f6f4f;
+}
+
+.week-delta-minus {
+  color: #a33a34;
+}
+
+.week-delta-zero {
+  color: #315f86;
+}
+
 .split-grid,
 .settings-grid {
   display: grid;
@@ -567,6 +583,14 @@ button:disabled {
   font-size: 0.92rem;
 }
 
+.live-clock-meta {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
 .detail-list {
   display: grid;
   gap: 0;
@@ -674,6 +698,23 @@ button:disabled {
   border-top: 1px solid #eef1f5;
 }
 
+.correction-value {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.correction-value strong {
+  font-family: "Geist Mono", ui-monospace, monospace;
+}
+
+.correction-value small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .roadmap-panel {
   display: flex;
   gap: 18px;
@@ -742,6 +783,27 @@ button:disabled {
 .trip-row-metrics small {
   grid-column: 1 / -1;
   color: var(--muted);
+}
+
+.auto-fit-input-wrap {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.auto-fit-input {
+  white-space: nowrap;
+}
+
+.auto-fit-measure {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  white-space: pre;
+  font: inherit;
+  font-size: 16px;
+  pointer-events: none;
 }
 
 .trip-helper-grid {

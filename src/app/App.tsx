@@ -11,13 +11,13 @@ import {
   UploadSimple,
   Warning
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import type { Settings, TimeEntry, Trip, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
-import { formatDays, formatDecimalHours, formatMinutes, formatSignedMinutes, formatWholeDays } from "../lib/format";
+import { formatAbsoluteMinutes, formatDays, formatMinutes, formatSignedMinutes, formatWholeDays, minutesToHourInput, parseHoursToMinutes } from "../lib/format";
 import {
   calculateDay,
   calculateFlexBalance,
@@ -214,7 +214,7 @@ function Dashboard({ data }: { data: WorkData }) {
         <form className="panel form-panel day-entry-panel" onSubmit={(event) => event.preventDefault()}>
           <div className="panel-heading">
             <span className="section-label">Tageserfassung</span>
-            <strong>{formatDateKey(selectedDate)}</strong>
+            <strong>{formatLongDateKey(selectedDate)}</strong>
           </div>
           <div className="date-row">
             <button type="button" className="secondary-button" onClick={() => setSelectedDate(addDays(selectedDate, -1))}>Zurück</button>
@@ -450,23 +450,53 @@ function BackupPanel({ importRef, importPreview, onPreview, onReplace, onDone, r
 }
 
 function CorrectionsPanel({ data }: { data: WorkData }) {
-  const flex = data.settings ? calculateFlexBalance(data.settings.flexStartMinutes ?? 0, data.timeEntries, data.flexCorrections) : 0;
-  const [form, setForm] = useState({ date: todayKey(), newValueMinutes: String(flex), note: "" });
+  const flexEntries = entriesForFlexBalance(data.timeEntries, todayKey());
+  const flex = data.settings ? calculateFlexBalance(data.settings.flexStartMinutes ?? 0, flexEntries, data.flexCorrections) : 0;
+  const [form, setForm] = useState({ date: todayKey(), newValueHours: minutesToHourInput(flex), note: "" });
+  const [valueError, setValueError] = useState<string | undefined>();
+
+  async function saveCorrection() {
+    const newValueMinutes = parseHoursToMinutes(form.newValueHours);
+    if (newValueMinutes === null) {
+      setValueError("Bitte Stunden eingeben, z.B. 97,34.");
+      return;
+    }
+
+    setValueError(undefined);
+    await data.addCorrection({ date: form.date, oldValueMinutes: flex, newValueMinutes, note: form.note });
+    setForm({ date: todayKey(), newValueHours: minutesToHourInput(newValueMinutes), note: "" });
+  }
+
   return (
     <div className="panel">
       <span className="section-label">Gleitzeitkorrekturen</span>
       <div className="form-grid">
         <Field label="Datum"><input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></Field>
-        <Field label="Neuer Gesamtwert (Minuten)"><input type="number" value={form.newValueMinutes} onChange={(event) => setForm({ ...form, newValueMinutes: event.target.value })} /></Field>
+        <Field label="Neuer Gesamtwert (Stunden)" error={valueError}>
+          <input
+            type="text"
+            inputMode="decimal"
+            placeholder="97,34"
+            value={form.newValueHours}
+            aria-invalid={Boolean(valueError)}
+            onChange={(event) => {
+              setValueError(undefined);
+              setForm({ ...form, newValueHours: event.target.value });
+            }}
+          />
+        </Field>
       </div>
       <Field label="Grund oder Notiz"><input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
-      <button className="secondary-button" onClick={() => void data.addCorrection({ date: form.date, oldValueMinutes: flex, newValueMinutes: Number(form.newValueMinutes), note: form.note })}>Korrektur speichern</button>
+      <button className="secondary-button" onClick={() => void saveCorrection()}>Korrektur speichern</button>
       <div className="correction-list">
         {data.flexCorrections.length === 0 ? <p className="muted">Noch keine Korrekturen.</p> : null}
         {data.flexCorrections.map((correction) => (
           <div key={correction.id} className="correction-row">
             <span>{formatDateKey(correction.date)}</span>
-            <strong>{formatSignedMinutes(correction.diffMinutes)}</strong>
+            <span className="correction-value">
+              <strong>{formatMinutes(correction.newValueMinutes)}</strong>
+              <small>Korrektur {formatSignedMinutes(correction.diffMinutes)}</small>
+            </span>
             <button className="icon-button" title="Korrektur löschen" onClick={() => void data.removeCorrection(correction.id)}>Entfernen</button>
           </div>
         ))}
@@ -513,7 +543,10 @@ function TripsView({ data }: { data: WorkData }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState(() => tripToForm());
-  const previewDurationMinutes = calculateTripDurationMinutes(form.startTime, form.endTime);
+  const [tripTimeErrors, setTripTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
+  const previewStartTime = previewTime(form.startTime) ?? "";
+  const previewEndTime = previewTime(form.endTime) ?? "";
+  const previewDurationMinutes = calculateTripDurationMinutes(previewStartTime, previewEndTime);
   const previewTripCosts = {
     transportType: form.transportType,
     oneWayKilometers: parseDecimalNumber(form.oneWayKilometers),
@@ -541,14 +574,35 @@ function TripsView({ data }: { data: WorkData }) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function handleTripTimeBlur(field: "startTime" | "endTime", value: string) {
+    const normalized = normalizeTimeInput(value);
+    if (normalized === null || normalized === "") {
+      setTripTimeErrors((current) => ({ ...current, [field]: "Bitte als HH:MM eingeben, z.B. 07:30." }));
+      return;
+    }
+
+    setForm((current) => ({ ...current, [field]: normalized }));
+    setTripTimeErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
   async function saveTrip() {
-    const durationMinutes = calculateTripDurationMinutes(form.startTime, form.endTime);
+    const startTime = normalizeTimeInput(form.startTime);
+    const endTime = normalizeTimeInput(form.endTime);
+    const nextErrors: Partial<Record<"startTime" | "endTime", string>> = {};
+    if (!startTime) nextErrors.startTime = "Bitte als HH:MM eingeben, z.B. 07:30.";
+    if (!endTime) nextErrors.endTime = "Bitte als HH:MM eingeben, z.B. 15:30.";
+    if (!startTime || !endTime) {
+      setTripTimeErrors(nextErrors);
+      return;
+    }
+
+    const durationMinutes = calculateTripDurationMinutes(startTime, endTime);
     const perDiemCents = calculateDomesticPerDiemCents(durationMinutes);
     await data.saveTrip({
       id: editingId ?? undefined,
       date: form.date,
-      startTime: normalizeTimeInput(form.startTime) || "00:00",
-      endTime: normalizeTimeInput(form.endTime) || "00:00",
+      startTime,
+      endTime,
       durationMinutes,
       reason: form.reason.trim(),
       origin: form.origin.trim(),
@@ -565,12 +619,14 @@ function TripsView({ data }: { data: WorkData }) {
     });
     setEditingId(null);
     setForm(tripToForm());
+    setTripTimeErrors({});
     setNotice("Reise gespeichert.");
   }
 
   function editTrip(trip: Trip) {
     setEditingId(trip.id);
     setForm(tripToForm(trip));
+    setTripTimeErrors({});
     setNotice(null);
   }
 
@@ -605,12 +661,32 @@ function TripsView({ data }: { data: WorkData }) {
                 {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
               </select>
             </Field>
-            <Field label="Zeit von"><input type="time" value={form.startTime} onChange={(event) => updateTripField("startTime", event.target.value)} /></Field>
-            <Field label="Zeit bis"><input type="time" value={form.endTime} onChange={(event) => updateTripField("endTime", event.target.value)} /></Field>
+            <Field label="Zeit von" error={tripTimeErrors.startTime}>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="07:30"
+                value={form.startTime}
+                aria-invalid={Boolean(tripTimeErrors.startTime)}
+                onChange={(event) => updateTripField("startTime", event.target.value)}
+                onBlur={(event) => handleTripTimeBlur("startTime", event.target.value)}
+              />
+            </Field>
+            <Field label="Zeit bis" error={tripTimeErrors.endTime}>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="15:30"
+                value={form.endTime}
+                aria-invalid={Boolean(tripTimeErrors.endTime)}
+                onChange={(event) => updateTripField("endTime", event.target.value)}
+                onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
+              />
+            </Field>
             <Field label="Grund"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
-            <Field label="Einfache Strecke (km)"><input inputMode="decimal" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
-            <Field label="Startort"><input value={form.origin} onChange={(event) => updateTripField("origin", event.target.value)} /></Field>
-            <Field label="Zieladresse"><input value={form.destination} onChange={(event) => updateTripField("destination", event.target.value)} /></Field>
+            <Field label="Einfache Strecke (km)"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
+            <Field label="Startort"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
+            <Field label="Zieladresse"><AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} /></Field>
             <Field label="Sonstige Kosten (EUR)"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
             <Field label="Beschreibung sonstige Kosten"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
             <Field label="Steuerpflichtiger BEZU (EUR)"><input inputMode="decimal" value={form.taxableTransportSubsidyEuros} onChange={(event) => updateTripField("taxableTransportSubsidyEuros", event.target.value)} /></Field>
@@ -713,7 +789,7 @@ function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWe
             <span>{formatDateKey(day.date)}</span>
             <span>{day.entry?.startTime ?? "-"}</span>
             <span>{day.entry?.endTime ?? "offen"}</span>
-            <strong>{formatSignedMinutes(day.calculation.deltaMinutes)}</strong>
+            <strong className={`week-delta week-delta-${deltaTone(day.calculation.deltaMinutes)}`}>{formatAbsoluteMinutes(day.calculation.deltaMinutes)}</strong>
           </div>
         ))}
       </div>
@@ -764,7 +840,7 @@ function LiveDayClock({ day, targetMinutes }: { day: ReturnType<typeof calculate
   const centerStatus = liveClockStatus(day);
   const remainingMinutes = Math.max(targetMinutes - day.netMinutes, 0);
   const ariaLabel = day.hasStart
-    ? `Live-Auswertung: ${formatMinutes(remainingMinutes)} verbleibend, Tagesstand ${formatMinutes(day.netMinutes)}.`
+    ? `Live-Auswertung: ${formatMinutes(remainingMinutes)} verbleibend, bereits gearbeitet ${formatMinutes(day.netMinutes)}.`
     : "Live-Auswertung: Dienstbeginn fehlt.";
 
   return (
@@ -803,10 +879,10 @@ function LiveDayClock({ day, targetMinutes }: { day: ReturnType<typeof calculate
         </div>
       </div>
       <dl className="detail-list live-clock-details">
-        <div><dt>Soll-Ende</dt><dd>{day.hasStart ? day.targetEndTime : "-"}</dd></div>
-        <div><dt>Verwendetes Ende</dt><dd>{day.hasStart ? day.effectiveEndTime ?? "offen" : "-"}</dd></div>
-        <div><dt>Tagesstand</dt><dd>{day.hasStart ? formatMinutes(day.netMinutes) : "-"}</dd></div>
+        <div><dt>arbeiten bis</dt><dd>{day.hasStart ? day.targetEndTime : "-"}</dd></div>
+        <div><dt>bereits gearbeitet</dt><dd>{day.hasStart ? formatMinutes(day.netMinutes) : "-"}</dd></div>
       </dl>
+      <p className="live-clock-meta">Verwendetes Ende: {day.hasStart ? day.effectiveEndTime ?? "offen" : "-"}</p>
     </aside>
   );
 }
@@ -822,6 +898,46 @@ function Notice({ title, text, action, tone = "success" }: { title: string; text
 
 function Field({ label, children, error, className = "" }: { label: string; children: React.ReactNode; error?: string; className?: string }) {
   return <label className={`field ${className}`.trim()}><span>{label}</span>{children}{error ? <small className="field-error">{error}</small> : null}</label>;
+}
+
+function AutoFitInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [fontSize, setFontSize] = useState(16);
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    const measure = measureRef.current;
+    if (!input || !measure) return;
+
+    const updateFontSize = () => {
+      const availableWidth = input.clientWidth - 26;
+      if (availableWidth <= 0) return;
+      measure.textContent = value || input.placeholder || "";
+      const fullSizeWidth = measure.scrollWidth;
+      const nextFontSize = fullSizeWidth > availableWidth ? Math.max(8, Math.floor((availableWidth / fullSizeWidth) * 16)) : 16;
+      setFontSize(nextFontSize);
+    };
+
+    updateFontSize();
+    const observer = new ResizeObserver(updateFontSize);
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [value]);
+
+  return (
+    <span className="auto-fit-input-wrap">
+      <input
+        ref={inputRef}
+        className="auto-fit-input"
+        style={{ fontSize: `${fontSize}px` }}
+        value={value}
+        title={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <span ref={measureRef} className="auto-fit-measure" aria-hidden="true" />
+    </span>
+  );
 }
 
 function SkeletonRows() {
@@ -859,7 +975,7 @@ function tripToForm(trip?: Trip) {
     origin: trip?.origin ?? DEFAULT_TRIP_ORIGIN,
     destination: trip?.destination ?? "",
     transportType: trip?.transportType ?? "kilometergeld" as TripTransportType,
-    oneWayKilometers: trip ? String(trip.oneWayKilometers) : "0",
+    oneWayKilometers: trip ? String(trip.oneWayKilometers) : "",
     otherCostsEuros: trip ? centsToEuroInput(trip.otherCostsCents) : "0",
     otherCostsDescription: trip?.otherCostsDescription ?? "",
     taxableTransportSubsidyEuros: trip ? centsToEuroInput(trip.taxableTransportSubsidyCents ?? 0) : "0",
@@ -938,12 +1054,6 @@ function clampHoursToMinutes(value: string, minMinutes: number, maxMinutes: numb
   return Math.min(Math.max(hoursToMinutes(value), minMinutes), maxMinutes);
 }
 
-function parseHoursToMinutes(value: string): number | null {
-  const numeric = Number(value.trim().replace(",", "."));
-  if (!Number.isFinite(numeric)) return null;
-  return Math.round(numeric * 60);
-}
-
 function parseDecimalNumber(value: string): number {
   const numeric = Number(value.trim().replace(",", "."));
   return Number.isFinite(numeric) ? Math.max(numeric, 0) : 0;
@@ -961,16 +1071,21 @@ function formatEuroCents(cents: number): string {
   return `${(cents / 100).toLocaleString("de-AT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`;
 }
 
+function formatLongDateKey(dateKey: string): string {
+  return `${weekdayName(dateKey)}, ${formatDateKey(dateKey).replace(/^[^,]+,\s*/, "")}`;
+}
+
+function deltaTone(minutes: number): "plus" | "minus" | "zero" {
+  if (minutes > 0) return "plus";
+  if (minutes < 0) return "minus";
+  return "zero";
+}
+
 function buildGoogleMapsUrl(origin: string, destination: string): string | null {
   const trimmedOrigin = origin.trim();
   const trimmedDestination = destination.trim();
   if (!trimmedOrigin || !trimmedDestination) return null;
   return `https://www.google.com/maps/dir/${encodeURIComponent(trimmedOrigin)}/${encodeURIComponent(trimmedDestination)}`;
-}
-
-function minutesToHourInput(minutes: number): string {
-  const hours = minutes / 60;
-  return Number.isInteger(hours) ? String(hours) : String(Number(hours.toFixed(2)));
 }
 
 function formatStorageEstimate(estimate: StorageEstimate | null): string {

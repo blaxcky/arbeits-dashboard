@@ -92,7 +92,7 @@ export function calculateDay(entry: TimeLikeEntry | undefined, now = new Date())
 }
 
 export function calculateWeek(entries: TimeLikeEntry[], selectedDate: string, now = new Date()): WeekSummary {
-  const weekDays = isoWeekDays(selectedDate);
+  const weekDays = isoWeekDays(selectedDate).slice(0, 5);
   const byDate = new Map(entries.map((entry) => [entry.date, entry]));
   const days = weekDays.map((date) => {
     const entry = byDate.get(date);
