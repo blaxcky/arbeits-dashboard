@@ -1,6 +1,6 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.0.0";
+export const BACKUP_SCHEMA_VERSION = "1.1.0";
 export const DB_SCHEMA_VERSION = 3;
 
 export interface Settings {
@@ -92,7 +92,7 @@ export interface TripFile {
 
 export interface BackupManifest {
   appName: typeof APP_NAME;
-  schemaVersion: typeof BACKUP_SCHEMA_VERSION;
+  schemaVersion: string;
   exportedAt: string;
   counts: Record<string, number>;
 }

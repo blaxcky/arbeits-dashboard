@@ -1,6 +1,9 @@
 import JSZip from "jszip";
 import { readAllData, replaceAllData } from "../db/database";
-import { APP_NAME, BACKUP_SCHEMA_VERSION, type BackupData, type BackupManifest, type BackupPayload } from "../db/schema";
+import { APP_NAME, BACKUP_SCHEMA_VERSION, type BackupData, type BackupManifest, type BackupPayload, type TripFile } from "../db/schema";
+
+type SerializedTripFile = Omit<TripFile, "dataUrl"> & ({ dataUrl: string; path?: never } | { path: string; dataUrl?: never });
+type SerializedBackupData = Omit<BackupData, "files"> & { files: SerializedTripFile[] };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -8,6 +11,18 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 export async function exportBackup(): Promise<Blob> {
   const data = await readAllData();
+  const zip = new JSZip();
+  const filesFolder = zip.folder("files");
+  const serializedData: SerializedBackupData = {
+    ...data,
+    files: data.files.map((file, index) => {
+      const path = backupFilePath(file, index);
+      const bytes = dataUrlToBytes(file.dataUrl, file.mimeType);
+      filesFolder?.file(path.slice("files/".length), bytes);
+      const { dataUrl: _dataUrl, ...metadata } = file;
+      return { ...metadata, path };
+    })
+  };
   const manifest: BackupManifest = {
     appName: APP_NAME,
     schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -20,10 +35,8 @@ export async function exportBackup(): Promise<Blob> {
       files: data.files.length
     }
   };
-  const zip = new JSZip();
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
-  zip.file("data.json", JSON.stringify(data, null, 2));
-  zip.folder("files");
+  zip.file("data.json", JSON.stringify(serializedData, null, 2));
   return zip.generateAsync({ type: "blob" });
 }
 
@@ -54,7 +67,8 @@ export async function inspectBackup(file: File): Promise<BackupPayload> {
   const data = parseJson(await dataFile.async("string"), "Daten sind kein gültiges JSON.");
   validateManifest(manifest);
   validateData(data);
-  return { manifest, data };
+  const hydratedData = await hydrateBackupFiles(data, zip);
+  return { manifest, data: hydratedData };
 }
 
 export async function importBackup(file: File): Promise<BackupPayload> {
@@ -66,12 +80,12 @@ export async function importBackup(file: File): Promise<BackupPayload> {
 function validateManifest(value: unknown): asserts value is BackupManifest {
   if (!isObject(value)) throw new Error("Manifest ist ungültig.");
   if (value.appName !== APP_NAME) throw new Error("Backup gehört nicht zu dieser App.");
-  if (value.schemaVersion !== BACKUP_SCHEMA_VERSION) throw new Error("Backup-Schema wird nicht unterstützt.");
+  if (typeof value.schemaVersion !== "string" || !/^1\.\d+\.\d+$/.test(value.schemaVersion)) throw new Error("Backup-Schema wird nicht unterstützt.");
   if (typeof value.exportedAt !== "string" || Number.isNaN(Date.parse(value.exportedAt))) throw new Error("Export-Zeitpunkt fehlt oder ist ungültig.");
   if (!isObject(value.counts)) throw new Error("Backup-Zählwerte fehlen.");
 }
 
-function validateData(value: unknown): asserts value is BackupData {
+function validateData(value: unknown): asserts value is SerializedBackupData {
   if (!isObject(value)) throw new Error("Daten sind ungültig.");
   if (!Array.isArray(value.timeEntries)) throw new Error("Zeiteinträge fehlen.");
   if (!Array.isArray(value.flexCorrections)) throw new Error("Gleitzeitkorrekturen fehlen.");
@@ -172,9 +186,77 @@ function validateTripFile(value: unknown): void {
   requireString(value, "fileName", "Nachweis-Dateiname fehlt.");
   requireString(value, "mimeType", "Nachweis-Dateityp fehlt.");
   requireNumber(value, "size", "Nachweis-Dateigröße fehlt.");
-  requireString(value, "dataUrl", "Nachweis-Dateiinhalt fehlt.");
+  const hasDataUrl = typeof value.dataUrl === "string";
+  const hasPath = typeof value.path === "string";
+  if (hasDataUrl === hasPath) throw new Error("Nachweis-Dateiinhalt fehlt.");
+  if (typeof value.path === "string" && !isValidBackupFilePath(value.path)) throw new Error("Nachweis-Dateipfad ist ungültig.");
   requireString(value, "description", "Nachweis-Beschreibung fehlt.");
   requireString(value, "createdAt", "Nachweis-Erstellt-Zeit fehlt.");
+}
+
+async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promise<BackupData> {
+  const files: TripFile[] = await Promise.all(
+    data.files.map(async (file) => {
+      if (typeof file.path !== "string") return file;
+      const path = file.path;
+      const zipFile = zip.file(path);
+      if (!zipFile) throw new Error(`Nachweis-Datei fehlt im Backup: ${path}`);
+      const bytes = await zipFile.async("uint8array");
+      const { path: _path, ...metadata } = file;
+      return {
+        ...metadata,
+        dataUrl: bytesToDataUrl(bytes, file.mimeType)
+      };
+    })
+  );
+  return { ...data, files };
+}
+
+function backupFilePath(file: TripFile, index: number): string {
+  const id = sanitizePathPart(file.id) || `file-${index + 1}`;
+  const fileName = sanitizePathPart(file.fileName) || "nachweis";
+  return `files/${id}-${fileName}`;
+}
+
+function sanitizePathPart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "").replace(/^\.+/, "");
+}
+
+function isValidBackupFilePath(path: string): boolean {
+  return path.startsWith("files/") && !path.includes("..") && !path.includes("\\") && !path.startsWith("/") && path.length > "files/".length;
+}
+
+function dataUrlToBytes(dataUrl: string, expectedMimeType: string): Uint8Array {
+  const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(dataUrl);
+  if (!match) throw new Error("Nachweis-Dateiinhalt ist kein gültiger Data-URL.");
+  const mimeType = match[1] ?? "";
+  if (mimeType && mimeType !== expectedMimeType) throw new Error("Nachweis-Dateityp passt nicht zum Dateiinhalt.");
+  if (match[2] !== ";base64") {
+    return new TextEncoder().encode(decodeURIComponent(match[3]));
+  }
+  return base64ToBytes(match[3]);
+}
+
+function bytesToDataUrl(bytes: Uint8Array, mimeType: string): string {
+  return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function requireString(value: Record<string, unknown>, key: string, message: string): void {
