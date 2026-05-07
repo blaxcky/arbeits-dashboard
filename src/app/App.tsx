@@ -2,12 +2,14 @@ import {
   ArrowClockwise,
   Briefcase,
   CalendarCheck,
+  CalendarPlus,
   ClipboardText,
   Database,
   DownloadSimple,
   Gear,
   House,
   ListChecks,
+  X,
   UploadSimple,
   Warning
 } from "@phosphor-icons/react";
@@ -197,6 +199,13 @@ function Dashboard({ data }: { data: WorkData }) {
     setMessage("Zeiteintrag gelöscht.");
   }
 
+  async function bookVacationDay() {
+    if (!settings) return;
+    const minutesPerDay = settings.dailyTargetMinutes || 480;
+    await data.saveSettings({ vacationUsedMinutes: settings.vacationUsedMinutes + minutesPerDay });
+    setMessage(`Urlaubstag mit ${formatMinutes(minutesPerDay)} gebucht.`);
+  }
+
   return (
     <section className="page-stack">
       <Header eyebrow="Dashboard" title="Zeiterfassung" description="Tagesdaten manuell pflegen, Live-Stand prüfen und Woche, Gleitzeit sowie Urlaub im Blick behalten." />
@@ -277,6 +286,11 @@ function Dashboard({ data }: { data: WorkData }) {
             value={vacation ? formatWholeDays(vacation.remainingMinutes, dailyTargetMinutes) : "0 Tage"}
             detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}
             icon={<CalendarCheck size={22} />}
+            action={
+              <button className="icon-button metric-action" type="button" title="Urlaubstag buchen" aria-label="Urlaubstag buchen" onClick={() => void bookVacationDay()} disabled={!settings}>
+                <CalendarPlus size={18} />
+              </button>
+            }
             progress={{ value: vacationEntitlementMinutes > 0 ? (vacation?.remainingMinutes ?? 0) / vacationEntitlementMinutes : 0, tone: "vacation" }}
           />
           <Metric title="Dieses Jahr verbrauchen" value={formatDays(requiredConsumption, dailyTargetMinutes)} detail="Resturlaub plus Gleitzeit über Grenze" />
@@ -444,7 +458,9 @@ function BackupPanel({ importRef, importPreview, onPreview, onReplace, onDone, r
       />
       {backupError ? <Notice tone="danger" title="Backup-Fehler" text={backupError} /> : null}
       {importPreview ? <Notice tone="warning" title="Import-Vorschau" text={importPreview} /> : null}
-      <button className="danger-button" disabled={!file} onClick={() => void handleReplace()}>Backup importieren und ersetzen</button>
+      <div className="backup-import-actions">
+        <button className="danger-button" disabled={!file} onClick={() => void handleReplace()}>Backup importieren und ersetzen</button>
+      </div>
     </div>
   );
 }
@@ -506,6 +522,26 @@ function CorrectionsPanel({ data }: { data: WorkData }) {
 }
 
 function DangerPanel({ data, onDone }: { data: WorkData; onDone: (message: string) => void }) {
+  const [deleteUnlocked, setDeleteUnlocked] = useState(false);
+
+  async function handleWipeData() {
+    if (!deleteUnlocked) return;
+
+    try {
+      if (!window.confirm("Vorher Backup exportieren. Wirklich alle lokalen Arbeitsdaten löschen?")) return;
+
+      const typed = window.prompt("Bitte LÖSCHEN eingeben, um die lokale Datenlöschung zu bestätigen.");
+      if (typed !== "LÖSCHEN") return;
+
+      if (!window.confirm("Letzte Bestätigung: Lokale Arbeitsdaten endgültig löschen?")) return;
+
+      await data.wipeData();
+      onDone("Lokale Daten gelöscht.");
+    } finally {
+      setDeleteUnlocked(false);
+    }
+  }
+
   return (
     <div className="panel danger-panel">
       <span className="section-label">Reset</span>
@@ -514,7 +550,14 @@ function DangerPanel({ data, onDone }: { data: WorkData; onDone: (message: strin
         <button className="secondary-button" onClick={async () => { await resetServiceWorkerAndCaches(); onDone("Cache und Service Worker wurden zurückgesetzt."); window.location.reload(); }}>
           <ArrowClockwise size={18} /> Cache zurücksetzen
         </button>
-        <button className="danger-button" onClick={async () => { if (window.confirm("Vorher Backup exportieren. Wirklich alle lokalen Arbeitsdaten löschen?")) { await data.wipeData(); onDone("Lokale Daten gelöscht."); } }}>Lokale Daten löschen</button>
+      </div>
+      <div className="locked-delete-box">
+        <button className="secondary-button" type="button" onClick={() => setDeleteUnlocked(true)} disabled={deleteUnlocked}>
+          Löschen entsperren
+        </button>
+        <button className="danger-button" type="button" disabled={!deleteUnlocked} onClick={() => void handleWipeData()}>
+          Lokale Daten löschen
+        </button>
       </div>
     </div>
   );
@@ -544,6 +587,7 @@ function TripsView({ data }: { data: WorkData }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState(() => tripToForm());
   const [tripTimeErrors, setTripTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
+  const [mapPreviewOpen, setMapPreviewOpen] = useState(false);
   const previewStartTime = previewTime(form.startTime) ?? "";
   const previewEndTime = previewTime(form.endTime) ?? "";
   const previewDurationMinutes = calculateTripDurationMinutes(previewStartTime, previewEndTime);
@@ -562,6 +606,7 @@ function TripsView({ data }: { data: WorkData }) {
   const previewDifferentialCents = calculateTripDifferentialCents({ ...previewTripCosts, durationMinutes: previewDurationMinutes });
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
   const mapsUrl = buildGoogleMapsUrl(form.origin, form.destination);
+  const mapsEmbedUrl = buildGoogleMapsEmbedUrl(form.origin, form.destination);
   const needsKilometerEvidence = form.transportType === "kilometergeld";
   const needsPublicTransportEvidence = form.transportType === "oeffi-zuschuss";
   const editingTrip = editingId ? data.trips.find((trip) => trip.id === editingId) : undefined;
@@ -569,6 +614,10 @@ function TripsView({ data }: { data: WorkData }) {
   useEffect(() => {
     if (editingTrip) setForm(tripToForm(editingTrip));
   }, [editingTrip]);
+
+  useEffect(() => {
+    if (!mapsEmbedUrl) setMapPreviewOpen(false);
+  }, [mapsEmbedUrl]);
 
   function updateTripField(field: keyof ReturnType<typeof tripToForm>, value: string | boolean) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -704,7 +753,12 @@ function TripsView({ data }: { data: WorkData }) {
             <div><dt>Gesamt</dt><dd>{formatEuroCents(calculateTripTotalCents(previewTripCosts))}</dd></div>
           </dl>
           <div className="trip-helper-grid">
-            {mapsUrl ? <a className="secondary-button" href={mapsUrl} target="_blank" rel="noreferrer">Google Maps öffnen</a> : <span className="muted">Google-Maps-Link erscheint nach Startort und Zieladresse.</span>}
+            {mapsUrl ? (
+              <div className="button-row trip-map-actions">
+                <a className="secondary-button" href={mapsUrl} target="_blank" rel="noreferrer">Google Maps öffnen</a>
+                <button className="secondary-button" type="button" onClick={() => setMapPreviewOpen(true)} disabled={!mapsEmbedUrl}>Vorschau öffnen</button>
+              </div>
+            ) : <span className="muted">Google-Maps-Link erscheint nach Startort und Zieladresse.</span>}
             {needsKilometerEvidence ? <span className="inline-warning">Nachweis: Screenshot, dass kein Dienstauto frei war.</span> : null}
             {needsPublicTransportEvidence ? <span className="inline-warning">Nachweis: ÖBB-Verbindungskosten zeitnah sichern.</span> : null}
           </div>
@@ -712,6 +766,30 @@ function TripsView({ data }: { data: WorkData }) {
           <button className="primary-button" onClick={() => void saveTrip()}>{editingId ? "Änderungen speichern" : "Reise speichern"}</button>
         </div>
         <div className="panel">
+          {mapsEmbedUrl ? (
+            <div className={`map-preview ${mapPreviewOpen ? "map-preview-open" : ""}`}>
+              <div className="panel-heading">
+                <span className="section-label">Google-Maps-Vorschau</span>
+                {mapPreviewOpen ? (
+                  <button className="icon-button" type="button" title="Vorschau schließen" aria-label="Vorschau schließen" onClick={() => setMapPreviewOpen(false)}>
+                    <X size={18} />
+                  </button>
+                ) : (
+                  <button className="secondary-button" type="button" onClick={() => setMapPreviewOpen(true)}>Vorschau öffnen</button>
+                )}
+              </div>
+              {mapPreviewOpen ? (
+                <iframe
+                  title="Google-Maps-Vorschau"
+                  src={mapsEmbedUrl}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen
+                />
+              ) : null}
+              <a href={mapsUrl ?? mapsEmbedUrl} target="_blank" rel="noreferrer">Extern in Google Maps öffnen</a>
+            </div>
+          ) : null}
           <span className="section-label">Jahresübersicht {summary.year}</span>
           <dl className="detail-list">
             <div><dt>Reisen</dt><dd>{summary.count}</dd></div>
@@ -813,13 +891,16 @@ type MetricProgress = {
   tone?: "default" | "warning" | "vacation";
 };
 
-function Metric({ title, value, detail, icon, tone = "default", progress }: { title: string; value: string; detail: string; icon?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress }) {
+function Metric({ title, value, detail, icon, action, tone = "default", progress }: { title: string; value: string; detail: string; icon?: React.ReactNode; action?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress }) {
   const progressValue = progress ? clampProgress(progress.value) : 0;
   const overflowValue = progress?.overflow ? clampProgress(progress.overflow) : 0;
 
   return (
     <article className={`metric metric-${tone}`}>
-      <div className="metric-title">{icon}{title}</div>
+      <div className="metric-title-row">
+        <div className="metric-title">{icon}{title}</div>
+        {action}
+      </div>
       <strong>{value}</strong>
       {progress ? (
         <div className={`metric-progress metric-progress-${progress.tone ?? "default"}`} aria-label={`${title}: ${Math.round(progressValue * 100)} Prozent`}>
@@ -1088,6 +1169,14 @@ function buildGoogleMapsUrl(origin: string, destination: string): string | null 
   return `https://www.google.com/maps/dir/${encodeURIComponent(trimmedOrigin)}/${encodeURIComponent(trimmedDestination)}`;
 }
 
+function buildGoogleMapsEmbedUrl(origin: string, destination: string): string | null {
+  const trimmedOrigin = origin.trim();
+  const trimmedDestination = destination.trim();
+  if (!trimmedOrigin || !trimmedDestination) return null;
+  const query = encodeURIComponent(`${trimmedOrigin} nach ${trimmedDestination}`);
+  return `https://www.google.com/maps?q=${query}&output=embed`;
+}
+
 function formatStorageEstimate(estimate: StorageEstimate | null): string {
   if (!estimate?.usage) return "lokal";
   const usage = formatBytes(estimate.usage);
@@ -1137,16 +1226,17 @@ function formatCompactSignedMinutes(minutes: number): string {
   return rest === 0 ? `${sign} ${hours} h` : `${sign} ${hours} h ${rest} min`;
 }
 
-function normalizeTimeInput(value: string): string | null {
+export function normalizeTimeInput(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed === "") return "";
 
+  const hourMatch = /^(\d{1,2})$/.exec(trimmed);
   const colonMatch = /^(\d{1,2}):(\d{1,2})$/.exec(trimmed);
   const compactMatch = /^(\d{3,4})$/.exec(trimmed);
-  if (!colonMatch && !compactMatch) return null;
+  if (!hourMatch && !colonMatch && !compactMatch) return null;
 
-  const hours = colonMatch ? Number(colonMatch[1]) : Number(trimmed.slice(0, -2));
-  const minutes = colonMatch ? Number(colonMatch[2]) : Number(trimmed.slice(-2));
+  const hours = hourMatch ? Number(hourMatch[1]) : colonMatch ? Number(colonMatch[1]) : Number(trimmed.slice(0, -2));
+  const minutes = hourMatch ? 0 : colonMatch ? Number(colonMatch[2]) : Number(trimmed.slice(-2));
   if (hours > 23 || minutes > 59) return null;
 
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
