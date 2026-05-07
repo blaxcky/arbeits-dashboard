@@ -13,9 +13,9 @@ import {
   UploadSimple,
   Warning
 } from "@phosphor-icons/react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
-import type { Settings, TimeEntry, Trip, TripTransportType } from "../db/schema";
+import type { Settings, TimeEntry, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
@@ -625,6 +625,15 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const needsKilometerEvidence = form.transportType === "kilometergeld";
   const needsPublicTransportEvidence = form.transportType === "oeffi-zuschuss";
   const editingTrip = editingId ? data.trips.find((trip) => trip.id === editingId) : undefined;
+  const filesByTripId = useMemo(() => {
+    const grouped = new Map<string, TripFile[]>();
+    data.files.forEach((file) => {
+      const tripFiles = grouped.get(file.tripId) ?? [];
+      tripFiles.push(file);
+      grouped.set(file.tripId, tripFiles);
+    });
+    return grouped;
+  }, [data.files]);
 
   useEffect(() => {
     if (editingTrip) setForm(tripToForm(editingTrip));
@@ -715,6 +724,40 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   function openGoogleMaps() {
     if (!mapsUrl) return;
     window.open(mapsUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function uploadTripScreenshot(trip: Trip, fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Bitte ein Bild als Screenshot auswählen.");
+      return;
+    }
+
+    const dataUrl = await readFileAsDataUrl(file);
+    await data.saveTripFile({
+      tripId: trip.id,
+      type: evidenceTypeForTrip(trip),
+      fileName: file.name,
+      mimeType: file.type,
+      size: file.size,
+      dataUrl,
+      description: evidenceDescriptionForTrip(trip)
+    });
+    showToast("Screenshot gespeichert.");
+  }
+
+  function downloadTripFile(file: TripFile) {
+    const anchor = document.createElement("a");
+    anchor.href = file.dataUrl;
+    anchor.download = file.fileName;
+    anchor.click();
+  }
+
+  async function removeTripFile(file: TripFile) {
+    if (!window.confirm(`Screenshot "${file.fileName}" löschen?`)) return;
+    await data.removeTripFile(file.id);
+    showToast("Screenshot gelöscht.");
   }
 
   return (
@@ -908,6 +951,42 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 <button className="secondary-button" onClick={() => void toggleDone(trip)}>{trip.done ? "Offen" : "Erledigt"}</button>
                 <button className="secondary-button" onClick={() => editTrip(trip)}>Bearbeiten</button>
                 <button className="danger-button" onClick={() => void removeTrip(trip.id)}>Löschen</button>
+              </div>
+              <div className="trip-evidence-row">
+                <div className="trip-evidence-heading">
+                  <span className="section-label">Screenshots</span>
+                  <label className="secondary-button file-upload-button">
+                    <UploadSimple size={17} />
+                    Screenshot speichern
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => {
+                        void uploadTripScreenshot(trip, event.target.files);
+                        event.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+                {(filesByTripId.get(trip.id) ?? []).length === 0 ? <span className="muted">Noch kein Screenshot gespeichert.</span> : null}
+                {(filesByTripId.get(trip.id) ?? []).map((file) => (
+                  <div key={file.id} className="trip-evidence-item">
+                    <a href={file.dataUrl} target="_blank" rel="noreferrer">
+                      <img src={file.dataUrl} alt="" />
+                      <span>
+                        <strong>{file.fileName}</strong>
+                        <small>{tripFileTypeLabel(file.type)} · {formatFileSize(file.size)}</small>
+                      </span>
+                    </a>
+                    <div className="trip-evidence-actions">
+                      <button className="secondary-button" type="button" onClick={() => downloadTripFile(file)}>
+                        <DownloadSimple size={17} />
+                        Herunterladen
+                      </button>
+                      <button className="danger-button" type="button" onClick={() => void removeTripFile(file)}>Löschen</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </article>
           ))}
@@ -1277,6 +1356,40 @@ function buildGoogleMapsEmbedUrl(origin: string, destination: string): string | 
   if (!trimmedOrigin || !trimmedDestination) return null;
   const query = encodeURIComponent(`${trimmedOrigin} nach ${trimmedDestination}`);
   return `https://www.google.com/maps?q=${query}&output=embed`;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Datei konnte nicht gelesen werden."));
+    });
+    reader.addEventListener("error", () => reject(new Error("Datei konnte nicht gelesen werden.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function evidenceTypeForTrip(trip: Trip): TripFileType {
+  if (trip.transportType === "kilometergeld") return "dienstauto-nachweis";
+  if (trip.transportType === "oeffi-zuschuss") return "oebb-verbindungskosten";
+  return "sonstiger-beleg";
+}
+
+function evidenceDescriptionForTrip(trip: Trip): string {
+  if (trip.transportType === "kilometergeld") return "Screenshot, dass kein Dienstauto frei war.";
+  if (trip.transportType === "oeffi-zuschuss") return "Screenshot der ÖBB-Verbindungskosten.";
+  return "Beleg oder Screenshot zur Reise.";
+}
+
+function tripFileTypeLabel(type: TripFileType): string {
+  if (type === "dienstauto-nachweis") return "Dienstauto-Nachweis";
+  if (type === "oebb-verbindungskosten") return "ÖBB-Verbindungskosten";
+  return "Sonstiger Beleg";
+}
+
+function formatFileSize(bytes: number): string {
+  return formatBytes(bytes);
 }
 
 function formatStorageEstimate(estimate: StorageEstimate | null): string {

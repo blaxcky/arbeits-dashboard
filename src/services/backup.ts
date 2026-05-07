@@ -17,7 +17,7 @@ export async function exportBackup(): Promise<Blob> {
       flexCorrections: data.flexCorrections.length,
       trips: data.trips.length,
       todos: 0,
-      files: 0
+      files: data.files.length
     }
   };
   const zip = new JSZip();
@@ -78,11 +78,13 @@ function validateData(value: unknown): asserts value is BackupData {
   if (!("settings" in value)) throw new Error("Einstellungen fehlen.");
   if (!("vacationSummary" in value)) throw new Error("Urlaubswerte fehlen.");
   if (!Array.isArray(value.trips)) throw new Error("Reisekosten fehlen.");
+  if (!Array.isArray(value.files)) throw new Error("Nachweise fehlen.");
   if (value.settings !== null) validateSettings(value.settings);
   value.timeEntries.forEach(validateTimeEntry);
   value.flexCorrections.forEach(validateFlexCorrection);
   if (value.vacationSummary !== null) validateVacationSummary(value.vacationSummary);
   value.trips.forEach(validateTrip);
+  value.files.forEach(validateTripFile);
 }
 
 function parseJson(text: string, message: string): unknown {
@@ -160,6 +162,19 @@ function validateTrip(value: unknown): void {
   if (typeof value.done !== "boolean") throw new Error("Reise-Erledigt-Status fehlt.");
   requireString(value, "createdAt", "Reise-Erstellt-Zeit fehlt.");
   requireString(value, "updatedAt", "Reise-Aktualisiert-Zeit fehlt.");
+}
+
+function validateTripFile(value: unknown): void {
+  if (!isObject(value)) throw new Error("Nachweis ist ungültig.");
+  requireString(value, "id", "Nachweis-ID fehlt.");
+  requireString(value, "tripId", "Nachweis-Reise-ID fehlt.");
+  requireString(value, "type", "Nachweistyp fehlt.");
+  requireString(value, "fileName", "Nachweis-Dateiname fehlt.");
+  requireString(value, "mimeType", "Nachweis-Dateityp fehlt.");
+  requireNumber(value, "size", "Nachweis-Dateigröße fehlt.");
+  requireString(value, "dataUrl", "Nachweis-Dateiinhalt fehlt.");
+  requireString(value, "description", "Nachweis-Beschreibung fehlt.");
+  requireString(value, "createdAt", "Nachweis-Erstellt-Zeit fehlt.");
 }
 
 function requireString(value: Record<string, unknown>, key: string, message: string): void {

@@ -574,7 +574,7 @@ Geplante Funktionen:
 - [x] Einfache Strecke in Kilometern.
 - [x] Diäten.
 - [x] Sonstige Kosten.
-- [ ] Nachweise und Screenshots.
+- [x] Nachweise und Screenshots.
 - [x] Erledigt-Status.
 - [x] Jahresübersichten.
 - [ ] Differenzwerbungskosten vollständig berechnen und getrennt ausweisen.
@@ -636,7 +636,7 @@ Regeln:
 - [x] Eingetragen wird immer die einfache Wegstrecke.
 - [x] Hin- und Rückfahrt werden automatisch gerechnet.
 - [x] Berechnung: einfache Strecke x 2 x 0,50 EUR.
-- [ ] Nachweis hochladen können, dass kein Dienstauto frei war.
+- [x] Nachweis hochladen können, dass kein Dienstauto frei war.
 
 Beispiel:
 
@@ -676,7 +676,7 @@ Regeln:
 - [x] für jeden weiteren km: 0,10 EUR je km.
 - [x] Maximalbetrag: 109,00 EUR je Wegstrecke.
 - [x] Diese Variante ist separat auswählbar.
-- [ ] Screenshot der Verbindungskosten von der ÖBB-Ticketseite hochladen können.
+- [x] Screenshot der Verbindungskosten von der ÖBB-Ticketseite hochladen können.
 - [ ] Steuerpflichtigen Anteil und bezahlte Steuer erfassen können, falls relevant.
 - [ ] Jahresgrenze für Beförderungszuschüsse überwachen.
 
@@ -720,7 +720,7 @@ Umsetzung:
 
 - [x] Freien Betrag eintragen.
 - [ ] Beschreibung pro sonstigem Kostenposten erfassen.
-- [ ] Beleg oder Screenshot zuordnen.
+- [x] Beleg oder Screenshot zuordnen.
 - [ ] Notiz erfassen.
 
 ### 14.8 Diäten Arbeitgeber
@@ -799,12 +799,12 @@ Dateien und Screenshots werden später lokal in IndexedDB gespeichert und Reisee
 
 Nachweise müssen:
 
-- [ ] lokal gespeichert werden.
-- [ ] einer Reise zugeordnet sein.
-- [ ] angezeigt werden können.
-- [ ] heruntergeladen werden können.
-- [ ] im Backup enthalten sein.
-- [ ] nach Import wiederhergestellt werden.
+- [x] lokal gespeichert werden.
+- [x] einer Reise zugeordnet sein.
+- [x] angezeigt werden können.
+- [x] heruntergeladen werden können.
+- [x] im Backup enthalten sein.
+- [x] nach Import wiederhergestellt werden.
 
 Mögliche Nachweistypen:
 
@@ -826,10 +826,10 @@ Aktueller Ablauf:
 
 Die App soll pro Reise ermöglichen:
 
-- [ ] Screenshot hochladen.
-- [ ] Screenshot anzeigen.
-- [ ] Screenshot herunterladen.
-- [ ] Screenshot im Backup sichern.
+- [x] Screenshot hochladen.
+- [x] Screenshot anzeigen.
+- [x] Screenshot herunterladen.
+- [x] Screenshot im Backup sichern.
 
 ### 15.2 Nachweis beim erhöhten Beförderungszuschuss
 
@@ -843,10 +843,10 @@ Grund:
 
 Die App soll ermöglichen:
 
-- [ ] Screenshot zur Reise hochladen.
-- [ ] Screenshot lokal speichern.
-- [ ] Screenshot wieder herunterladen.
-- [ ] Screenshot im Backup sichern.
+- [x] Screenshot zur Reise hochladen.
+- [x] Screenshot lokal speichern.
+- [x] Screenshot wieder herunterladen.
+- [x] Screenshot im Backup sichern.
 
 ### 15.3 Belege für sonstige Kosten
 
@@ -856,7 +856,7 @@ Mögliche Daten:
 
 - [ ] Betrag.
 - [ ] Beschreibung.
-- [ ] Datei oder Screenshot.
+- [x] Datei oder Screenshot.
 - [ ] Notiz.
 - [ ] Datum des Uploads.
 
@@ -864,15 +864,15 @@ Mögliche Daten:
 
 Ein Nachweis oder eine Datei soll enthalten:
 
-- [ ] ID.
-- [ ] Reise-ID.
-- [ ] Typ.
-- [ ] Dateiname.
-- [ ] MIME-Type.
-- [ ] Dateigröße.
-- [ ] Datei-Blob oder Backup-Dateipfad.
-- [ ] Beschreibung.
-- [ ] createdAt.
+- [x] ID.
+- [x] Reise-ID.
+- [x] Typ.
+- [x] Dateiname.
+- [x] MIME-Type.
+- [x] Dateigröße.
+- [x] Datei-Blob oder Backup-Dateipfad.
+- [x] Beschreibung.
+- [x] createdAt.
 
 ## 16. Roadmap Komfortfunktionen
 
@@ -1174,7 +1174,7 @@ src/modules/expenses/
 - [ ] Steuerliche Diäten automatisch berechnen.
 - [ ] Differenzwerbungskosten automatisch berechnen.
 - [ ] Beförderungszuschuss-Jahresgrenze überwachen.
-- [ ] Nachweise und Screenshots pro Reise speichern.
+- [x] Nachweise und Screenshots pro Reise speichern.
 - [ ] Google-Maps-Link pro Reise erzeugen.
 - [ ] ÖBB-Komfortlink oder Widget pro Reise erzeugen.
 

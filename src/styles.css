@@ -1092,6 +1092,90 @@ button:disabled {
   gap: 8px;
 }
 
+.trip-evidence-row {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #eef1f5;
+}
+
+.trip-evidence-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.file-upload-button {
+  position: relative;
+  cursor: pointer;
+}
+
+.file-upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.trip-evidence-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 10px;
+}
+
+.trip-evidence-item a {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.trip-evidence-item img {
+  width: 54px;
+  height: 42px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #eef1f5;
+}
+
+.trip-evidence-item span,
+.trip-evidence-item strong,
+.trip-evidence-item small {
+  min-width: 0;
+}
+
+.trip-evidence-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-evidence-item small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.trip-evidence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .skeleton-stack {
   display: grid;
   gap: 12px;
@@ -1179,6 +1263,14 @@ button:disabled {
 
   .trip-row-metrics {
     text-align: left;
+  }
+
+  .trip-evidence-item {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-evidence-actions {
+    justify-content: flex-start;
   }
 
   .date-row,

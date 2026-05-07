@@ -8,6 +8,7 @@ import {
   type Settings,
   type TimeEntry,
   type Trip,
+  type TripFile,
   type VacationSummary,
   defaultSettings
 } from "./schema";
@@ -19,6 +20,7 @@ class WorkDashboardDb extends Dexie {
   vacationSummary!: Table<VacationSummary, string>;
   appMeta!: Table<AppMeta, string>;
   trips!: Table<Trip, string>;
+  files!: Table<TripFile, string>;
 
   constructor() {
     super("arbeits-dashboard");
@@ -36,6 +38,15 @@ class WorkDashboardDb extends Dexie {
       vacationSummary: "id, year",
       appMeta: "id",
       trips: "id, date, done, transportType"
+    });
+    this.version(3).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt"
     });
   }
 }
@@ -151,7 +162,28 @@ export async function upsertTrip(input: Omit<Trip, "id" | "createdAt" | "updated
 }
 
 export async function deleteTrip(id: string): Promise<void> {
-  await db.trips.delete(id);
+  await db.transaction("rw", [db.trips, db.files], async () => {
+    await db.trips.delete(id);
+    await db.files.where("tripId").equals(id).delete();
+  });
+}
+
+export async function listTripFiles(): Promise<TripFile[]> {
+  return db.files.orderBy("createdAt").reverse().toArray();
+}
+
+export async function addTripFile(input: Omit<TripFile, "id" | "createdAt">): Promise<TripFile> {
+  const file: TripFile = {
+    ...input,
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString()
+  };
+  await db.files.put(file);
+  return file;
+}
+
+export async function deleteTripFile(id: string): Promise<void> {
+  await db.files.delete(id);
 }
 
 export async function readAllData(): Promise<BackupData> {
@@ -164,25 +196,26 @@ export async function readAllData(): Promise<BackupData> {
     appMeta: (await db.appMeta.get("main")) ?? null,
     trips: await db.trips.toArray(),
     todos: [],
-    files: []
+    files: await db.files.toArray()
   };
 }
 
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear()]);
     if (data.settings) await db.settings.put(data.settings);
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
     if (data.vacationSummary) await db.vacationSummary.put(data.vacationSummary);
     if (data.appMeta) await db.appMeta.put(data.appMeta);
     await db.trips.bulkPut(data.trips);
+    await db.files.bulkPut(data.files);
   });
   await ensureDefaults();
 }
 
 export async function deleteAllLocalData(): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear()]);
   });
 }

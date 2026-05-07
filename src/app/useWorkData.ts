@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addFlexCorrection,
+  addTripFile,
   deleteAllLocalData,
   deleteFlexCorrection,
   deleteTimeEntry,
+  deleteTripFile,
   deleteTrip,
   ensureDefaults,
   getTimeEntryByDate,
   listFlexCorrections,
+  listTripFiles,
   listTimeEntries,
   listTrips,
   updateSettings,
   upsertTimeEntry,
   upsertTrip
 } from "../db/database";
-import type { FlexCorrection, Settings, TimeEntry, Trip } from "../db/schema";
+import type { FlexCorrection, Settings, TimeEntry, Trip, TripFile } from "../db/schema";
 import { todayKey } from "../lib/dates";
 
 export interface WorkDataState {
@@ -24,6 +27,7 @@ export interface WorkDataState {
   timeEntries: TimeEntry[];
   flexCorrections: FlexCorrection[];
   trips: Trip[];
+  files: TripFile[];
 }
 
 export function useWorkData() {
@@ -33,15 +37,16 @@ export function useWorkData() {
     settings: null,
     timeEntries: [],
     flexCorrections: [],
-    trips: []
+    trips: [],
+    files: []
   });
   const [clock, setClock] = useState(new Date());
 
   const refresh = useCallback(async () => {
     try {
       const settings = await ensureDefaults();
-      const [timeEntries, flexCorrections, trips] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips()]);
-      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips });
+      const [timeEntries, flexCorrections, trips, files] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripFiles()]);
+      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, files });
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Daten konnten nicht geladen werden." }));
     }
@@ -91,6 +96,14 @@ export function useWorkData() {
     },
     removeTrip: async (id: string) => {
       await deleteTrip(id);
+      await refresh();
+    },
+    saveTripFile: async (input: Omit<TripFile, "id" | "createdAt">) => {
+      await addTripFile(input);
+      await refresh();
+    },
+    removeTripFile: async (id: string) => {
+      await deleteTripFile(id);
       await refresh();
     },
     wipeData: async () => {

@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
 export const BACKUP_SCHEMA_VERSION = "1.0.0";
-export const DB_SCHEMA_VERSION = 2;
+export const DB_SCHEMA_VERSION = 3;
 
 export interface Settings {
   id: "main";
@@ -76,6 +76,20 @@ export interface Trip {
   updatedAt: string;
 }
 
+export type TripFileType = "dienstauto-nachweis" | "oebb-verbindungskosten" | "sonstiger-beleg";
+
+export interface TripFile {
+  id: string;
+  tripId: string;
+  type: TripFileType;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  dataUrl: string;
+  description: string;
+  createdAt: string;
+}
+
 export interface BackupManifest {
   appName: typeof APP_NAME;
   schemaVersion: typeof BACKUP_SCHEMA_VERSION;
@@ -91,7 +105,7 @@ export interface BackupData {
   appMeta: AppMeta | null;
   trips: Trip[];
   todos: unknown[];
-  files: unknown[];
+  files: TripFile[];
 }
 
 export interface BackupPayload {
