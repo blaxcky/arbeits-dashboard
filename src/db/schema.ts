@@ -67,6 +67,7 @@ export interface Trip {
   perDiemCents: number;
   otherCostsCents: number;
   otherCostsDescription: string;
+  ticketPriceCents?: number;
   taxableTransportSubsidyCents: number;
   transportSubsidyTaxCents: number;
   note: string;

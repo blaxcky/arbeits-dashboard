@@ -153,6 +153,7 @@ function validateTrip(value: unknown): void {
   requireNumber(value, "perDiemCents", "Diäten fehlen.");
   requireNumber(value, "otherCostsCents", "Sonstige Kosten fehlen.");
   requireOptionalString(value, "otherCostsDescription", "Beschreibung sonstige Kosten ist ungültig.");
+  requireOptionalNumber(value, "ticketPriceCents", "Ticketpreis ist ungültig.");
   requireOptionalNumber(value, "taxableTransportSubsidyCents", "Steuerpflichtiger Beförderungszuschuss ist ungültig.");
   requireOptionalNumber(value, "transportSubsidyTaxCents", "Bezahlte Steuer ist ungültig.");
   requireOptionalString(value, "note", "Reise-Notiz ist ungültig.");

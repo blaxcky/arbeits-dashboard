@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDay,
   calculateFlexBalance,
+  calculateNextVacationUsedMinutes,
   calculateRequiredYearConsumption,
   calculateVacation,
   calculateWeek,
@@ -76,5 +77,12 @@ describe("time calculations", () => {
     expect(vacation.remainingMinutes).toBe(1440);
     expect(vacation.remainingDays).toBe(3);
     expect(calculateRequiredYearConsumption(vacation.remainingMinutes, 6200, 6000)).toBe(1640);
+  });
+
+  it("books vacation without exceeding entitlement", () => {
+    expect(calculateNextVacationUsedMinutes(960, 0, 480)).toBe(480);
+    expect(calculateNextVacationUsedMinutes(960, 720, 480)).toBe(960);
+    expect(calculateNextVacationUsedMinutes(960, 960, 480)).toBe(960);
+    expect(calculateNextVacationUsedMinutes(null, 0, 480)).toBe(0);
   });
 });

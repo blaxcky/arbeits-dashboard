@@ -80,6 +80,11 @@ export function calculateTransportDifferentialCents(trip: Pick<Trip, "transportT
   return Math.max(fictionalKilometerAllowanceCents - paidTransportSubsidyCents + paidTaxCents, 0);
 }
 
+export function calculateTaxablePublicTransportSubsidyCents(trip: Pick<Trip, "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "ticketPriceCents">>): number {
+  if (trip.transportType !== "oeffi-zuschuss") return 0;
+  return Math.max(calculateTripTravelCostCents(trip) - Math.max(trip.ticketPriceCents ?? 0, 0), 0);
+}
+
 export function calculateTripDifferentialCents(trip: Pick<Trip, "durationMinutes" | "perDiemCents" | "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "transportSubsidyTaxCents">>): number {
   return calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents) + calculateTransportDifferentialCents(trip);
 }

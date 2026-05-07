@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDomesticPerDiemCents,
   calculatePerDiemDifferentialCents,
+  calculateTaxablePublicTransportSubsidyCents,
   calculateTaxPerDiemCents,
   calculateTransportDifferentialCents,
   calculateTripDifferentialCents,
@@ -27,6 +28,7 @@ const baseTrip: Trip = {
   perDiemCents: 1200,
   otherCostsCents: 500,
   otherCostsDescription: "",
+  ticketPriceCents: 0,
   taxableTransportSubsidyCents: 0,
   transportSubsidyTaxCents: 0,
   note: "",
@@ -76,6 +78,19 @@ describe("expense calculations", () => {
     expect(calculateTransportDifferentialCents({ ...baseTrip, transportType: "befoerderungszuschuss", oneWayKilometers: 10 })).toBe(480);
     expect(calculateTransportDifferentialCents({ ...baseTrip, transportType: "befoerderungszuschuss", oneWayKilometers: 10, transportSubsidyTaxCents: 100 })).toBe(580);
     expect(calculateTransportDifferentialCents({ ...baseTrip, transportType: "kilometergeld", oneWayKilometers: 10 })).toBe(0);
+  });
+
+  it("calculates taxable public transport subsidy from ticket price without going below zero", () => {
+    expect(calculateTaxablePublicTransportSubsidyCents({ ...baseTrip, transportType: "oeffi-zuschuss", oneWayKilometers: 100, ticketPriceCents: 3000 })).toBe(4000);
+    expect(calculateTaxablePublicTransportSubsidyCents({ ...baseTrip, transportType: "oeffi-zuschuss", oneWayKilometers: 100, ticketPriceCents: 8000 })).toBe(0);
+    expect(calculateTaxablePublicTransportSubsidyCents({ ...baseTrip, transportType: "befoerderungszuschuss", oneWayKilometers: 100, ticketPriceCents: 3000 })).toBe(0);
+  });
+
+  it("keeps old trip objects without ticket price calculable", () => {
+    const oldTrip = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 100 };
+    delete oldTrip.ticketPriceCents;
+    expect(calculateTaxablePublicTransportSubsidyCents(oldTrip)).toBe(7000);
+    expect(calculateTripTotalCents(oldTrip)).toBe(8700);
   });
 
   it("adds travel cost, per diem and other costs", () => {

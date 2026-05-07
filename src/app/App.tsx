@@ -13,7 +13,7 @@ import {
   UploadSimple,
   Warning
 } from "@phosphor-icons/react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import type { Settings, TimeEntry, Trip, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
@@ -23,6 +23,7 @@ import { formatAbsoluteMinutes, formatDays, formatMinutes, formatSignedMinutes, 
 import {
   calculateDay,
   calculateFlexBalance,
+  calculateNextVacationUsedMinutes,
   calculateRequiredYearConsumption,
   calculateVacation,
   calculateWeek,
@@ -31,6 +32,7 @@ import {
 import {
   calculateDomesticPerDiemCents,
   calculatePerDiemDifferentialCents,
+  calculateTaxablePublicTransportSubsidyCents,
   calculateTaxPerDiemCents,
   calculateTransportDifferentialCents,
   calculateTripDifferentialCents,
@@ -54,9 +56,19 @@ const navItems = [
 ];
 
 const DEFAULT_TRIP_ORIGIN = "Finanzamt Österreich - Dienststelle Bruck Eisenstadt Oberwart, Neusiedler Str. 46, 7001 Eisenstadt";
+type Toast = { id: string; text: string };
 
 export function App() {
   const data = useWorkData();
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const showToast = useCallback((text: string) => {
+    setToasts((current) => [...current, { id: crypto.randomUUID(), text }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
 
   return (
     <HashRouter>
@@ -85,12 +97,13 @@ export function App() {
         <main className="workspace">
           {data.error ? <Notice tone="danger" title="Datenfehler" text={data.error} /> : null}
           <Routes>
-            <Route path="/" element={<Dashboard data={data} />} />
-            <Route path="/reisekosten" element={<TripsView data={data} />} />
+            <Route path="/" element={<Dashboard data={data} showToast={showToast} />} />
+            <Route path="/reisekosten" element={<TripsView data={data} showToast={showToast} />} />
             <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Fälligkeiten", "Prioritäten", "Tags", "Filter und Suche"]} />} />
-            <Route path="/einstellungen" element={<SettingsView data={data} />} />
+            <Route path="/einstellungen" element={<SettingsView data={data} showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          <ToastStack toasts={toasts} onRemove={removeToast} />
         </main>
       </div>
     </HashRouter>
@@ -98,17 +111,17 @@ export function App() {
 }
 
 type WorkData = ReturnType<typeof useWorkData>;
+type ShowToast = (message: string) => void;
 type SettingsForm = ReturnType<typeof settingsToForm>;
 type SettingsErrors = Partial<Record<keyof SettingsForm, string>>;
 
-function Dashboard({ data }: { data: WorkData }) {
+function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const settings = data.settings;
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const entry = data.entriesByDate.get(selectedDate);
   const [form, setForm] = useState(() => entryToForm(entry, selectedDate, settings));
   const [timeErrors, setTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
   const [breakError, setBreakError] = useState<string | undefined>();
-  const [message, setMessage] = useState<string | null>(null);
   const previewEntry = {
     date: selectedDate,
     startTime: previewTime(form.startTime),
@@ -156,7 +169,6 @@ function Dashboard({ data }: { data: WorkData }) {
     const startTime = timeForSave(draft.startTime, entry?.startTime);
     const endTime = timeForSave(draft.endTime, entry?.endTime);
     if (!entry && !createWhenEmpty && !startTime && !endTime) return;
-    setMessage(null);
     await data.saveTimeEntry({
       date: selectedDate,
       startTime,
@@ -196,21 +208,25 @@ function Dashboard({ data }: { data: WorkData }) {
 
   async function remove() {
     await data.removeTimeEntry(selectedDate);
-    setMessage("Zeiteintrag gelöscht.");
+    showToast("Zeiteintrag gelöscht.");
   }
 
   async function bookVacationDay() {
     if (!settings) return;
     const minutesPerDay = settings.dailyTargetMinutes || 480;
-    await data.saveSettings({ vacationUsedMinutes: settings.vacationUsedMinutes + minutesPerDay });
-    setMessage(`Urlaubstag mit ${formatMinutes(minutesPerDay)} gebucht.`);
+    const entitlementMinutes = settings.vacationEntitlementMinutes ?? 0;
+    const remainingMinutes = Math.max(entitlementMinutes - settings.vacationUsedMinutes, 0);
+    if (entitlementMinutes <= 0 || remainingMinutes <= 0) return;
+    const nextUsedMinutes = calculateNextVacationUsedMinutes(settings.vacationEntitlementMinutes, settings.vacationUsedMinutes, minutesPerDay);
+    const bookedMinutes = nextUsedMinutes - settings.vacationUsedMinutes;
+    await data.saveSettings({ vacationUsedMinutes: nextUsedMinutes });
+    showToast(`Urlaub mit ${formatMinutes(bookedMinutes)} gebucht.`);
   }
 
   return (
     <section className="page-stack">
       <Header eyebrow="Dashboard" title="Zeiterfassung" description="Tagesdaten manuell pflegen, Live-Stand prüfen und Woche, Gleitzeit sowie Urlaub im Blick behalten." />
       {data.loading ? <SkeletonRows /> : null}
-      {message ? <Notice tone="success" title="Status" text={message} /> : null}
       {setupMissing.length ? (
         <Notice
           tone="warning"
@@ -287,7 +303,7 @@ function Dashboard({ data }: { data: WorkData }) {
             detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}
             icon={<CalendarCheck size={22} />}
             action={
-              <button className="icon-button metric-action" type="button" title="Urlaubstag buchen" aria-label="Urlaubstag buchen" onClick={() => void bookVacationDay()} disabled={!settings}>
+              <button className="icon-button metric-action" type="button" title="Urlaubstag buchen" aria-label="Urlaubstag buchen" onClick={() => void bookVacationDay()} disabled={!settings || vacationEntitlementMinutes <= 0 || (vacation?.remainingMinutes ?? 0) <= 0}>
                 <CalendarPlus size={18} />
               </button>
             }
@@ -301,9 +317,8 @@ function Dashboard({ data }: { data: WorkData }) {
   );
 }
 
-function SettingsView({ data }: { data: WorkData }) {
+function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const settings = data.settings;
-  const [notice, setNotice] = useState<string | null>(null);
   const [importPreview, setImportPreview] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState(() => settingsToForm(settings));
@@ -326,7 +341,6 @@ function SettingsView({ data }: { data: WorkData }) {
     const nextErrors = validateSettingsForm(form);
     setSettingsErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      setNotice(null);
       return;
     }
 
@@ -338,7 +352,7 @@ function SettingsView({ data }: { data: WorkData }) {
       vacationEntitlementMinutes: form.vacationEntitlementMinutes === "" ? null : hoursToMinutes(form.vacationEntitlementMinutes),
       vacationUsedMinutes: clampHoursToMinutes(form.vacationUsedMinutes, 0, 20000)
     });
-    setNotice("Einstellungen gespeichert.");
+    showToast("Einstellungen gespeichert.");
   }
 
   function updateSettingsField(field: keyof SettingsForm, value: string) {
@@ -352,14 +366,13 @@ function SettingsView({ data }: { data: WorkData }) {
     setImportPreview(`Backup vom ${new Date(payload.manifest.exportedAt).toLocaleString("de-AT")} mit ${payload.data.timeEntries.length} Zeiteinträgen und ${payload.data.flexCorrections.length} Korrekturen.`);
     if (replace) {
       await data.refresh();
-      setNotice("Backup importiert und lokale Daten ersetzt.");
+      showToast("Backup importiert und lokale Daten ersetzt.");
     }
   }
 
   return (
     <section className="page-stack">
       <Header eyebrow="Einstellungen" title="Lokale Steuerzentrale" description="Arbeitszeit, Urlaub, Backup, PWA-Cache und Datenlöschung." />
-      {notice ? <Notice tone="success" title="Status" text={notice} /> : null}
       <div className="settings-grid">
         <div className="panel form-panel">
           <span className="section-label">Arbeitszeit</span>
@@ -373,10 +386,10 @@ function SettingsView({ data }: { data: WorkData }) {
           </div>
           <button className="primary-button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
         </div>
-        <BackupPanel importRef={importRef} importPreview={importPreview} onPreview={(file) => handleImport(file, false)} onReplace={(file) => handleImport(file, true)} onDone={setNotice} refresh={data.refresh} />
+        <BackupPanel importRef={importRef} importPreview={importPreview} onPreview={(file) => handleImport(file, false)} onReplace={(file) => handleImport(file, true)} onDone={showToast} refresh={data.refresh} />
         <SystemStatusPanel data={data} storageEstimate={storageEstimate} />
         <CorrectionsPanel data={data} />
-        <DangerPanel data={data} onDone={setNotice} />
+        <DangerPanel data={data} onDone={showToast} />
       </div>
     </section>
   );
@@ -582,9 +595,8 @@ function RoadmapView({ title, icon, items }: { title: string; icon: React.ReactN
 
 const transportOptions: TripTransportType[] = ["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"];
 
-function TripsView({ data }: { data: WorkData }) {
+function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState(() => tripToForm());
   const [tripTimeErrors, setTripTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
   const [mapPreviewOpen, setMapPreviewOpen] = useState(false);
@@ -596,6 +608,7 @@ function TripsView({ data }: { data: WorkData }) {
     oneWayKilometers: parseDecimalNumber(form.oneWayKilometers),
     perDiemCents: calculateDomesticPerDiemCents(previewDurationMinutes),
     otherCostsCents: eurosToCents(form.otherCostsEuros),
+    ticketPriceCents: form.transportType === "oeffi-zuschuss" ? eurosToCents(form.ticketPriceEuros) : 0,
     transportSubsidyTaxCents: eurosToCents(form.transportSubsidyTaxEuros)
   };
   const summary = summarizeTripsByYear(data.trips, currentYear());
@@ -603,6 +616,7 @@ function TripsView({ data }: { data: WorkData }) {
   const previewTaxPerDiemCents = calculateTaxPerDiemCents(previewDurationMinutes);
   const previewPerDiemDifferentialCents = calculatePerDiemDifferentialCents(previewDurationMinutes, previewTripCosts.perDiemCents);
   const previewTransportDifferentialCents = calculateTransportDifferentialCents(previewTripCosts);
+  const previewTaxableTransportSubsidyCents = calculateTaxablePublicTransportSubsidyCents(previewTripCosts);
   const previewDifferentialCents = calculateTripDifferentialCents({ ...previewTripCosts, durationMinutes: previewDurationMinutes });
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
   const mapsUrl = buildGoogleMapsUrl(form.origin, form.destination);
@@ -661,7 +675,8 @@ function TripsView({ data }: { data: WorkData }) {
       perDiemCents,
       otherCostsCents: eurosToCents(form.otherCostsEuros),
       otherCostsDescription: form.otherCostsDescription.trim(),
-      taxableTransportSubsidyCents: eurosToCents(form.taxableTransportSubsidyEuros),
+      ticketPriceCents: previewTripCosts.ticketPriceCents,
+      taxableTransportSubsidyCents: previewTaxableTransportSubsidyCents,
       transportSubsidyTaxCents: eurosToCents(form.transportSubsidyTaxEuros),
       note: form.note.trim(),
       done: form.done
@@ -669,14 +684,13 @@ function TripsView({ data }: { data: WorkData }) {
     setEditingId(null);
     setForm(tripToForm());
     setTripTimeErrors({});
-    setNotice("Reise gespeichert.");
+    showToast("Reise gespeichert.");
   }
 
   function editTrip(trip: Trip) {
     setEditingId(trip.id);
     setForm(tripToForm(trip));
     setTripTimeErrors({});
-    setNotice(null);
   }
 
   async function removeTrip(id: string) {
@@ -686,7 +700,7 @@ function TripsView({ data }: { data: WorkData }) {
       setEditingId(null);
       setForm(tripToForm());
     }
-    setNotice("Reise gelöscht.");
+    showToast("Reise gelöscht.");
   }
 
   async function toggleDone(trip: Trip) {
@@ -696,20 +710,15 @@ function TripsView({ data }: { data: WorkData }) {
   return (
     <section className="page-stack">
       <Header eyebrow="Reisekosten" title="Reisen erfassen" description="Dienstreisen lokal dokumentieren, Fahrtkostenarten zuordnen und Jahreswerte im Blick behalten." />
-      {notice ? <Notice tone="success" title="Status" text={notice} /> : null}
       <div className="split-grid">
         <div className="panel form-panel">
           <div className="panel-heading">
             <span className="section-label">{editingId ? "Reise bearbeiten" : "Neue Reise"}</span>
             {editingId ? <button className="secondary-button" onClick={() => { setEditingId(null); setForm(tripToForm()); }}>Neu</button> : null}
           </div>
-          <div className="form-grid">
+          <div className="form-grid trip-form-grid">
+            <Field label="Grund" className="field-wide"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
             <Field label="Datum"><input type="date" value={form.date} onChange={(event) => updateTripField("date", event.target.value)} /></Field>
-            <Field label="Fahrtkostenart">
-              <select value={form.transportType} onChange={(event) => updateTripField("transportType", event.target.value as TripTransportType)}>
-                {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
-              </select>
-            </Field>
             <Field label="Zeit von" error={tripTimeErrors.startTime}>
               <input
                 type="text"
@@ -732,14 +741,18 @@ function TripsView({ data }: { data: WorkData }) {
                 onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
               />
             </Field>
-            <Field label="Grund"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
-            <Field label="Einfache Strecke (km)"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
-            <Field label="Startort"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
+            <Field label="Startort" className="trip-location-start"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
             <Field label="Zieladresse"><AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} /></Field>
+            <Field label="Einfache Strecke (km)"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
+            <Field label="Fahrtkostenart">
+              <select value={form.transportType} onChange={(event) => updateTripField("transportType", event.target.value as TripTransportType)}>
+                {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
+              </select>
+            </Field>
+            <Field label="Ticketpreis (EUR)" className="trip-cost-field"><input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} /></Field>
+            <Field label="Bezahlte Steuer (EUR)"><input inputMode="decimal" value={form.transportSubsidyTaxEuros} onChange={(event) => updateTripField("transportSubsidyTaxEuros", event.target.value)} /></Field>
             <Field label="Sonstige Kosten (EUR)"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
             <Field label="Beschreibung sonstige Kosten"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
-            <Field label="Steuerpflichtiger BEZU (EUR)"><input inputMode="decimal" value={form.taxableTransportSubsidyEuros} onChange={(event) => updateTripField("taxableTransportSubsidyEuros", event.target.value)} /></Field>
-            <Field label="Bezahlte Steuer (EUR)"><input inputMode="decimal" value={form.transportSubsidyTaxEuros} onChange={(event) => updateTripField("transportSubsidyTaxEuros", event.target.value)} /></Field>
             <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
           </div>
           <dl className="detail-list trip-preview">
@@ -747,6 +760,7 @@ function TripsView({ data }: { data: WorkData }) {
             <div><dt>Fahrtkosten</dt><dd>{formatEuroCents(previewTravelCostCents)}</dd></div>
             <div><dt>Diäten Arbeitgeber</dt><dd>{formatEuroCents(previewTripCosts.perDiemCents)}</dd></div>
             <div><dt>Diäten steuerlich</dt><dd>{formatEuroCents(previewTaxPerDiemCents)}</dd></div>
+            <div><dt>Steuerpfl. Öffi-BEZU</dt><dd>{formatEuroCents(previewTaxableTransportSubsidyCents)}</dd></div>
             <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(previewPerDiemDifferentialCents)}</dd></div>
             <div><dt>Differenz Fahrtkosten</dt><dd>{formatEuroCents(previewTransportDifferentialCents)}</dd></div>
             <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(previewDifferentialCents)}</dd></div>
@@ -807,7 +821,7 @@ function TripsView({ data }: { data: WorkData }) {
             <span style={{ width: `${Math.min(summary.transportSubsidyCents / TRIP_RULES.transportSubsidyYearLimitCents, 1) * 100}%` }} />
           </div>
           {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
-          <p className="muted">Kilometergeld, Beförderungszuschüsse, Arbeitgeber-Diäten und steuerliche Vergleichswerte werden automatisch berechnet. Sonstige Kosten und steuerpflichtige BEZU-Anteile bleiben manuelle Eingaben.</p>
+          <p className="muted">Kilometergeld, Beförderungszuschüsse, Arbeitgeber-Diäten und steuerliche Vergleichswerte werden automatisch berechnet. Sonstige Kosten und bezahlte Steuer bleiben manuelle Eingaben.</p>
         </div>
       </div>
       <div className="panel">
@@ -977,6 +991,28 @@ function Notice({ title, text, action, tone = "success" }: { title: string; text
   );
 }
 
+function ToastStack({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: string) => void }) {
+  return (
+    <div className="toast-stack" aria-live="polite" aria-atomic="false">
+      {toasts.map((toast) => <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />)}
+    </div>
+  );
+}
+
+function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
+  useEffect(() => {
+    const timeout = window.setTimeout(() => onRemove(toast.id), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [toast.id, onRemove]);
+
+  return (
+    <div className="toast" role="status">
+      <strong>Status</strong>
+      <span>{toast.text}</span>
+    </div>
+  );
+}
+
 function Field({ label, children, error, className = "" }: { label: string; children: React.ReactNode; error?: string; className?: string }) {
   return <label className={`field ${className}`.trim()}><span>{label}</span>{children}{error ? <small className="field-error">{error}</small> : null}</label>;
 }
@@ -1050,8 +1086,8 @@ function settingsToForm(settings: Settings | null) {
 function tripToForm(trip?: Trip) {
   return {
     date: trip?.date ?? todayKey(),
-    startTime: trip?.startTime ?? "08:00",
-    endTime: trip?.endTime ?? "12:00",
+    startTime: trip?.startTime ?? "",
+    endTime: trip?.endTime ?? "",
     reason: trip?.reason ?? "",
     origin: trip?.origin ?? DEFAULT_TRIP_ORIGIN,
     destination: trip?.destination ?? "",
@@ -1059,7 +1095,7 @@ function tripToForm(trip?: Trip) {
     oneWayKilometers: trip ? String(trip.oneWayKilometers) : "",
     otherCostsEuros: trip ? centsToEuroInput(trip.otherCostsCents) : "0",
     otherCostsDescription: trip?.otherCostsDescription ?? "",
-    taxableTransportSubsidyEuros: trip ? centsToEuroInput(trip.taxableTransportSubsidyCents ?? 0) : "0",
+    ticketPriceEuros: trip ? centsToEuroInput(trip.ticketPriceCents ?? 0) : "0",
     transportSubsidyTaxEuros: trip ? centsToEuroInput(trip.transportSubsidyTaxCents ?? 0) : "0",
     note: trip?.note ?? "",
     done: trip?.done ?? false
@@ -1080,6 +1116,7 @@ function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt">
     perDiemCents: trip.perDiemCents,
     otherCostsCents: trip.otherCostsCents,
     otherCostsDescription: trip.otherCostsDescription ?? "",
+    ticketPriceCents: trip.ticketPriceCents ?? 0,
     taxableTransportSubsidyCents: trip.taxableTransportSubsidyCents ?? 0,
     transportSubsidyTaxCents: trip.transportSubsidyTaxCents ?? 0,
     note: trip.note ?? "",

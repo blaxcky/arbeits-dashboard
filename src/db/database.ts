@@ -141,6 +141,7 @@ export async function upsertTrip(input: Omit<Trip, "id" | "createdAt" | "updated
   const now = new Date().toISOString();
   const trip: Trip = {
     ...input,
+    ticketPriceCents: input.ticketPriceCents ?? 0,
     id: input.id ?? crypto.randomUUID(),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now

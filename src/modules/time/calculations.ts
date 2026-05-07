@@ -132,6 +132,13 @@ export function calculateVacation(entitlementMinutes: number | null, usedMinutes
   };
 }
 
+export function calculateNextVacationUsedMinutes(entitlementMinutes: number | null, usedMinutes: number, minutesPerDay = 480): number {
+  const entitlement = Math.max(entitlementMinutes ?? 0, 0);
+  if (entitlement <= 0) return Math.max(usedMinutes, 0);
+  const remainingMinutes = Math.max(entitlement - usedMinutes, 0);
+  return Math.min(Math.max(usedMinutes, 0) + Math.min(Math.max(minutesPerDay, 0), remainingMinutes), entitlement);
+}
+
 export function calculateRequiredYearConsumption(vacationRemainingMinutes: number, flexBalanceMinutes: number, flexLimitMinutes: number): number {
   return vacationRemainingMinutes + Math.max(flexBalanceMinutes - flexLimitMinutes, 0);
 }
