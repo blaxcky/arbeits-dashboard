@@ -117,6 +117,10 @@ export function calculateFlexBalance(startMinutes: number, entries: TimeLikeEntr
   return startMinutes + dayDeltas + correctionDeltas;
 }
 
+export function entriesForFlexBalance(entries: TimeLikeEntry[], currentDate: string): TimeLikeEntry[] {
+  return entries.filter((entry) => entry.date !== currentDate || !entry.startTime || Boolean(entry.endTime));
+}
+
 export function calculateVacation(entitlementMinutes: number | null, usedMinutes: number, minutesPerDay = 480) {
   const entitlement = entitlementMinutes ?? 0;
   const remainingMinutes = Math.max(entitlement - usedMinutes, 0);

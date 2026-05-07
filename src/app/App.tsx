@@ -17,13 +17,14 @@ import type { Settings, TimeEntry, Trip, TripTransportType } from "../db/schema"
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
-import { formatDays, formatDecimalHours, formatMinutes, formatSignedMinutes } from "../lib/format";
+import { formatDays, formatDecimalHours, formatMinutes, formatSignedMinutes, formatWholeDays } from "../lib/format";
 import {
   calculateDay,
   calculateFlexBalance,
   calculateRequiredYearConsumption,
   calculateVacation,
-  calculateWeek
+  calculateWeek,
+  entriesForFlexBalance
 } from "../modules/time/calculations";
 import {
   calculateDomesticPerDiemCents,
@@ -115,7 +116,8 @@ function Dashboard({ data }: { data: WorkData }) {
   };
   const day = calculateDay(previewEntry, data.clock);
   const week = calculateWeek(data.timeEntries, selectedDate, data.clock);
-  const flex = settings ? calculateFlexBalance(settings.flexStartMinutes ?? 0, data.timeEntries, data.flexCorrections) : 0;
+  const flexEntries = entriesForFlexBalance(data.timeEntries, todayKey());
+  const flex = settings ? calculateFlexBalance(settings.flexStartMinutes ?? 0, flexEntries, data.flexCorrections) : 0;
   const vacation = settings ? calculateVacation(settings.vacationEntitlementMinutes, settings.vacationUsedMinutes, settings.dailyTargetMinutes) : null;
   const requiredConsumption = settings && vacation ? calculateRequiredYearConsumption(vacation.remainingMinutes, flex, settings.flexLimitMinutes) : 0;
   const setupMissing = settings ? [settings.flexStartMinutes === null ? "Gleitzeitstartwert" : null, settings.vacationEntitlementMinutes === null ? "Urlaubsanspruch" : null].filter(Boolean) : [];
@@ -124,6 +126,7 @@ function Dashboard({ data }: { data: WorkData }) {
   const flexLimitMinutes = settings?.flexLimitMinutes ?? 6000;
   const flexDistanceToLimit = flexLimitMinutes - flex;
   const vacationEntitlementMinutes = vacation?.entitlementMinutes ?? 0;
+  const dailyTargetMinutes = settings?.dailyTargetMinutes ?? 480;
   const breakField = (
     <Field label="Pause in Minuten" className="break-field" error={breakError}>
       <input
@@ -247,12 +250,10 @@ function Dashboard({ data }: { data: WorkData }) {
           </div>
           <div className="button-row">
             <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Löschen</button>
+            {breakField}
           </div>
         </form>
-        <div className="live-clock-stack">
-          <LiveDayClock day={day} targetMinutes={previewEntry.targetMinutes} />
-          <div className="panel break-panel">{breakField}</div>
-        </div>
+        <LiveDayClock day={day} targetMinutes={previewEntry.targetMinutes} />
         <div className="dashboard-side-grid">
           <Metric
             title="Woche"
@@ -273,12 +274,12 @@ function Dashboard({ data }: { data: WorkData }) {
           />
           <Metric
             title="Resturlaub"
-            value={vacation ? formatDays(vacation.remainingMinutes, settings?.dailyTargetMinutes) : "0,0 Tage"}
+            value={vacation ? formatWholeDays(vacation.remainingMinutes, dailyTargetMinutes) : "0 Tage"}
             detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}
             icon={<CalendarCheck size={22} />}
             progress={{ value: vacationEntitlementMinutes > 0 ? (vacation?.remainingMinutes ?? 0) / vacationEntitlementMinutes : 0, tone: "vacation" }}
           />
-          <Metric title="Dieses Jahr verbrauchen" value={formatMinutes(requiredConsumption)} detail="Resturlaub plus Gleitzeit über Grenze" />
+          <Metric title="Dieses Jahr verbrauchen" value={formatDays(requiredConsumption, dailyTargetMinutes)} detail="Resturlaub plus Gleitzeit über Grenze" />
         </div>
       </div>
       <WeekTable week={week} onWeekChange={(offsetDays) => setSelectedDate(addDays(selectedDate, offsetDays))} />
@@ -761,8 +762,9 @@ function LiveDayClock({ day, targetMinutes }: { day: ReturnType<typeof calculate
   const mainProgress = day.hasStart ? ringProgress(day.netMinutes, targetMinutes) : 0;
   const overtimeProgress = day.deltaMinutes > 0 ? ringProgress(day.deltaMinutes, targetMinutes) : 0;
   const centerStatus = liveClockStatus(day);
+  const remainingMinutes = Math.max(targetMinutes - day.netMinutes, 0);
   const ariaLabel = day.hasStart
-    ? `Live-Auswertung: ${formatMinutes(day.netMinutes)} gearbeitet, Tagesstand ${formatSignedMinutes(day.deltaMinutes)}.`
+    ? `Live-Auswertung: ${formatMinutes(remainingMinutes)} verbleibend, Tagesstand ${formatMinutes(day.netMinutes)}.`
     : "Live-Auswertung: Dienstbeginn fehlt.";
 
   return (
@@ -796,14 +798,14 @@ function LiveDayClock({ day, targetMinutes }: { day: ReturnType<typeof calculate
           ) : null}
         </svg>
         <div className="live-clock-center">
-          <strong>{formatMinutes(day.netMinutes)}</strong>
+          <strong>{day.hasStart ? formatMinutes(remainingMinutes) : formatMinutes(targetMinutes)}</strong>
           <span>{centerStatus}</span>
         </div>
       </div>
       <dl className="detail-list live-clock-details">
         <div><dt>Soll-Ende</dt><dd>{day.hasStart ? day.targetEndTime : "-"}</dd></div>
         <div><dt>Verwendetes Ende</dt><dd>{day.hasStart ? day.effectiveEndTime ?? "offen" : "-"}</dd></div>
-        <div><dt>Tagesstand</dt><dd>{day.hasStart ? formatSignedMinutes(day.deltaMinutes) : "-"}</dd></div>
+        <div><dt>Tagesstand</dt><dd>{day.hasStart ? formatMinutes(day.netMinutes) : "-"}</dd></div>
       </dl>
     </aside>
   );

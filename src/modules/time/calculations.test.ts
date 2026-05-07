@@ -4,7 +4,8 @@ import {
   calculateFlexBalance,
   calculateRequiredYearConsumption,
   calculateVacation,
-  calculateWeek
+  calculateWeek,
+  entriesForFlexBalance
 } from "./calculations";
 
 const fixedNow = new Date(2026, 4, 6, 14, 30);
@@ -56,6 +57,16 @@ describe("time calculations", () => {
       [{ diffMinutes: -30 }]
     );
     expect(balance).toBe(150);
+  });
+
+  it("excludes only the open current day from flex balance entries", () => {
+    const entries = [
+      { date: "2026-05-06", startTime: "07:00", breakMinutes: 30, targetMinutes: 480 },
+      { date: "2026-05-06", startTime: "07:00", endTime: "16:00", breakMinutes: 30, targetMinutes: 480 },
+      { date: "2026-05-05", startTime: "07:00", breakMinutes: 30, targetMinutes: 480 }
+    ];
+
+    expect(entriesForFlexBalance(entries, "2026-05-06")).toEqual([entries[1], entries[2]]);
   });
 
   it("converts vacation and required yearly consumption", () => {

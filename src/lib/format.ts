@@ -25,6 +25,12 @@ export function formatDays(minutes: number, minutesPerDay = 480): string {
   })} Tage`;
 }
 
+export function formatWholeDays(minutes: number, minutesPerDay = 480): string {
+  return `${Math.round(minutes / minutesPerDay).toLocaleString("de-AT", {
+    maximumFractionDigits: 0
+  })} Tage`;
+}
+
 export function formatClockFromMinutes(minutes: number): string {
   const dayMinutes = ((Math.round(minutes) % 1440) + 1440) % 1440;
   const hours = Math.floor(dayMinutes / 60);
