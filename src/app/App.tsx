@@ -727,43 +727,55 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             {editingId ? <button className="secondary-button" onClick={() => { setEditingId(null); setForm(tripToForm()); }}>Neu</button> : null}
           </div>
           <div className="form-grid trip-form-grid">
-            <Field label="Grund" className="field-wide"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
-            <Field label="Datum"><input type="date" value={form.date} onChange={(event) => updateTripField("date", event.target.value)} /></Field>
-            <Field label="Zeit von" error={tripTimeErrors.startTime}>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="07:30"
-                value={form.startTime}
-                aria-invalid={Boolean(tripTimeErrors.startTime)}
-                onChange={(event) => updateTripField("startTime", event.target.value)}
-                onBlur={(event) => handleTripTimeBlur("startTime", event.target.value)}
-              />
-            </Field>
-            <Field label="Zeit bis" error={tripTimeErrors.endTime}>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="15:30"
-                value={form.endTime}
-                aria-invalid={Boolean(tripTimeErrors.endTime)}
-                onChange={(event) => updateTripField("endTime", event.target.value)}
-                onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
-              />
-            </Field>
-            <Field label="Startort" className="trip-field-half"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
-            <Field label="Zieladresse" className="trip-field-half"><AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} /></Field>
-            <Field label="Einfache Strecke (km)" className="trip-field-half"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
-            <Field label="Fahrtkostenart" className="trip-field-half">
-              <select value={form.transportType} onChange={(event) => updateTripField("transportType", event.target.value as TripTransportType)}>
-                {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
-              </select>
-            </Field>
-            <Field label="Ticketpreis (EUR)" className="trip-field-half trip-cost-field"><input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} /></Field>
-            <Field label="Bezahlte Steuer (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.transportSubsidyTaxEuros} onChange={(event) => updateTripField("transportSubsidyTaxEuros", event.target.value)} /></Field>
-            <Field label="Sonstige Kosten (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
-            <Field label="Beschreibung sonstige Kosten" className="trip-field-half"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
-            <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
+            <section className="trip-form-section" aria-labelledby="trip-section-dates">
+              <h3 id="trip-section-dates" className="trip-form-section-title">Reisedaten</h3>
+              <Field label="Grund" className="field-wide"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
+              <Field label="Datum"><input type="date" value={form.date} onChange={(event) => updateTripField("date", event.target.value)} /></Field>
+              <Field label="Zeit von" error={tripTimeErrors.startTime}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="07:30"
+                  value={form.startTime}
+                  aria-invalid={Boolean(tripTimeErrors.startTime)}
+                  onChange={(event) => updateTripField("startTime", event.target.value)}
+                  onBlur={(event) => handleTripTimeBlur("startTime", event.target.value)}
+                />
+              </Field>
+              <Field label="Zeit bis" error={tripTimeErrors.endTime}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="15:30"
+                  value={form.endTime}
+                  aria-invalid={Boolean(tripTimeErrors.endTime)}
+                  onChange={(event) => updateTripField("endTime", event.target.value)}
+                  onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
+                />
+              </Field>
+            </section>
+            <section className="trip-form-section" aria-labelledby="trip-section-route">
+              <h3 id="trip-section-route" className="trip-form-section-title">Route</h3>
+              <Field label="Startort" className="trip-field-half"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
+              <Field label="Zieladresse" className="trip-field-half"><AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} /></Field>
+              <Field label="Einfache Strecke (km)" className="trip-field-half"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
+            </section>
+            <section className="trip-form-section" aria-labelledby="trip-section-costs">
+              <h3 id="trip-section-costs" className="trip-form-section-title">Fahrtkosten</h3>
+              <Field label="Fahrtkostenart" className="trip-field-half">
+                <select value={form.transportType} onChange={(event) => updateTripField("transportType", event.target.value as TripTransportType)}>
+                  {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
+                </select>
+              </Field>
+              <Field label="Ticketpreis (EUR)" className="trip-field-half trip-cost-field"><input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} /></Field>
+              <Field label="Bezahlte Steuer (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.transportSubsidyTaxEuros} onChange={(event) => updateTripField("transportSubsidyTaxEuros", event.target.value)} /></Field>
+            </section>
+            <section className="trip-form-section" aria-labelledby="trip-section-other">
+              <h3 id="trip-section-other" className="trip-form-section-title">Sonstiges</h3>
+              <Field label="Sonstige Kosten (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
+              <Field label="Beschreibung sonstige Kosten" className="trip-field-half"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
+              <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
+            </section>
           </div>
           <dl className="detail-list trip-preview">
             <div><dt>Dauer</dt><dd>{formatMinutes(previewDurationMinutes)}</dd></div>

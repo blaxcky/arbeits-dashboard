@@ -429,17 +429,50 @@ button:disabled {
 
 .trip-form-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0 14px;
 }
 
-.trip-form-grid > .field {
+.trip-form-section {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.trip-form-section + .trip-form-section {
+  margin-top: 60px;
+}
+
+.trip-form-section-title {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.trip-form-section-title::after {
+  content: "";
+  height: 2px;
+  flex: 1;
+  background: #cbd5e1;
+}
+
+.trip-form-section > .field {
   grid-column: span 2;
 }
 
-.trip-form-grid .field-wide {
+.trip-form-section .field-wide {
   grid-column: 1 / -1;
 }
 
-.trip-form-grid .trip-field-half {
+.trip-form-section .trip-field-half {
   grid-column: span 3;
 }
 
@@ -1118,6 +1151,7 @@ button:disabled {
   .split-grid,
   .settings-grid,
   .trip-side-layout-map-open,
+  .trip-form-section,
   .trip-form-grid,
   .form-grid {
     grid-template-columns: 1fr;
@@ -1130,8 +1164,8 @@ button:disabled {
     width: auto;
   }
 
-  .trip-form-grid > .field,
-  .trip-form-grid .trip-field-half {
+  .trip-form-section > .field,
+  .trip-form-section .trip-field-half {
     grid-column: auto;
   }
 
