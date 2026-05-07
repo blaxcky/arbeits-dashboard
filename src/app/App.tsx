@@ -712,6 +712,11 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     await data.saveTrip({ ...stripTripMeta(trip), id: trip.id, done: !trip.done });
   }
 
+  function openGoogleMaps() {
+    if (!mapsUrl) return;
+    window.open(mapsUrl, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <section className="page-stack">
       <Header eyebrow="Reisekosten" title="Reisen erfassen" description="Dienstreisen lokal dokumentieren, Fahrtkostenarten zuordnen und Jahreswerte im Blick behalten." />
@@ -774,47 +779,40 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
           <div className="trip-helper-grid">
             {mapsUrl ? (
               <div className="button-row trip-map-actions">
-                <a className="secondary-button" href={mapsUrl} target="_blank" rel="noreferrer">Google Maps öffnen</a>
-                <button className="secondary-button" type="button" onClick={() => setMapPreviewOpen(true)} disabled={!mapsEmbedUrl}>Vorschau öffnen</button>
+                <button className="secondary-button" type="button" onClick={openGoogleMaps}>Google Maps öffnen</button>
+                <button className="secondary-button" type="button" onClick={() => setMapPreviewOpen((open) => !open)} disabled={!mapsEmbedUrl}>
+                  {mapPreviewOpen ? "Vorschau schließen" : "Vorschau öffnen"}
+                </button>
+                <button className="secondary-button" type="button" onClick={() => setLargeMapPreviewOpen((open) => !open)} disabled={!mapsEmbedUrl}>
+                  {largeMapPreviewOpen ? "Große Vorschau schließen" : "Große Vorschau"}
+                </button>
               </div>
             ) : <span className="muted">Google-Maps-Link erscheint nach Startort und Zieladresse.</span>}
             {needsKilometerEvidence ? <span className="inline-warning">Nachweis: Screenshot, dass kein Dienstauto frei war.</span> : null}
             {needsPublicTransportEvidence ? <span className="inline-warning">Nachweis: ÖBB-Verbindungskosten zeitnah sichern.</span> : null}
           </div>
+          {mapPreviewOpen && mapsEmbedUrl ? (
+            <div className="map-preview">
+              <div className="panel-heading">
+                <span className="section-label">Google-Maps-Vorschau</span>
+                <button className="icon-button" type="button" title="Vorschau schließen" aria-label="Vorschau schließen" onClick={() => setMapPreviewOpen(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+              <iframe
+                title="Google-Maps-Vorschau"
+                src={mapsEmbedUrl}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+          ) : null}
           <label className="check-row"><input type="checkbox" checked={form.done} onChange={(event) => updateTripField("done", event.target.checked)} /> Erledigt</label>
           <button className="primary-button" onClick={() => void saveTrip()}>{editingId ? "Änderungen speichern" : "Reise speichern"}</button>
         </div>
-        <div className="panel">
-          {mapsEmbedUrl ? (
-            <div className={`map-preview ${mapPreviewOpen ? "map-preview-open" : ""}`}>
-              <div className="panel-heading">
-                <span className="section-label">Google-Maps-Vorschau</span>
-                <div className="button-row compact-button-row">
-                  <button className="secondary-button" type="button" onClick={() => setLargeMapPreviewOpen((open) => !open)} disabled={!mapsEmbedUrl}>
-                    {largeMapPreviewOpen ? "Große Vorschau schließen" : "Große Vorschau"}
-                  </button>
-                  {mapPreviewOpen ? (
-                    <button className="icon-button" type="button" title="Vorschau schließen" aria-label="Vorschau schließen" onClick={() => setMapPreviewOpen(false)}>
-                      <X size={18} />
-                    </button>
-                  ) : (
-                    <button className="secondary-button" type="button" onClick={() => setMapPreviewOpen(true)}>Vorschau öffnen</button>
-                  )}
-                </div>
-              </div>
-              {mapPreviewOpen ? (
-                <iframe
-                  title="Google-Maps-Vorschau"
-                  src={mapsEmbedUrl}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  allowFullScreen
-                />
-              ) : null}
-              <a href={mapsUrl ?? mapsEmbedUrl} target="_blank" rel="noreferrer">Extern in Google Maps öffnen</a>
-            </div>
-          ) : null}
-          <div className={`trip-summary-map-grid ${largeMapPreviewOpen && mapsEmbedUrl ? "trip-summary-map-grid-open" : ""}`}>
+        <div className={`trip-side-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trip-side-layout-map-open" : ""}`}>
+          <div className="panel">
             <div className="trip-summary-panel">
               <span className="section-label">Jahresübersicht {summary.year}</span>
               <dl className="detail-list">
@@ -835,8 +833,16 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
               <p className="muted">Kilometergeld, Beförderungszuschüsse, Arbeitgeber-Diäten und steuerliche Vergleichswerte werden automatisch berechnet. Sonstige Kosten und bezahlte Steuer bleiben manuelle Eingaben.</p>
             </div>
-            {largeMapPreviewOpen && mapsEmbedUrl ? (
+          </div>
+          {largeMapPreviewOpen && mapsEmbedUrl ? (
+            <div className="panel large-map-card">
               <div className="large-map-preview">
+                <div className="panel-heading">
+                  <span className="section-label">Große Google-Maps-Vorschau</span>
+                  <button className="icon-button" type="button" title="Große Vorschau schließen" aria-label="Große Vorschau schließen" onClick={() => setLargeMapPreviewOpen(false)}>
+                    <X size={18} />
+                  </button>
+                </div>
                 <div className="large-map-route">
                   <div>
                     <span>Startort</span>
@@ -860,10 +866,10 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                   referrerPolicy="no-referrer-when-downgrade"
                   allowFullScreen
                 />
-                <a href={mapsUrl ?? mapsEmbedUrl} target="_blank" rel="noreferrer">Extern in Google Maps öffnen</a>
+                <button className="secondary-button map-external-button" type="button" onClick={openGoogleMaps}>Extern in Google Maps öffnen</button>
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="panel">
@@ -1245,7 +1251,12 @@ function buildGoogleMapsUrl(origin: string, destination: string): string | null 
   const trimmedOrigin = origin.trim();
   const trimmedDestination = destination.trim();
   if (!trimmedOrigin || !trimmedDestination) return null;
-  return `https://www.google.com/maps/dir/${encodeURIComponent(trimmedOrigin)}/${encodeURIComponent(trimmedDestination)}`;
+  const params = new URLSearchParams({
+    api: "1",
+    origin: trimmedOrigin,
+    destination: trimmedDestination
+  });
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
 function buildGoogleMapsEmbedUrl(origin: string, destination: string): string | null {

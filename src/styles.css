@@ -404,7 +404,7 @@ button:disabled {
 }
 
 .trips-layout-map-open {
-  grid-template-columns: minmax(360px, 0.82fr) minmax(680px, 1.18fr);
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
 }
 
 .form-panel {
@@ -929,6 +929,7 @@ button:disabled {
 
 .trip-map-actions {
   justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .compact-button-row {
@@ -944,15 +945,6 @@ button:disabled {
   border-top: 1px solid #eef1f5;
 }
 
-.map-preview:first-child {
-  margin-top: 0;
-  margin-bottom: 18px;
-  padding-top: 0;
-  padding-bottom: 18px;
-  border-top: 0;
-  border-bottom: 1px solid #eef1f5;
-}
-
 .map-preview iframe {
   width: 100%;
   min-height: 340px;
@@ -961,20 +953,15 @@ button:disabled {
   background: #eef1f5;
 }
 
-.map-preview a {
-  color: var(--accent-dark);
-  font-size: 0.88rem;
-  font-weight: 800;
-}
-
-.trip-summary-map-grid {
+.trip-side-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
+  align-items: start;
 }
 
-.trip-summary-map-grid-open {
-  grid-template-columns: minmax(260px, 0.72fr) minmax(360px, 1fr);
+.trip-side-layout-map-open {
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr);
 }
 
 .trip-summary-panel {
@@ -987,6 +974,10 @@ button:disabled {
   display: grid;
   align-content: start;
   gap: 12px;
+  min-width: 0;
+}
+
+.large-map-card {
   min-width: 0;
 }
 
@@ -1029,10 +1020,8 @@ button:disabled {
   background: #eef1f5;
 }
 
-.large-map-preview a {
-  color: var(--accent-dark);
-  font-size: 0.88rem;
-  font-weight: 800;
+.map-external-button {
+  justify-self: start;
 }
 
 .inline-warning {
@@ -1128,7 +1117,7 @@ button:disabled {
   .dashboard-workflow-grid,
   .split-grid,
   .settings-grid,
-  .trip-summary-map-grid-open,
+  .trip-side-layout-map-open,
   .trip-form-grid,
   .form-grid {
     grid-template-columns: 1fr;
