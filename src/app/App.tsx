@@ -600,6 +600,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [form, setForm] = useState(() => tripToForm());
   const [tripTimeErrors, setTripTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
   const [mapPreviewOpen, setMapPreviewOpen] = useState(false);
+  const [largeMapPreviewOpen, setLargeMapPreviewOpen] = useState(false);
   const previewStartTime = previewTime(form.startTime) ?? "";
   const previewEndTime = previewTime(form.endTime) ?? "";
   const previewDurationMinutes = calculateTripDurationMinutes(previewStartTime, previewEndTime);
@@ -631,6 +632,10 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
 
   useEffect(() => {
     if (!mapsEmbedUrl) setMapPreviewOpen(false);
+  }, [mapsEmbedUrl]);
+
+  useEffect(() => {
+    if (!mapsEmbedUrl) setLargeMapPreviewOpen(false);
   }, [mapsEmbedUrl]);
 
   function updateTripField(field: keyof ReturnType<typeof tripToForm>, value: string | boolean) {
@@ -710,7 +715,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   return (
     <section className="page-stack">
       <Header eyebrow="Reisekosten" title="Reisen erfassen" description="Dienstreisen lokal dokumentieren, Fahrtkostenarten zuordnen und Jahreswerte im Blick behalten." />
-      <div className="split-grid">
+      <div className={`split-grid trips-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trips-layout-map-open" : ""}`}>
         <div className="panel form-panel">
           <div className="panel-heading">
             <span className="section-label">{editingId ? "Reise bearbeiten" : "Neue Reise"}</span>
@@ -741,18 +746,18 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
               />
             </Field>
-            <Field label="Startort" className="trip-location-start"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
-            <Field label="Zieladresse"><AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} /></Field>
-            <Field label="Einfache Strecke (km)"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
-            <Field label="Fahrtkostenart">
+            <Field label="Startort" className="trip-field-half"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
+            <Field label="Zieladresse" className="trip-field-half"><AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} /></Field>
+            <Field label="Einfache Strecke (km)" className="trip-field-half"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
+            <Field label="Fahrtkostenart" className="trip-field-half">
               <select value={form.transportType} onChange={(event) => updateTripField("transportType", event.target.value as TripTransportType)}>
                 {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
               </select>
             </Field>
-            <Field label="Ticketpreis (EUR)" className="trip-cost-field"><input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} /></Field>
-            <Field label="Bezahlte Steuer (EUR)"><input inputMode="decimal" value={form.transportSubsidyTaxEuros} onChange={(event) => updateTripField("transportSubsidyTaxEuros", event.target.value)} /></Field>
-            <Field label="Sonstige Kosten (EUR)"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
-            <Field label="Beschreibung sonstige Kosten"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
+            <Field label="Ticketpreis (EUR)" className="trip-field-half trip-cost-field"><input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} /></Field>
+            <Field label="Bezahlte Steuer (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.transportSubsidyTaxEuros} onChange={(event) => updateTripField("transportSubsidyTaxEuros", event.target.value)} /></Field>
+            <Field label="Sonstige Kosten (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
+            <Field label="Beschreibung sonstige Kosten" className="trip-field-half"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
             <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
           </div>
           <dl className="detail-list trip-preview">
@@ -784,13 +789,18 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             <div className={`map-preview ${mapPreviewOpen ? "map-preview-open" : ""}`}>
               <div className="panel-heading">
                 <span className="section-label">Google-Maps-Vorschau</span>
-                {mapPreviewOpen ? (
-                  <button className="icon-button" type="button" title="Vorschau schließen" aria-label="Vorschau schließen" onClick={() => setMapPreviewOpen(false)}>
-                    <X size={18} />
+                <div className="button-row compact-button-row">
+                  <button className="secondary-button" type="button" onClick={() => setLargeMapPreviewOpen((open) => !open)} disabled={!mapsEmbedUrl}>
+                    {largeMapPreviewOpen ? "Große Vorschau schließen" : "Große Vorschau"}
                   </button>
-                ) : (
-                  <button className="secondary-button" type="button" onClick={() => setMapPreviewOpen(true)}>Vorschau öffnen</button>
-                )}
+                  {mapPreviewOpen ? (
+                    <button className="icon-button" type="button" title="Vorschau schließen" aria-label="Vorschau schließen" onClick={() => setMapPreviewOpen(false)}>
+                      <X size={18} />
+                    </button>
+                  ) : (
+                    <button className="secondary-button" type="button" onClick={() => setMapPreviewOpen(true)}>Vorschau öffnen</button>
+                  )}
+                </div>
               </div>
               {mapPreviewOpen ? (
                 <iframe
@@ -804,24 +814,56 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <a href={mapsUrl ?? mapsEmbedUrl} target="_blank" rel="noreferrer">Extern in Google Maps öffnen</a>
             </div>
           ) : null}
-          <span className="section-label">Jahresübersicht {summary.year}</span>
-          <dl className="detail-list">
-            <div><dt>Reisen</dt><dd>{summary.count}</dd></div>
-            <div><dt>Erledigt</dt><dd>{summary.doneCount}</dd></div>
-            <div><dt>Dauer</dt><dd>{formatMinutes(summary.durationMinutes)}</dd></div>
-            <div><dt>Kilometer</dt><dd>{summary.kilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
-            <div><dt>Reisekosten gesamt</dt><dd>{formatEuroCents(summary.totalCents)}</dd></div>
-            <div><dt>BEZU Jahresstand</dt><dd>{formatEuroCents(summary.transportSubsidyCents)}</dd></div>
-            <div><dt>BEZU Restgrenze</dt><dd>{formatEuroCents(transportSubsidyRemainingCents)}</dd></div>
-            <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(summary.perDiemDifferentialCents)}</dd></div>
-            <div><dt>Differenz Fahrtkosten</dt><dd>{formatEuroCents(summary.transportDifferentialCents)}</dd></div>
-            <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(summary.differentialCents)}</dd></div>
-          </dl>
-          <div className="limit-bar" aria-label={`Beförderungszuschuss Jahresgrenze: ${formatEuroCents(summary.transportSubsidyCents)} von ${formatEuroCents(TRIP_RULES.transportSubsidyYearLimitCents)}`}>
-            <span style={{ width: `${Math.min(summary.transportSubsidyCents / TRIP_RULES.transportSubsidyYearLimitCents, 1) * 100}%` }} />
+          <div className={`trip-summary-map-grid ${largeMapPreviewOpen && mapsEmbedUrl ? "trip-summary-map-grid-open" : ""}`}>
+            <div className="trip-summary-panel">
+              <span className="section-label">Jahresübersicht {summary.year}</span>
+              <dl className="detail-list">
+                <div><dt>Reisen</dt><dd>{summary.count}</dd></div>
+                <div><dt>Erledigt</dt><dd>{summary.doneCount}</dd></div>
+                <div><dt>Dauer</dt><dd>{formatMinutes(summary.durationMinutes)}</dd></div>
+                <div><dt>Kilometer</dt><dd>{summary.kilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
+                <div><dt>Reisekosten gesamt</dt><dd>{formatEuroCents(summary.totalCents)}</dd></div>
+                <div><dt>BEZU Jahresstand</dt><dd>{formatEuroCents(summary.transportSubsidyCents)}</dd></div>
+                <div><dt>BEZU Restgrenze</dt><dd>{formatEuroCents(transportSubsidyRemainingCents)}</dd></div>
+                <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(summary.perDiemDifferentialCents)}</dd></div>
+                <div><dt>Differenz Fahrtkosten</dt><dd>{formatEuroCents(summary.transportDifferentialCents)}</dd></div>
+                <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(summary.differentialCents)}</dd></div>
+              </dl>
+              <div className="limit-bar" aria-label={`Beförderungszuschuss Jahresgrenze: ${formatEuroCents(summary.transportSubsidyCents)} von ${formatEuroCents(TRIP_RULES.transportSubsidyYearLimitCents)}`}>
+                <span style={{ width: `${Math.min(summary.transportSubsidyCents / TRIP_RULES.transportSubsidyYearLimitCents, 1) * 100}%` }} />
+              </div>
+              {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
+              <p className="muted">Kilometergeld, Beförderungszuschüsse, Arbeitgeber-Diäten und steuerliche Vergleichswerte werden automatisch berechnet. Sonstige Kosten und bezahlte Steuer bleiben manuelle Eingaben.</p>
+            </div>
+            {largeMapPreviewOpen && mapsEmbedUrl ? (
+              <div className="large-map-preview">
+                <div className="large-map-route">
+                  <div>
+                    <span>Startort</span>
+                    <strong>{form.origin.trim()}</strong>
+                  </div>
+                  <div>
+                    <span>Zieladresse</span>
+                    <strong>{form.destination.trim()}</strong>
+                  </div>
+                  {form.oneWayKilometers.trim() ? (
+                    <div>
+                      <span>Einfache Strecke</span>
+                      <strong>{form.oneWayKilometers.trim()} km</strong>
+                    </div>
+                  ) : null}
+                </div>
+                <iframe
+                  title="Große Google-Maps-Vorschau"
+                  src={mapsEmbedUrl}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen
+                />
+                <a href={mapsUrl ?? mapsEmbedUrl} target="_blank" rel="noreferrer">Extern in Google Maps öffnen</a>
+              </div>
+            ) : null}
           </div>
-          {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
-          <p className="muted">Kilometergeld, Beförderungszuschüsse, Arbeitgeber-Diäten und steuerliche Vergleichswerte werden automatisch berechnet. Sonstige Kosten und bezahlte Steuer bleiben manuelle Eingaben.</p>
         </div>
       </div>
       <div className="panel">
