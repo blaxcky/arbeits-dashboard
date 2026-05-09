@@ -175,7 +175,7 @@ function validateTrip(value: unknown): void {
   requireOptionalString(value, "otherCostsDescription", "Beschreibung sonstige Kosten ist ungültig.");
   requireOptionalNumber(value, "ticketPriceCents", "Ticketpreis ist ungültig.");
   requireOptionalNumber(value, "taxableTransportSubsidyCents", "Steuerpflichtiger Beförderungszuschuss ist ungültig.");
-  requireOptionalNumber(value, "transportSubsidyTaxCents", "Bezahlte Steuer ist ungültig.");
+  requireOptionalNumber(value, "transportSubsidyTaxCents", "Altes Steuerfeld ist ungültig.");
   requireOptionalString(value, "note", "Reise-Notiz ist ungültig.");
   if (typeof value.done !== "boolean") throw new Error("Reise-Erledigt-Status fehlt.");
   requireString(value, "createdAt", "Reise-Erstellt-Zeit fehlt.");

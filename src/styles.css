@@ -361,19 +361,6 @@ button:disabled {
   align-items: flex-start;
 }
 
-.week-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.week-summary strong {
-  color: #1f2937;
-}
-
 .week-nav {
   display: flex;
   flex-wrap: wrap;

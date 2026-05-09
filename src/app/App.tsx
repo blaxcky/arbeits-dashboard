@@ -683,6 +683,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [destinationPickerOpen, setDestinationPickerOpen] = useState(false);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
   const [municipalityError, setMunicipalityError] = useState<string | null>(null);
+  const latestTripDraft = useRef({ form, editingId });
+  const saveTripRef = useRef(data.saveTrip);
   const previewStartTime = previewTime(form.startTime) ?? "";
   const previewEndTime = previewTime(form.endTime) ?? "";
   const previewDurationMinutes = calculateTripDurationMinutes(previewStartTime, previewEndTime);
@@ -718,6 +720,51 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     return grouped;
   }, [data.files]);
   const currentTripFiles = editingTrip ? filesByTripId.get(editingTrip.id) ?? [] : [];
+
+  useEffect(() => {
+    latestTripDraft.current = { form, editingId };
+    saveTripRef.current = data.saveTrip;
+  }, [form, editingId, data.saveTrip]);
+
+  useEffect(() => {
+    return () => {
+      const draft = latestTripDraft.current;
+      if (!draft.form.reason.trim()) return;
+      const startTime = normalizeTimeInput(draft.form.startTime);
+      const endTime = normalizeTimeInput(draft.form.endTime);
+      const savedStartTime = startTime === null ? undefined : startTime || undefined;
+      const savedEndTime = endTime === null ? undefined : endTime || undefined;
+      const durationMinutes = savedStartTime && savedEndTime ? calculateTripDurationMinutes(savedStartTime, savedEndTime) : 0;
+      const tripCosts = {
+        transportType: draft.form.transportType,
+        oneWayKilometers: parseDecimalNumber(draft.form.oneWayKilometers),
+        perDiemCents: calculateDomesticPerDiemCents(durationMinutes),
+        otherCostsCents: eurosToCents(draft.form.otherCostsEuros),
+        ticketPriceCents: draft.form.transportType === "oeffi-zuschuss" ? eurosToCents(draft.form.ticketPriceEuros) : 0
+      };
+      void saveTripRef.current({
+        id: draft.editingId ?? undefined,
+        date: draft.form.date,
+        startTime: savedStartTime,
+        endTime: savedEndTime,
+        durationMinutes,
+        reason: draft.form.reason.trim(),
+        origin: draft.form.origin.trim(),
+        destination: draft.form.destination.trim(),
+        municipalityCode: draft.form.municipalityCode.trim() || undefined,
+        transportType: draft.form.transportType,
+        oneWayKilometers: tripCosts.oneWayKilometers,
+        perDiemCents: tripCosts.perDiemCents,
+        otherCostsCents: tripCosts.otherCostsCents,
+        otherCostsDescription: draft.form.otherCostsDescription.trim(),
+        ticketPriceCents: tripCosts.ticketPriceCents,
+        taxableTransportSubsidyCents: calculateTaxablePublicTransportSubsidyCents(tripCosts),
+        transportSubsidyTaxCents: 0,
+        note: draft.form.note.trim(),
+        done: draft.form.done
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (editingTrip) setForm(tripToForm(editingTrip));
