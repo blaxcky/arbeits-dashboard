@@ -1,21 +1,30 @@
 import {
   ArrowClockwise,
+  ArrowCircleDown,
+  ArrowCircleUp,
   Briefcase,
   CalendarCheck,
   CalendarPlus,
+  CheckCircle,
   ClipboardText,
+  Copy,
   Database,
   DownloadSimple,
   Gear,
   House,
   ListChecks,
+  MapPin,
+  MinusCircle,
+  PencilSimple,
+  Plus,
+  Trash,
   X,
   UploadSimple,
   Warning
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
-import type { Settings, TimeEntry, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
+import type { SavedDestination, Settings, TimeEntry, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
@@ -32,6 +41,7 @@ import {
 import {
   calculateDomesticPerDiemCents,
   calculatePerDiemDifferentialCents,
+  calculatePublicTransportPayoutCents,
   calculateTaxablePublicTransportSubsidyCents,
   calculateTaxPerDiemCents,
   calculateTransportDifferentialCents,
@@ -45,6 +55,7 @@ import {
   TRANSPORT_LABELS,
   TRIP_RULES
 } from "../modules/expenses/calculations";
+import { parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
 
@@ -83,10 +94,17 @@ export function App() {
           </Link>
           <nav className="nav-list">
             {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.to === "/"} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                <item.icon size={20} weight="duotone" />
-                <span>{item.label}</span>
-              </NavLink>
+              <div key={item.to} className="nav-group">
+                <NavLink to={item.to} end={item.to === "/"} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+                  <item.icon size={20} weight="duotone" />
+                  <span>{item.label}</span>
+                </NavLink>
+                {item.to === "/reisekosten" ? (
+                  <NavLink to="/reisekosten/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
+                    <span>Jahresübersicht</span>
+                  </NavLink>
+                ) : null}
+              </div>
             ))}
           </nav>
           <div className="privacy-note">
@@ -99,6 +117,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<Dashboard data={data} showToast={showToast} />} />
             <Route path="/reisekosten" element={<TripsView data={data} showToast={showToast} />} />
+            <Route path="/reisekosten/jahr" element={<TripsYearView data={data} showToast={showToast} />} />
             <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Fälligkeiten", "Prioritäten", "Tags", "Filter und Suche"]} />} />
             <Route path="/einstellungen" element={<SettingsView data={data} showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -122,6 +141,8 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [form, setForm] = useState(() => entryToForm(entry, selectedDate, settings));
   const [timeErrors, setTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
   const [breakError, setBreakError] = useState<string | undefined>();
+  const [vacationEditValue, setVacationEditValue] = useState<string | null>(null);
+  const [vacationEditError, setVacationEditError] = useState<string | undefined>();
   const previewEntry = {
     date: selectedDate,
     startTime: previewTime(form.startTime),
@@ -223,9 +244,34 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
     showToast(`Urlaub mit ${formatMinutes(bookedMinutes)} gebucht.`);
   }
 
+  async function bookFlexDay() {
+    if (!settings) return;
+    await data.addCorrection({
+      date: selectedDate,
+      oldValueMinutes: flex,
+      newValueMinutes: flex - settings.dailyTargetMinutes,
+      note: "Gleittag vorgemerkt"
+    });
+    showToast(`Gleittag mit ${formatMinutes(settings.dailyTargetMinutes)} gebucht.`);
+  }
+
+  async function saveVacationRemaining() {
+    if (vacationEditValue === null || !settings) return;
+    const remainingMinutes = parseHoursToMinutes(vacationEditValue);
+    const entitlementMinutes = settings.vacationEntitlementMinutes ?? 0;
+    if (remainingMinutes === null || remainingMinutes < 0 || remainingMinutes > entitlementMinutes) {
+      setVacationEditError(`Bitte 0 bis ${minutesToHourInput(entitlementMinutes)} Stunden eingeben.`);
+      return;
+    }
+    await data.saveSettings({ vacationUsedMinutes: entitlementMinutes - remainingMinutes });
+    setVacationEditValue(null);
+    setVacationEditError(undefined);
+    showToast("Resturlaub gespeichert.");
+  }
+
   return (
     <section className="page-stack">
-      <Header eyebrow="Dashboard" title="Zeiterfassung" description="Tagesdaten manuell pflegen, Live-Stand prüfen und Woche, Gleitzeit sowie Urlaub im Blick behalten." />
+      <Header eyebrow="Dashboard" title="Zeiterfassung" />
       {data.loading ? <SkeletonRows /> : null}
       {setupMissing.length ? (
         <Notice
@@ -290,6 +336,11 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             title="Gleitzeit"
             value={formatSignedMinutes(flex)}
             detail={flexDistanceToLimit >= 0 ? `noch ${formatMinutes(flexDistanceToLimit)} bis Grenze` : `${formatMinutes(Math.abs(flexDistanceToLimit))} über Grenze`}
+            action={
+              <button className="icon-button metric-action" type="button" title="Gleittag buchen" aria-label="Gleittag buchen" onClick={() => void bookFlexDay()} disabled={!settings}>
+                <CalendarPlus size={18} />
+              </button>
+            }
             tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"}
             progress={{
               value: flexLimitMinutes > 0 ? flex / flexLimitMinutes : 0,
@@ -302,6 +353,33 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             value={vacation ? formatWholeDays(vacation.remainingMinutes, dailyTargetMinutes) : "0 Tage"}
             detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}
             icon={<CalendarCheck size={22} />}
+            editableDetail={vacationEditValue !== null ? (
+              <span className="inline-edit">
+                <input
+                  autoFocus
+                  value={vacationEditValue}
+                  aria-invalid={Boolean(vacationEditError)}
+                  onChange={(event) => {
+                    setVacationEditError(undefined);
+                    setVacationEditValue(event.target.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setVacationEditValue(null);
+                      setVacationEditError(undefined);
+                    }
+                    if (event.key === "Enter") void saveVacationRemaining();
+                  }}
+                  onBlur={() => void saveVacationRemaining()}
+                />
+                {vacationEditError ? <small>{vacationEditError}</small> : null}
+              </span>
+            ) : undefined}
+            onDetailDoubleClick={() => {
+              if (!vacation || vacationEntitlementMinutes <= 0) return;
+              setVacationEditValue(minutesToHourInput(vacation.remainingMinutes));
+              setVacationEditError(undefined);
+            }}
             action={
               <button className="icon-button metric-action" type="button" title="Urlaubstag buchen" aria-label="Urlaubstag buchen" onClick={() => void bookVacationDay()} disabled={!settings || vacationEntitlementMinutes <= 0 || (vacation?.remainingMinutes ?? 0) <= 0}>
                 <CalendarPlus size={18} />
@@ -372,7 +450,7 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
 
   return (
     <section className="page-stack">
-      <Header eyebrow="Einstellungen" title="Lokale Steuerzentrale" description="Arbeitszeit, Urlaub, Backup, PWA-Cache und Datenlöschung." />
+      <Header eyebrow="Einstellungen" title="Lokale Steuerzentrale" />
       <div className="settings-grid">
         <div className="panel form-panel">
           <span className="section-label">Arbeitszeit</span>
@@ -579,7 +657,7 @@ function DangerPanel({ data, onDone }: { data: WorkData; onDone: (message: strin
 function RoadmapView({ title, icon, items }: { title: string; icon: React.ReactNode; items: string[] }) {
   return (
     <section className="page-stack">
-      <Header eyebrow="Roadmap" title={title} description="Dieses Modul ist vorbereitet, aber in V1 noch kein aktiver Arbeitsbereich." />
+      <Header eyebrow="Roadmap" title={title} />
       <div className="panel roadmap-panel">
         {icon}
         <div>
@@ -602,6 +680,9 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [mapPreviewOpen, setMapPreviewOpen] = useState(false);
   const [largeMapPreviewOpen, setLargeMapPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<TripFile | null>(null);
+  const [destinationPickerOpen, setDestinationPickerOpen] = useState(false);
+  const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
+  const [municipalityError, setMunicipalityError] = useState<string | null>(null);
   const previewStartTime = previewTime(form.startTime) ?? "";
   const previewEndTime = previewTime(form.endTime) ?? "";
   const previewDurationMinutes = calculateTripDurationMinutes(previewStartTime, previewEndTime);
@@ -610,16 +691,17 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     oneWayKilometers: parseDecimalNumber(form.oneWayKilometers),
     perDiemCents: calculateDomesticPerDiemCents(previewDurationMinutes),
     otherCostsCents: eurosToCents(form.otherCostsEuros),
-    ticketPriceCents: form.transportType === "oeffi-zuschuss" ? eurosToCents(form.ticketPriceEuros) : 0,
-    transportSubsidyTaxCents: eurosToCents(form.transportSubsidyTaxEuros)
+    ticketPriceCents: form.transportType === "oeffi-zuschuss" ? eurosToCents(form.ticketPriceEuros) : 0
   };
   const summary = summarizeTripsByYear(data.trips, currentYear());
   const previewTravelCostCents = calculateTripTravelCostCents(previewTripCosts);
+  const previewPayoutCents = calculatePublicTransportPayoutCents(previewTripCosts);
   const previewTaxPerDiemCents = calculateTaxPerDiemCents(previewDurationMinutes);
   const previewPerDiemDifferentialCents = calculatePerDiemDifferentialCents(previewDurationMinutes, previewTripCosts.perDiemCents);
   const previewTransportDifferentialCents = calculateTransportDifferentialCents(previewTripCosts);
   const previewTaxableTransportSubsidyCents = calculateTaxablePublicTransportSubsidyCents(previewTripCosts);
   const previewDifferentialCents = calculateTripDifferentialCents({ ...previewTripCosts, durationMinutes: previewDurationMinutes });
+  const publicTicketAboveSubsidy = form.transportType === "oeffi-zuschuss" && previewTripCosts.ticketPriceCents > previewTravelCostCents;
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
   const mapsUrl = buildGoogleMapsUrl(form.origin, form.destination);
   const mapsEmbedUrl = buildGoogleMapsEmbedUrl(form.origin, form.destination);
@@ -640,6 +722,26 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   useEffect(() => {
     if (editingTrip) setForm(tripToForm(editingTrip));
   }, [editingTrip]);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`${import.meta.env.BASE_URL}gemeinden.xml`)
+      .then((response) => {
+        if (!response.ok) throw new Error("Gemeindedatei fehlt");
+        return response.text();
+      })
+      .then((xml) => {
+        if (!active) return;
+        setMunicipalities(parseMunicipalitiesXml(xml));
+        setMunicipalityError(null);
+      })
+      .catch(() => {
+        if (active) setMunicipalityError("Gemeindedatei fehlt");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!mapsEmbedUrl) setMapPreviewOpen(false);
@@ -672,7 +774,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
 
   function handleTripTimeBlur(field: "startTime" | "endTime", value: string) {
     const normalized = normalizeTimeInput(value);
-    if (normalized === null || normalized === "") {
+    if (normalized === null) {
       setTripTimeErrors((current) => ({ ...current, [field]: "Bitte als HH:MM eingeben, z.B. 07:30." }));
       return;
     }
@@ -681,28 +783,34 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     setTripTimeErrors((current) => ({ ...current, [field]: undefined }));
   }
 
-  async function saveTrip() {
+  async function saveTrip(closeAfterSave = false) {
     const startTime = normalizeTimeInput(form.startTime);
     const endTime = normalizeTimeInput(form.endTime);
     const nextErrors: Partial<Record<"startTime" | "endTime", string>> = {};
-    if (!startTime) nextErrors.startTime = "Bitte als HH:MM eingeben, z.B. 07:30.";
-    if (!endTime) nextErrors.endTime = "Bitte als HH:MM eingeben, z.B. 15:30.";
-    if (!startTime || !endTime) {
+    if (startTime === null) nextErrors.startTime = "Bitte als HH:MM eingeben, z.B. 07:30.";
+    if (endTime === null) nextErrors.endTime = "Bitte als HH:MM eingeben, z.B. 15:30.";
+    if (startTime === null || endTime === null) {
       setTripTimeErrors(nextErrors);
       return;
     }
+    if (!form.reason.trim()) {
+      showToast("Bitte zumindest einen Grund erfassen.");
+      return;
+    }
 
-    const durationMinutes = calculateTripDurationMinutes(startTime, endTime);
+    const completeTimes = Boolean(startTime && endTime);
+    const durationMinutes = completeTimes ? calculateTripDurationMinutes(startTime, endTime) : 0;
     const perDiemCents = calculateDomesticPerDiemCents(durationMinutes);
-    await data.saveTrip({
+    const savedTrip = await data.saveTrip({
       id: editingId ?? undefined,
       date: form.date,
-      startTime,
-      endTime,
+      startTime: startTime || undefined,
+      endTime: endTime || undefined,
       durationMinutes,
       reason: form.reason.trim(),
       origin: form.origin.trim(),
       destination: form.destination.trim(),
+      municipalityCode: form.municipalityCode.trim() || undefined,
       transportType: form.transportType,
       oneWayKilometers: parseDecimalNumber(form.oneWayKilometers),
       perDiemCents,
@@ -710,14 +818,25 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
       otherCostsDescription: form.otherCostsDescription.trim(),
       ticketPriceCents: previewTripCosts.ticketPriceCents,
       taxableTransportSubsidyCents: previewTaxableTransportSubsidyCents,
-      transportSubsidyTaxCents: eurosToCents(form.transportSubsidyTaxEuros),
+      transportSubsidyTaxCents: 0,
       note: form.note.trim(),
       done: form.done
     });
+    if (closeAfterSave) {
+      setEditingId(null);
+      setForm(tripToForm());
+    } else {
+      setEditingId(savedTrip.id);
+    }
+    setTripTimeErrors({});
+    showToast("Reise gespeichert.");
+  }
+
+  async function startNewTrip() {
+    if (form.reason.trim()) await saveTrip(true);
     setEditingId(null);
     setForm(tripToForm());
     setTripTimeErrors({});
-    showToast("Reise gespeichert.");
   }
 
   function editTrip(trip: Trip) {
@@ -817,12 +936,12 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
 
   return (
     <section className="page-stack">
-      <Header eyebrow="Reisekosten" title="Reisen erfassen" description="Dienstreisen lokal dokumentieren, Fahrtkostenarten zuordnen und Jahreswerte im Blick behalten." />
+      <Header eyebrow="Reisekosten" title="Reisen erfassen" />
       <div className={`split-grid trips-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trips-layout-map-open" : ""}`}>
         <div className="panel form-panel">
           <div className="panel-heading">
             <span className="section-label">{editingId ? "Reise bearbeiten" : "Neue Reise"}</span>
-            {editingId ? <button className="secondary-button" onClick={() => { setEditingId(null); setForm(tripToForm()); }}>Neu</button> : null}
+            <button className="secondary-button" onClick={() => void startNewTrip()}>Neu</button>
           </div>
           <div className="form-grid trip-form-grid">
             <section className="trip-form-section" aria-labelledby="trip-section-dates">
@@ -855,7 +974,15 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             <section className="trip-form-section" aria-labelledby="trip-section-route">
               <h3 id="trip-section-route" className="trip-form-section-title">Route</h3>
               <Field label="Startort" className="trip-field-half"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
-              <Field label="Zieladresse" className="trip-field-half"><AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} /></Field>
+              <Field label="Zieladresse" className="trip-field-half">
+                <div className="input-with-button">
+                  <AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} />
+                  <button className="icon-button" type="button" title="Zieladressen öffnen" aria-label="Zieladressen öffnen" onClick={() => setDestinationPickerOpen(true)}>
+                    <MapPin size={18} />
+                  </button>
+                </div>
+              </Field>
+              <Field label="Gemeindekennzahl" className="trip-field-half"><input value={form.municipalityCode} onChange={(event) => updateTripField("municipalityCode", event.target.value)} /></Field>
               <Field label="Einfache Strecke (km)" className="trip-field-half"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
             </section>
             <section className="trip-form-section" aria-labelledby="trip-section-costs">
@@ -866,7 +993,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 </select>
               </Field>
               <Field label="Ticketpreis (EUR)" className="trip-field-half trip-cost-field"><input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} /></Field>
-              <Field label="Bezahlte Steuer (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.transportSubsidyTaxEuros} onChange={(event) => updateTripField("transportSubsidyTaxEuros", event.target.value)} /></Field>
             </section>
             <section className="trip-form-section" aria-labelledby="trip-section-other">
               <h3 id="trip-section-other" className="trip-form-section-title">Sonstiges</h3>
@@ -889,8 +1015,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             <div className="trip-preview-group">
               <span className="trip-preview-title">Kosten</span>
               <dl className="trip-preview-list">
-                <div><dt>Fahrtkosten</dt><dd>{formatEuroCents(previewTravelCostCents)}</dd></div>
                 <div><dt>Diäten Arbeitgeber</dt><dd>{formatEuroCents(previewTripCosts.perDiemCents)}</dd></div>
+                <div><dt>Fahrtkosten</dt><dd>{formatEuroCents(previewPayoutCents)}</dd></div>
                 <div><dt>Sonstige Kosten</dt><dd>{formatEuroCents(previewTripCosts.otherCostsCents)}</dd></div>
               </dl>
             </div>
@@ -899,12 +1025,14 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <dl className="trip-preview-list">
                 <div><dt>Diäten steuerlich</dt><dd>{formatEuroCents(previewTaxPerDiemCents)}</dd></div>
                 <div><dt>Steuerpfl. Öffi-BEZU</dt><dd>{formatEuroCents(previewTaxableTransportSubsidyCents)}</dd></div>
+                <div className="trip-preview-separator" aria-hidden="true" />
                 <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(previewPerDiemDifferentialCents)}</dd></div>
-                <div><dt>Differenz Fahrtkosten</dt><dd>{formatEuroCents(previewTransportDifferentialCents)}</dd></div>
-                <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(previewDifferentialCents)}</dd></div>
+                <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(previewTransportDifferentialCents)}</dd></div>
+                <div className="trip-preview-grand-total"><dt>Differenz gesamt</dt><dd>{formatEuroCents(previewDifferentialCents)}</dd></div>
               </dl>
             </div>
           </section>
+          {publicTicketAboveSubsidy ? <Notice tone="warning" title="Ticketpreis liegt über dem Öffi-BEZU" text="Es wird der Ticketpreis ersetzt; dadurch entsteht kein steuerpflichtiger Öffi-BEZU." /> : null}
           <div className="trip-helper-grid">
             {mapsUrl ? (
               <div className="button-row trip-map-actions">
@@ -984,31 +1112,25 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             ))}
           </section>
           <label className="check-row"><input type="checkbox" checked={form.done} onChange={(event) => updateTripField("done", event.target.checked)} /> Erledigt</label>
-          <button className="primary-button" onClick={() => void saveTrip()}>{editingId ? "Änderungen speichern" : "Reise speichern"}</button>
+          <div className="button-row trip-save-actions">
+            <button className="primary-button" onClick={() => void saveTrip(false)}>{editingId ? "Änderungen speichern" : "Reise speichern"}</button>
+            <button className="secondary-button" onClick={() => void saveTrip(true)}>Speichern und Schließen</button>
+          </div>
         </div>
         <div className={`trip-side-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trip-side-layout-map-open" : ""}`}>
-          <div className="panel">
-            <div className="trip-summary-panel">
-              <span className="section-label">Jahresübersicht {summary.year}</span>
-              <dl className="detail-list">
-                <div><dt>Reisen</dt><dd>{summary.count}</dd></div>
-                <div><dt>Erledigt</dt><dd>{summary.doneCount}</dd></div>
-                <div><dt>Dauer</dt><dd>{formatMinutes(summary.durationMinutes)}</dd></div>
-                <div><dt>Kilometer</dt><dd>{summary.kilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
-                <div><dt>Reisekosten gesamt</dt><dd>{formatEuroCents(summary.totalCents)}</dd></div>
-                <div><dt>BEZU Jahresstand</dt><dd>{formatEuroCents(summary.transportSubsidyCents)}</dd></div>
-                <div><dt>BEZU Restgrenze</dt><dd>{formatEuroCents(transportSubsidyRemainingCents)}</dd></div>
-                <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(summary.perDiemDifferentialCents)}</dd></div>
-                <div><dt>Differenz Fahrtkosten</dt><dd>{formatEuroCents(summary.transportDifferentialCents)}</dd></div>
-                <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(summary.differentialCents)}</dd></div>
-              </dl>
-              <div className="limit-bar" aria-label={`Beförderungszuschuss Jahresgrenze: ${formatEuroCents(summary.transportSubsidyCents)} von ${formatEuroCents(TRIP_RULES.transportSubsidyYearLimitCents)}`}>
-                <span style={{ width: `${Math.min(summary.transportSubsidyCents / TRIP_RULES.transportSubsidyYearLimitCents, 1) * 100}%` }} />
-              </div>
-              {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
-              <p className="muted">Kilometergeld, Beförderungszuschüsse, Arbeitgeber-Diäten und steuerliche Vergleichswerte werden automatisch berechnet. Sonstige Kosten und bezahlte Steuer bleiben manuelle Eingaben.</p>
-            </div>
-          </div>
+          <TripCostPanel
+            durationMinutes={previewDurationMinutes}
+            kilometers={previewTripCosts.oneWayKilometers * 2}
+            totalCents={calculateTripTotalCents(previewTripCosts)}
+            travelCostCents={previewPayoutCents}
+            perDiemCents={previewTripCosts.perDiemCents}
+            otherCostsCents={previewTripCosts.otherCostsCents}
+            taxPerDiemCents={previewTaxPerDiemCents}
+            taxableTransportSubsidyCents={previewTaxableTransportSubsidyCents}
+            perDiemDifferentialCents={previewPerDiemDifferentialCents}
+            transportDifferentialCents={previewTransportDifferentialCents}
+            differentialCents={previewDifferentialCents}
+          />
           {largeMapPreviewOpen && mapsEmbedUrl ? (
             <div className="panel large-map-card">
               <div className="large-map-preview">
@@ -1027,7 +1149,13 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                     <span>Zieladresse</span>
                     <strong>{form.destination.trim()}</strong>
                   </div>
-                  {form.oneWayKilometers.trim() ? (
+                {form.municipalityCode.trim() ? (
+                  <div>
+                    <span>Gemeindekennzahl</span>
+                    <strong>{form.municipalityCode.trim()}</strong>
+                  </div>
+                ) : null}
+                {form.oneWayKilometers.trim() ? (
                     <div>
                       <span>Einfache Strecke</span>
                       <strong>{form.oneWayKilometers.trim()} km</strong>
@@ -1055,11 +1183,12 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         <div className="trip-list">
           {data.trips.length === 0 ? <p className="muted">Noch keine Reisen erfasst.</p> : null}
           {data.trips.map((trip) => (
-            <article key={trip.id} className={`trip-row ${trip.done ? "trip-row-done" : ""}`}>
+            <article key={trip.id} className={`trip-row ${trip.done ? "trip-row-done" : ""} ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`}>
               <div>
                 <strong>{formatDateKey(trip.date)} · {trip.reason || "Ohne Grund"}</strong>
-                <span>{trip.origin || "-"} → {trip.destination || "-"} · {TRANSPORT_LABELS[trip.transportType]}</span>
+                <span>{formatTripOrigin(trip.origin)}{formatTripOrigin(trip.origin) ? " → " : ""}{trip.destination || "-"} · {TRANSPORT_LABELS[trip.transportType]}</span>
                 {trip.note ? <span>{trip.note}</span> : null}
+                <span className="trip-badges">{!trip.done ? <em>Offen</em> : null}{isTripIncomplete(trip) ? <em>Unvollständig</em> : null}</span>
               </div>
               <div className="trip-row-metrics">
                 <span>{formatMinutes(trip.durationMinutes)}</span>
@@ -1105,7 +1234,264 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
           </div>
         </div>
       ) : null}
+      {destinationPickerOpen ? (
+        <DestinationPicker
+          destinations={data.savedDestinations}
+          municipalities={municipalities}
+          municipalityError={municipalityError}
+          onSave={(destination) => data.saveDestination(destination)}
+          onDelete={(id) => data.removeDestination(id)}
+          onPick={(destination) => {
+            setForm((current) => ({ ...current, destination: destination.address, municipalityCode: destination.municipalityCode ?? "" }));
+            setDestinationPickerOpen(false);
+          }}
+          onClose={() => setDestinationPickerOpen(false)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function TripCostPanel({
+  durationMinutes,
+  kilometers,
+  totalCents,
+  travelCostCents,
+  perDiemCents,
+  otherCostsCents,
+  taxPerDiemCents,
+  taxableTransportSubsidyCents,
+  perDiemDifferentialCents,
+  transportDifferentialCents,
+  differentialCents
+}: {
+  durationMinutes: number;
+  kilometers: number;
+  totalCents: number;
+  travelCostCents: number;
+  perDiemCents: number;
+  otherCostsCents: number;
+  taxPerDiemCents: number;
+  taxableTransportSubsidyCents: number;
+  perDiemDifferentialCents: number;
+  transportDifferentialCents: number;
+  differentialCents: number;
+}) {
+  return (
+    <div className="panel trip-cost-panel">
+      <span className="section-label">Aktuelle Kostenauswertung</span>
+      <div className="trip-preview trip-preview-side">
+        <div className="trip-preview-group trip-preview-group-primary">
+          <span className="trip-preview-title">Reise</span>
+          <dl className="trip-preview-list">
+            <div><dt>Dauer</dt><dd>{formatMinutes(durationMinutes)}</dd></div>
+            <div><dt>Kilometer gesamt</dt><dd>{kilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
+            <div className="trip-preview-total"><dt>Gesamt</dt><dd>{formatEuroCents(totalCents)}</dd></div>
+          </dl>
+        </div>
+        <div className="trip-preview-group">
+          <span className="trip-preview-title">Kosten</span>
+          <dl className="trip-preview-list">
+            <div><dt>Diäten Arbeitgeber</dt><dd>{formatEuroCents(perDiemCents)}</dd></div>
+            <div><dt>Fahrtkosten</dt><dd>{formatEuroCents(travelCostCents)}</dd></div>
+            <div><dt>Sonstige Kosten</dt><dd>{formatEuroCents(otherCostsCents)}</dd></div>
+          </dl>
+        </div>
+        <div className="trip-preview-group trip-preview-group-tax">
+          <span className="trip-preview-title">Steuer & Differenz</span>
+          <dl className="trip-preview-list">
+            <div><dt>Diäten steuerlich</dt><dd>{formatEuroCents(taxPerDiemCents)}</dd></div>
+            <div><dt>Steuerpfl. Öffi-BEZU</dt><dd>{formatEuroCents(taxableTransportSubsidyCents)}</dd></div>
+            <div className="trip-preview-separator" aria-hidden="true" />
+            <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(perDiemDifferentialCents)}</dd></div>
+            <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(transportDifferentialCents)}</dd></div>
+            <div className="trip-preview-grand-total"><dt>Differenz gesamt</dt><dd>{formatEuroCents(differentialCents)}</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
+  const year = currentYear();
+  const summary = summarizeTripsByYear(data.trips, year);
+  const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
+  const openTrips = data.trips.filter((trip) => !trip.done);
+
+  return (
+    <section className="page-stack">
+      <Header eyebrow="Reisekosten" title="Jahresübersicht" />
+      <div className="settings-grid">
+        <div className="panel">
+          <span className="section-label">Jahreswerte {year}</span>
+          <dl className="detail-list">
+            <div><dt>Reisen</dt><dd>{summary.count}</dd></div>
+            <div><dt>Erledigt</dt><dd>{summary.doneCount}</dd></div>
+            <div><dt>Dauer</dt><dd>{formatMinutes(summary.durationMinutes)}</dd></div>
+            <div><dt>Kilometer</dt><dd>{summary.kilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
+            <div><dt>Reisekosten gesamt</dt><dd>{formatEuroCents(summary.totalCents)}</dd></div>
+            <div><dt>BEZU Jahresstand</dt><dd>{formatEuroCents(summary.transportSubsidyCents)}</dd></div>
+            <div><dt>BEZU Restgrenze</dt><dd>{formatEuroCents(transportSubsidyRemainingCents)}</dd></div>
+            <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(summary.perDiemDifferentialCents)}</dd></div>
+            <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(summary.transportDifferentialCents)}</dd></div>
+            <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(summary.differentialCents)}</dd></div>
+          </dl>
+          <div className="limit-bar" aria-label={`Beförderungszuschuss Jahresgrenze: ${formatEuroCents(summary.transportSubsidyCents)} von ${formatEuroCents(TRIP_RULES.transportSubsidyYearLimitCents)}`}>
+            <span style={{ width: `${Math.min(summary.transportSubsidyCents / TRIP_RULES.transportSubsidyYearLimitCents, 1) * 100}%` }} />
+          </div>
+          {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
+        </div>
+        <div className="panel">
+          <span className="section-label">Offene Reiserechnungen</span>
+          <dl className="detail-list">
+            <div><dt>Offene Anzahl</dt><dd>{summary.openCount}</dd></div>
+            <div><dt>Offener Gesamtbetrag</dt><dd>{formatEuroCents(summary.openTotalCents)}</dd></div>
+            <div><dt>Offene Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(summary.openTransportDifferentialCents)}</dd></div>
+            <div><dt>Älteste offene Reise</dt><dd>{summary.oldestOpenTrip ? formatDateKey(summary.oldestOpenTrip.date) : "-"}</dd></div>
+          </dl>
+        </div>
+      </div>
+      <OpenTripsWorklist trips={openTrips} showToast={showToast} onDone={(trip) => data.saveTrip({ ...stripTripMeta(trip), id: trip.id, done: true })} />
+    </section>
+  );
+}
+
+function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showToast: ShowToast; onDone: (trip: Trip) => Promise<unknown> }) {
+  async function copyValue(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      showToast("Wert kopiert.");
+    } catch {
+      showToast("Kopieren nicht möglich.");
+    }
+  }
+
+  return (
+    <div className="panel">
+      <div className="panel-heading">
+        <span className="section-label">Offene Reisekosten abarbeiten</span>
+        <strong>{trips.length}</strong>
+      </div>
+      <div className="open-trip-list">
+        {trips.length === 0 ? <p className="muted">Keine offenen Reisekosten vorhanden.</p> : null}
+        {trips.map((trip) => {
+          const fields = openTripFields(trip);
+          return (
+            <article key={trip.id} className={`open-trip-card ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`}>
+              <div className="panel-heading">
+                <div>
+                  <strong>{formatDateKey(trip.date)} · {trip.reason || "Ohne Grund"}</strong>
+                  <span className="trip-badges">{isTripIncomplete(trip) ? <em>Unvollständig</em> : null}<em>Offen</em></span>
+                </div>
+                <strong>{formatEuroCents(calculateTripTotalCents(trip))}</strong>
+              </div>
+              <div className="copy-field-grid">
+                {fields.map((field) => (
+                  <div key={field.label} className={field.ready ? "" : "copy-field-missing"}>
+                    <span>{field.label}</span>
+                    <strong>{field.value || "Nicht kopierfertig"}</strong>
+                    <button className="icon-button" type="button" title={`${field.label} kopieren`} aria-label={`${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value)}>
+                      <Copy size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button className="secondary-button" type="button" onClick={() => void onDone(trip)}>
+                <CheckCircle size={17} /> Als erledigt markieren
+              </button>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DestinationPicker({
+  destinations,
+  municipalities,
+  municipalityError,
+  onSave,
+  onDelete,
+  onPick,
+  onClose
+}: {
+  destinations: SavedDestination[];
+  municipalities: Municipality[];
+  municipalityError: string | null;
+  onSave: (destination: Omit<SavedDestination, "id" | "createdAt" | "updatedAt"> & { id?: string }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onPick: (destination: SavedDestination) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<SavedDestination | null>(null);
+  const [form, setForm] = useState({ name: "", address: "", municipalityCode: "" });
+  const filtered = destinations.filter((destination) => `${destination.name} ${destination.address}`.toLowerCase().includes(query.trim().toLowerCase()));
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  function edit(destination: SavedDestination) {
+    setEditing(destination);
+    setForm({ name: destination.name, address: destination.address, municipalityCode: destination.municipalityCode ?? "" });
+  }
+
+  async function save() {
+    if (!form.name.trim() || !form.address.trim()) return;
+    await onSave({ id: editing?.id, name: form.name, address: form.address, municipalityCode: form.municipalityCode || undefined });
+    setEditing(null);
+    setForm({ name: "", address: "", municipalityCode: "" });
+  }
+
+  return (
+    <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="destination-picker-title" onClick={onClose}>
+      <div className="trip-file-modal-card destination-picker" onClick={(event) => event.stopPropagation()}>
+        <div className="panel-heading">
+          <div>
+            <span id="destination-picker-title" className="section-label">Zieladressen</span>
+            {municipalityError ? <p className="muted">{municipalityError}</p> : null}
+          </div>
+          <button className="icon-button" type="button" title="Schließen" aria-label="Schließen" onClick={onClose}><X size={18} /></button>
+        </div>
+        <Field label="Suche"><input value={query} onChange={(event) => setQuery(event.target.value)} /></Field>
+        <div className="form-grid">
+          <Field label="Name"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
+          <Field label="Adresse"><input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
+          <Field label="Gemeindekennzahl">
+            <input list="municipalities" value={form.municipalityCode} onChange={(event) => setForm({ ...form, municipalityCode: event.target.value })} />
+            <datalist id="municipalities">
+              {municipalities.map((municipality) => <option key={municipality.code} value={municipality.code}>{municipality.name}</option>)}
+            </datalist>
+          </Field>
+          <button className="secondary-button destination-save-button" type="button" onClick={() => void save()}>
+            <Plus size={17} /> {editing ? "Aktualisieren" : "Anlegen"}
+          </button>
+        </div>
+        <div className="destination-list">
+          {filtered.length === 0 ? <p className="muted">Keine Zieladresse gefunden.</p> : null}
+          {filtered.map((destination) => (
+            <article key={destination.id} className="destination-row">
+              <button type="button" onClick={() => onPick(destination)}>
+                <strong>{destination.name}</strong>
+                <span>{destination.address}</span>
+                {destination.municipalityCode ? <small>GKZ {destination.municipalityCode}</small> : null}
+              </button>
+              <div className="trip-actions">
+                <button className="icon-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => edit(destination)}><PencilSimple size={16} /></button>
+                <button className="icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void onDelete(destination.id)}><Trash size={16} /></button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1115,11 +1501,6 @@ function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWe
       <div className="panel-heading week-heading">
         <div>
           <span className="section-label">Woche ab {formatDateKey(week.weekStart)}</span>
-          <div className="week-summary">
-            <strong>{formatSignedMinutes(week.deltaMinutes)}</strong>
-            <span>Plus {formatMinutes(week.plusMinutes)}</span>
-            <span>Minus {formatMinutes(week.minusMinutes)}</span>
-          </div>
         </div>
         <div className="week-nav">
           <button type="button" className="secondary-button" onClick={() => onWeekChange(-7)}>Vorwoche</button>
@@ -1133,7 +1514,10 @@ function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWe
             <span>{formatDateKey(day.date)}</span>
             <span>{day.entry?.startTime ?? "-"}</span>
             <span>{day.entry?.endTime ?? "offen"}</span>
-            <strong className={`week-delta week-delta-${deltaTone(day.calculation.deltaMinutes)}`}>{formatAbsoluteMinutes(day.calculation.deltaMinutes)}</strong>
+            <strong className={`week-delta week-delta-${deltaTone(day.calculation.deltaMinutes)}`}>
+              {day.calculation.deltaMinutes > 0 ? <ArrowCircleUp size={16} weight="duotone" /> : day.calculation.deltaMinutes < 0 ? <ArrowCircleDown size={16} weight="duotone" /> : <MinusCircle size={16} weight="duotone" />}
+              {formatAbsoluteMinutes(day.calculation.deltaMinutes)}
+            </strong>
           </div>
         ))}
       </div>
@@ -1141,12 +1525,12 @@ function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWe
   );
 }
 
-function Header({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+function Header({ eyebrow, title, description }: { eyebrow: string; title: string; description?: string }) {
   return (
     <header className="page-header">
       <span>{eyebrow}</span>
       <h1>{title}</h1>
-      <p>{description}</p>
+      {description ? <p>{description}</p> : null}
     </header>
   );
 }
@@ -1157,7 +1541,7 @@ type MetricProgress = {
   tone?: "default" | "warning" | "vacation";
 };
 
-function Metric({ title, value, detail, icon, action, tone = "default", progress }: { title: string; value: string; detail: string; icon?: React.ReactNode; action?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress }) {
+function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, icon, action, tone = "default", progress }: { title: string; value: string; detail: string; editableDetail?: React.ReactNode; onDetailDoubleClick?: () => void; icon?: React.ReactNode; action?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress }) {
   const progressValue = progress ? clampProgress(progress.value) : 0;
   const overflowValue = progress?.overflow ? clampProgress(progress.overflow) : 0;
 
@@ -1176,7 +1560,7 @@ function Metric({ title, value, detail, icon, action, tone = "default", progress
           </span>
         </div>
       ) : null}
-      <p>{detail}</p>
+      <p onDoubleClick={onDetailDoubleClick} className={onDetailDoubleClick ? "metric-editable-detail" : undefined}>{editableDetail ?? detail}</p>
     </article>
   );
 }
@@ -1343,12 +1727,12 @@ function tripToForm(trip?: Trip) {
     reason: trip?.reason ?? "",
     origin: trip?.origin ?? DEFAULT_TRIP_ORIGIN,
     destination: trip?.destination ?? "",
+    municipalityCode: trip?.municipalityCode ?? "",
     transportType: trip?.transportType ?? "kilometergeld" as TripTransportType,
     oneWayKilometers: trip ? String(trip.oneWayKilometers) : "",
     otherCostsEuros: trip ? centsToEuroInput(trip.otherCostsCents) : "0",
     otherCostsDescription: trip?.otherCostsDescription ?? "",
     ticketPriceEuros: trip ? centsToEuroInput(trip.ticketPriceCents ?? 0) : "0",
-    transportSubsidyTaxEuros: trip ? centsToEuroInput(trip.transportSubsidyTaxCents ?? 0) : "0",
     note: trip?.note ?? "",
     done: trip?.done ?? false
   };
@@ -1363,6 +1747,7 @@ function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt">
     reason: trip.reason,
     origin: trip.origin,
     destination: trip.destination,
+    municipalityCode: trip.municipalityCode,
     transportType: trip.transportType,
     oneWayKilometers: trip.oneWayKilometers,
     perDiemCents: trip.perDiemCents,
@@ -1370,7 +1755,7 @@ function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt">
     otherCostsDescription: trip.otherCostsDescription ?? "",
     ticketPriceCents: trip.ticketPriceCents ?? 0,
     taxableTransportSubsidyCents: trip.taxableTransportSubsidyCents ?? 0,
-    transportSubsidyTaxCents: trip.transportSubsidyTaxCents ?? 0,
+    transportSubsidyTaxCents: 0,
     note: trip.note ?? "",
     done: trip.done
   };
@@ -1443,6 +1828,37 @@ function formatEuroCents(cents: number): string {
 
 function formatLongDateKey(dateKey: string): string {
   return `${weekdayName(dateKey)}, ${formatDateKey(dateKey).replace(/^[^,]+,\s*/, "")}`;
+}
+
+function isTripIncomplete(trip: Pick<Trip, "startTime" | "endTime">): boolean {
+  return !trip.startTime || !trip.endTime;
+}
+
+function formatTripOrigin(origin: string): string {
+  return origin === DEFAULT_TRIP_ORIGIN ? "" : origin || "";
+}
+
+function formatTripDateTime(trip: Trip, field: "startTime" | "endTime"): string {
+  const time = trip[field];
+  return time ? `${formatDateKey(trip.date)}, ${time}` : "";
+}
+
+function openTripFields(trip: Trip): Array<{ label: string; value: string; ready: boolean }> {
+  const isPublicTransport = trip.transportType === "oeffi-zuschuss";
+  const fields = [
+    { label: "Zeit von", value: formatTripDateTime(trip, "startTime"), ready: Boolean(trip.startTime) },
+    { label: "Zeit bis", value: formatTripDateTime(trip, "endTime"), ready: Boolean(trip.endTime) },
+    { label: "Grund", value: trip.reason, ready: Boolean(trip.reason.trim()) },
+    { label: "Gemeindekennzahl", value: trip.municipalityCode ?? "", ready: Boolean(trip.municipalityCode?.trim()) }
+  ];
+  if (isPublicTransport) {
+    fields.push(
+      { label: "Beschreibung", value: "Fahrt Öffis", ready: true },
+      { label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()) },
+      { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0 }
+    );
+  }
+  return fields;
 }
 
 function deltaTone(minutes: number): "plus" | "minus" | "zero" {

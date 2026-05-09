@@ -96,8 +96,9 @@ export function useWorkData() {
       await refresh();
     },
     saveTrip: async (input: Omit<Trip, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
-      await upsertTrip(input);
+      const trip = await upsertTrip(input);
       await refresh();
+      return trip;
     },
     removeTrip: async (id: string) => {
       await deleteTrip(id);
