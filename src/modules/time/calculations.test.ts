@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDay,
   calculateFlexBalance,
+  calculateNextFlexDayBalance,
   calculateNextVacationUsedMinutes,
   calculateRequiredYearConsumption,
   calculateVacation,
@@ -84,5 +85,12 @@ describe("time calculations", () => {
     expect(calculateNextVacationUsedMinutes(960, 720, 480)).toBe(960);
     expect(calculateNextVacationUsedMinutes(960, 960, 480)).toBe(960);
     expect(calculateNextVacationUsedMinutes(null, 0, 480)).toBe(0);
+  });
+
+  it("books flex days only down to ten minus hours", () => {
+    expect(calculateNextFlexDayBalance(0, 480)).toBe(-480);
+    expect(calculateNextFlexDayBalance(-120, 480)).toBe(-600);
+    expect(calculateNextFlexDayBalance(-121, 480)).toBeNull();
+    expect(calculateNextFlexDayBalance(-600, 480)).toBeNull();
   });
 });

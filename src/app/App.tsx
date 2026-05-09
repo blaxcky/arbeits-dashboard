@@ -32,6 +32,7 @@ import { formatAbsoluteMinutes, formatDays, formatMinutes, formatSignedMinutes, 
 import {
   calculateDay,
   calculateFlexBalance,
+  calculateNextFlexDayBalance,
   calculateNextVacationUsedMinutes,
   calculateRequiredYearConsumption,
   calculateVacation,
@@ -164,6 +165,8 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const flexDistanceToLimit = flexLimitMinutes - flex;
   const vacationEntitlementMinutes = vacation?.entitlementMinutes ?? 0;
   const dailyTargetMinutes = settings?.dailyTargetMinutes ?? 480;
+  const nextFlexDayBalance = settings ? calculateNextFlexDayBalance(flex, settings.dailyTargetMinutes) : null;
+  const canBookFlexDay = Boolean(settings && nextFlexDayBalance !== null);
   const breakField = (
     <Field label="Pause in Minuten" className="break-field" error={breakError}>
       <input
@@ -247,10 +250,15 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
 
   async function bookFlexDay() {
     if (!settings) return;
+    const nextBalance = calculateNextFlexDayBalance(flex, settings.dailyTargetMinutes);
+    if (nextBalance === null) {
+      showToast("Gleittag nicht möglich: maximal 10:00 h Minusstunden.");
+      return;
+    }
     await data.addCorrection({
       date: selectedDate,
       oldValueMinutes: flex,
-      newValueMinutes: flex - settings.dailyTargetMinutes,
+      newValueMinutes: nextBalance,
       note: "Gleittag vorgemerkt"
     });
     showToast(`Gleittag mit ${formatMinutes(settings.dailyTargetMinutes)} gebucht.`);
@@ -338,7 +346,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             value={formatSignedMinutes(flex)}
             detail={flexDistanceToLimit >= 0 ? `noch ${formatMinutes(flexDistanceToLimit)} bis Grenze` : `${formatMinutes(Math.abs(flexDistanceToLimit))} über Grenze`}
             action={
-              <button className="icon-button metric-action" type="button" title="Gleittag buchen" aria-label="Gleittag buchen" onClick={() => void bookFlexDay()} disabled={!settings}>
+              <button className="icon-button metric-action" type="button" title={canBookFlexDay ? "Gleittag buchen" : "Gleittag nicht möglich: maximal 10:00 h Minusstunden"} aria-label="Gleittag buchen" onClick={() => void bookFlexDay()} disabled={!canBookFlexDay}>
                 <CalendarPlus size={18} />
               </button>
             }
