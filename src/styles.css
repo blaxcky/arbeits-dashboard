@@ -389,46 +389,76 @@ button:disabled {
 
 .week-row {
   display: grid;
-  grid-template-columns: 1fr 1.3fr 0.7fr 0.7fr 0.8fr;
+  grid-template-columns: 1fr 1.25fr 0.65fr 0.65fr 52px 0.8fr;
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid #eef1f5;
   align-items: center;
 }
 
+.week-row-head {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 10px 0;
+  text-transform: uppercase;
+}
+
+.week-row-head span:nth-child(5),
+.week-row-head span:nth-child(6) {
+  justify-self: end;
+}
+
 .week-row strong {
   font-family: "Geist Mono", ui-monospace, monospace;
 }
 
-.week-delta {
+.week-status {
   justify-self: end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  min-width: 72px;
+  width: 32px;
+  height: 28px;
   border: 1px solid transparent;
   border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 0.9rem;
   line-height: 1.2;
 }
 
-.week-delta-plus {
+.week-hours {
+  justify-self: end;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.week-status.week-delta-plus {
   border-color: rgba(21, 128, 61, 0.34);
   background: rgba(21, 128, 61, 0.12);
   color: #13733b;
 }
 
-.week-delta-minus {
+.week-status.week-delta-minus {
   border-color: rgba(185, 28, 28, 0.34);
   background: rgba(185, 28, 28, 0.11);
   color: #b91c1c;
 }
 
-.week-delta-zero {
+.week-status.week-delta-zero {
   border-color: rgba(37, 99, 235, 0.28);
   background: rgba(37, 99, 235, 0.1);
+  color: #2556b8;
+}
+
+.week-hours.week-delta-plus {
+  color: #13733b;
+}
+
+.week-hours.week-delta-minus {
+  color: #b91c1c;
+}
+
+.week-hours.week-delta-zero {
   color: #2556b8;
 }
 
@@ -1649,7 +1679,28 @@ button:disabled {
   }
 
   .week-row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 44px minmax(74px, auto);
+    gap: 8px 10px;
+  }
+
+  .week-row-head {
+    display: none;
+  }
+
+  .week-row > span:nth-child(3),
+  .week-row > span:nth-child(4) {
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .week-row > span:nth-child(5) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .week-row > strong:nth-child(6) {
+    grid-column: 4;
+    grid-row: 1;
   }
 
   .trip-row {

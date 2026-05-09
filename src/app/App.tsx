@@ -1594,18 +1594,32 @@ function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWe
         </div>
       </div>
       <div className="week-table">
-        {week.days.map((day) => (
-          <div key={day.date} className="week-row">
-            <span>{weekdayName(day.date)}</span>
-            <span>{formatDateKey(day.date)}</span>
-            <span>{day.entry?.startTime ?? "-"}</span>
-            <span>{day.entry?.endTime ?? "offen"}</span>
-            <strong className={`week-delta week-delta-${deltaTone(day.calculation.deltaMinutes)}`}>
-              {day.calculation.deltaMinutes > 0 ? <ArrowCircleUp size={16} weight="duotone" /> : day.calculation.deltaMinutes < 0 ? <ArrowCircleDown size={16} weight="duotone" /> : <MinusCircle size={16} weight="duotone" />}
-              {formatAbsoluteMinutes(day.calculation.deltaMinutes)}
-            </strong>
-          </div>
-        ))}
+        <div className="week-row week-row-head">
+          <span>Tag</span>
+          <span>Datum</span>
+          <span>Von</span>
+          <span>Bis</span>
+          <span>Status</span>
+          <span>Stunden</span>
+        </div>
+        {week.days.map((day) => {
+          const tone = deltaTone(day.calculation.deltaMinutes);
+          const statusLabel = tone === "plus" ? "Plusstunden" : tone === "minus" ? "Minusstunden" : "Ausgeglichen";
+          return (
+            <div key={day.date} className="week-row">
+              <span>{weekdayName(day.date)}</span>
+              <span>{formatDateKey(day.date)}</span>
+              <span>{day.entry?.startTime ?? "-"}</span>
+              <span>{day.entry?.endTime ?? "offen"}</span>
+              <span className={`week-status week-delta-${tone}`} aria-label={statusLabel}>
+                {day.calculation.deltaMinutes > 0 ? <ArrowCircleUp size={16} weight="duotone" /> : day.calculation.deltaMinutes < 0 ? <ArrowCircleDown size={16} weight="duotone" /> : <MinusCircle size={16} weight="duotone" />}
+              </span>
+              <strong className={`week-hours week-delta-${tone}`}>
+                {formatAbsoluteMinutes(day.calculation.deltaMinutes)}
+              </strong>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
