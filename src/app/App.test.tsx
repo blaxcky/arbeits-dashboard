@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../db/schema";
-import { formatTripCopyDateTime, normalizeTimeInput, openTripFields } from "./App";
+import { destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields } from "./App";
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -64,5 +64,23 @@ describe("trip copy fields", () => {
       ready: true
     });
     expect(fields.find((field) => field.label === "Anzahl")).toMatchObject({ value: "60", ready: true });
+  });
+});
+
+describe("destination import draft", () => {
+  it("uses the first address part as editable name and keeps an existing GKZ", () => {
+    expect(destinationImportDraft("Stephansplatz 1, 1010 Wien", "90101", [])).toEqual({
+      name: "Stephansplatz 1",
+      address: "Stephansplatz 1, 1010 Wien",
+      municipalityCode: "90101"
+    });
+  });
+
+  it("derives the GKZ from municipalities when the form value is empty", () => {
+    expect(destinationImportDraft("Stephansplatz 1, 1010 Wien", "", [{ code: "90001", name: "Wien", postalCodes: "1010", localityName: "Wien" }])).toEqual({
+      name: "Stephansplatz 1",
+      address: "Stephansplatz 1, 1010 Wien",
+      municipalityCode: "90001"
+    });
   });
 });

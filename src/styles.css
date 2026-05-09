@@ -1140,6 +1140,10 @@ button:disabled {
   position: relative;
 }
 
+.input-with-button input {
+  padding-right: 52px;
+}
+
 .input-with-button .auto-fit-input {
   padding-right: 52px;
 }
@@ -1410,8 +1414,64 @@ button:disabled {
   max-width: 860px;
 }
 
+.municipality-picker {
+  max-width: 760px;
+}
+
+.municipality-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(520px, 58dvh);
+  overflow: auto;
+}
+
+.municipality-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #e5ebf2;
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 10px 12px;
+  color: inherit;
+  text-align: left;
+}
+
+.municipality-row:hover {
+  border-color: #cbd5df;
+  background: #f6f9fb;
+}
+
+.municipality-row span,
+.municipality-row small,
+.municipality-row strong {
+  min-width: 0;
+}
+
+.municipality-row strong,
+.municipality-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.municipality-row small {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.municipality-row code {
+  color: var(--accent-dark);
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-weight: 800;
+}
+
 .destination-save-button {
   align-self: end;
+}
+
+.destination-import-button {
+  justify-self: start;
 }
 
 .destination-row {

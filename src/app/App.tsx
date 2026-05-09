@@ -13,6 +13,7 @@ import {
   Gear,
   House,
   ListChecks,
+  MagnifyingGlass,
   MapPin,
   MinusCircle,
   PencilSimple,
@@ -56,7 +57,7 @@ import {
   TRANSPORT_LABELS,
   TRIP_RULES
 } from "../modules/expenses/calculations";
-import { parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
+import { findMunicipalityForAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
 
@@ -691,6 +692,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [largeMapPreviewOpen, setLargeMapPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<TripFile | null>(null);
   const [destinationPickerOpen, setDestinationPickerOpen] = useState(false);
+  const [municipalityPickerOpen, setMunicipalityPickerOpen] = useState(false);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
   const [municipalityError, setMunicipalityError] = useState<string | null>(null);
   const latestTripDraft = useRef({ form, editingId });
@@ -783,7 +785,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
 
   useEffect(() => {
     let active = true;
-    fetch(`${import.meta.env.BASE_URL}gemeinden.xml`)
+    fetch(`${import.meta.env.BASE_URL}Reflist-2162-Österreichische-Ortschaften.xml`)
       .then((response) => {
         if (!response.ok) throw new Error("Gemeindedatei fehlt");
         return response.text();
@@ -804,6 +806,12 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   useEffect(() => {
     if (!mapsEmbedUrl) setMapPreviewOpen(false);
   }, [mapsEmbedUrl]);
+
+  useEffect(() => {
+    if (municipalities.length === 0 || form.municipalityCode.trim()) return;
+    const municipality = findMunicipalityForAddress(form.destination, municipalities);
+    if (municipality) setForm((current) => ({ ...current, municipalityCode: municipality.code }));
+  }, [form.destination, form.municipalityCode, municipalities]);
 
   useEffect(() => {
     if (!mapsEmbedUrl) setLargeMapPreviewOpen(false);
@@ -827,7 +835,14 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   }, [data.files, previewFile]);
 
   function updateTripField(field: keyof ReturnType<typeof tripToForm>, value: string | boolean) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === "destination" && typeof value === "string") {
+        const municipality = findMunicipalityForAddress(value, municipalities);
+        if (municipality) next.municipalityCode = municipality.code;
+      }
+      return next;
+    });
   }
 
   function handleTripTimeBlur(field: "startTime" | "endTime", value: string) {
@@ -1047,7 +1062,14 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                   </button>
                 </div>
               </Field>
-              <Field label="Gemeindekennzahl" className="trip-field-half"><input value={form.municipalityCode} onChange={(event) => updateTripField("municipalityCode", event.target.value)} /></Field>
+              <Field label="Gemeindekennzahl" className="trip-field-half">
+                <div className="input-with-button">
+                  <input value={form.municipalityCode} onChange={(event) => updateTripField("municipalityCode", event.target.value)} />
+                  <button className="icon-button" type="button" title="Ortschaft suchen" aria-label="Ortschaft suchen" onClick={() => setMunicipalityPickerOpen(true)}>
+                    <MagnifyingGlass size={18} />
+                  </button>
+                </div>
+              </Field>
               <Field label="Einfache Strecke (km)" className="trip-field-half"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
             </section>
             <section className="trip-form-section" aria-labelledby="trip-section-costs">
@@ -1312,6 +1334,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
           destinations={data.savedDestinations}
           municipalities={municipalities}
           municipalityError={municipalityError}
+          currentDestination={form.destination}
+          currentMunicipalityCode={form.municipalityCode}
           onSave={(destination) => data.saveDestination(destination)}
           onDelete={(id) => data.removeDestination(id)}
           onPick={(destination) => {
@@ -1319,6 +1343,18 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             setDestinationPickerOpen(false);
           }}
           onClose={() => setDestinationPickerOpen(false)}
+        />
+      ) : null}
+      {municipalityPickerOpen ? (
+        <MunicipalityPicker
+          municipalities={municipalities}
+          municipalityError={municipalityError}
+          initialQuery={form.destination}
+          onPick={(municipality) => {
+            setForm((current) => ({ ...current, municipalityCode: municipality.code }));
+            setMunicipalityPickerOpen(false);
+          }}
+          onClose={() => setMunicipalityPickerOpen(false)}
         />
       ) : null}
     </section>
@@ -1503,10 +1539,57 @@ function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showTo
   );
 }
 
+function MunicipalityPicker({ municipalities, municipalityError, initialQuery, onPick, onClose }: { municipalities: Municipality[]; municipalityError: string | null; initialQuery: string; onPick: (municipality: Municipality) => void; onClose: () => void }) {
+  const [query, setQuery] = useState(initialQuery);
+  const normalizedQuery = municipalitySearchText({ code: "", name: query });
+  const filtered = normalizedQuery
+    ? municipalities.filter((municipality) => municipalitySearchText(municipality).includes(normalizedQuery)).slice(0, 80)
+    : municipalities.slice(0, 80);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="municipality-picker-title" onClick={onClose}>
+      <div className="trip-file-modal-card municipality-picker" onClick={(event) => event.stopPropagation()}>
+        <div className="panel-heading">
+          <div>
+            <span id="municipality-picker-title" className="section-label">Ortschaft suchen</span>
+            {municipalityError ? <p className="muted">{municipalityError}</p> : null}
+          </div>
+          <button className="icon-button" type="button" title="Schließen" aria-label="Schließen" onClick={onClose}><X size={18} /></button>
+        </div>
+        <Field label="Ortschaft, Gemeinde, PLZ oder GKZ">
+          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} />
+        </Field>
+        <div className="municipality-list">
+          {filtered.length === 0 ? <p className="muted">Keine Ortschaft gefunden.</p> : null}
+          {filtered.map((municipality, index) => (
+            <button key={`${municipality.code}-${municipality.localityName ?? municipality.name}-${municipality.postalCodes ?? ""}-${index}`} type="button" className="municipality-row" onClick={() => onPick(municipality)}>
+              <span>
+                <strong>{municipality.localityName ?? municipality.name}</strong>
+                <small>{municipality.postalCodes ? `${municipality.postalCodes} · ` : ""}{municipality.name}</small>
+              </span>
+              <code>{municipality.code}</code>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DestinationPicker({
   destinations,
   municipalities,
   municipalityError,
+  currentDestination,
+  currentMunicipalityCode,
   onSave,
   onDelete,
   onPick,
@@ -1515,6 +1598,8 @@ function DestinationPicker({
   destinations: SavedDestination[];
   municipalities: Municipality[];
   municipalityError: string | null;
+  currentDestination: string;
+  currentMunicipalityCode: string;
   onSave: (destination: Omit<SavedDestination, "id" | "createdAt" | "updatedAt"> & { id?: string }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onPick: (destination: SavedDestination) => void;
@@ -1524,6 +1609,8 @@ function DestinationPicker({
   const [editing, setEditing] = useState<SavedDestination | null>(null);
   const [form, setForm] = useState({ name: "", address: "", municipalityCode: "" });
   const filtered = destinations.filter((destination) => `${destination.name} ${destination.address}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const trimmedCurrentDestination = currentDestination.trim();
+  const currentDestinationSaved = Boolean(trimmedCurrentDestination) && destinations.some((destination) => destination.address.trim() === trimmedCurrentDestination);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1545,6 +1632,18 @@ function DestinationPicker({
     setForm({ name: "", address: "", municipalityCode: "" });
   }
 
+  function updateAddress(address: string) {
+    const municipality = findMunicipalityForAddress(address, municipalities);
+    setForm((current) => ({ ...current, address, municipalityCode: municipality?.code ?? current.municipalityCode }));
+  }
+
+  function importCurrentDestination() {
+    const draft = destinationImportDraft(currentDestination, currentMunicipalityCode, municipalities);
+    if (!draft) return;
+    setEditing(null);
+    setForm(draft);
+  }
+
   return (
     <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="destination-picker-title" onClick={onClose}>
       <div className="trip-file-modal-card destination-picker" onClick={(event) => event.stopPropagation()}>
@@ -1556,9 +1655,20 @@ function DestinationPicker({
           <button className="icon-button" type="button" title="Schließen" aria-label="Schließen" onClick={onClose}><X size={18} /></button>
         </div>
         <Field label="Suche"><input value={query} onChange={(event) => setQuery(event.target.value)} /></Field>
+        {trimmedCurrentDestination ? (
+          currentDestinationSaved ? (
+            <button className="secondary-button destination-import-button" type="button" disabled>
+              <CheckCircle size={17} /> Bereits gespeichert
+            </button>
+          ) : (
+            <button className="secondary-button destination-import-button" type="button" onClick={importCurrentDestination}>
+              <MapPin size={17} /> Adresse übernehmen
+            </button>
+          )
+        ) : null}
         <div className="form-grid">
           <Field label="Name"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-          <Field label="Adresse"><input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></Field>
+          <Field label="Adresse"><input value={form.address} onChange={(event) => updateAddress(event.target.value)} /></Field>
           <Field label="Gemeindekennzahl">
             <input list="municipalities" value={form.municipalityCode} onChange={(event) => setForm({ ...form, municipalityCode: event.target.value })} />
             <datalist id="municipalities">
@@ -1588,6 +1698,14 @@ function DestinationPicker({
       </div>
     </div>
   );
+}
+
+export function destinationImportDraft(destination: string, municipalityCode: string, municipalities: Municipality[]) {
+  const address = destination.trim();
+  if (!address) return null;
+  const municipality = municipalityCode.trim() || findMunicipalityForAddress(address, municipalities)?.code || "";
+  const name = address.split(",").map((part) => part.trim()).find(Boolean) || address;
+  return { name, address, municipalityCode: municipality };
 }
 
 function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWeek>; onWeekChange: (offsetDays: number) => void }) {
