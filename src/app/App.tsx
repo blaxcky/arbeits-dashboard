@@ -677,6 +677,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(() => tripToForm());
   const [tripTimeErrors, setTripTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
+  const [openTripsDialogOpen, setOpenTripsDialogOpen] = useState(false);
   const [mapPreviewOpen, setMapPreviewOpen] = useState(false);
   const [largeMapPreviewOpen, setLargeMapPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<TripFile | null>(null);
@@ -710,6 +711,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const needsKilometerEvidence = form.transportType === "kilometergeld";
   const needsPublicTransportEvidence = form.transportType === "oeffi-zuschuss";
   const editingTrip = editingId ? data.trips.find((trip) => trip.id === editingId) : undefined;
+  const openTrips = data.trips.filter((trip) => !trip.done);
   const filesByTripId = useMemo(() => {
     const grouped = new Map<string, TripFile[]>();
     data.files.forEach((file) => {
@@ -984,6 +986,13 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   return (
     <section className="page-stack">
       <Header eyebrow="Reisekosten" title="Reisen erfassen" />
+      <div className="trips-overview-actions">
+        <button className="primary-button" type="button" onClick={() => setOpenTripsDialogOpen(true)}>
+          <ListChecks size={18} />
+          Offene abarbeiten
+        </button>
+        <span>{openTrips.length} offen</span>
+      </div>
       <div className={`split-grid trips-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trips-layout-map-open" : ""}`}>
         <div className="panel form-panel">
           <div className="panel-heading">
@@ -1281,6 +1290,14 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
           </div>
         </div>
       ) : null}
+      {openTripsDialogOpen ? (
+        <OpenTripsDialog
+          trips={openTrips}
+          showToast={showToast}
+          onClose={() => setOpenTripsDialogOpen(false)}
+          onDone={(trip) => data.saveTrip({ ...stripTripMeta(trip), id: trip.id, done: true })}
+        />
+      ) : null}
       {destinationPickerOpen ? (
         <DestinationPicker
           destinations={data.savedDestinations}
@@ -1360,11 +1377,10 @@ function TripCostPanel({
   );
 }
 
-function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
+function TripsYearView({ data }: { data: WorkData; showToast: ShowToast }) {
   const year = currentYear();
   const summary = summarizeTripsByYear(data.trips, year);
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
-  const openTrips = data.trips.filter((trip) => !trip.done);
 
   return (
     <section className="page-stack">
@@ -1399,8 +1415,35 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
           </dl>
         </div>
       </div>
-      <OpenTripsWorklist trips={openTrips} showToast={showToast} onDone={(trip) => data.saveTrip({ ...stripTripMeta(trip), id: trip.id, done: true })} />
     </section>
+  );
+}
+
+function OpenTripsDialog({ trips, showToast, onClose, onDone }: { trips: Trip[]; showToast: ShowToast; onClose: () => void; onDone: (trip: Trip) => Promise<unknown> }) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="open-trips-dialog-title" onClick={onClose}>
+      <div className="trip-file-modal-card open-trips-dialog" onClick={(event) => event.stopPropagation()}>
+        <div className="panel-heading">
+          <div>
+            <span id="open-trips-dialog-title" className="section-label">Offene Reisekosten abarbeiten</span>
+            <strong>{trips.length} offen</strong>
+          </div>
+          <button className="icon-button" type="button" title="Abarbeitung schließen" aria-label="Abarbeitung schließen" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <OpenTripsWorklist trips={trips} showToast={showToast} onDone={onDone} />
+      </div>
+    </div>
   );
 }
 
@@ -1415,11 +1458,7 @@ function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showTo
   }
 
   return (
-    <div className="panel">
-      <div className="panel-heading">
-        <span className="section-label">Offene Reisekosten abarbeiten</span>
-        <strong>{trips.length}</strong>
-      </div>
+    <div className="open-trips-worklist">
       <div className="open-trip-list">
         {trips.length === 0 ? <p className="muted">Keine offenen Reisekosten vorhanden.</p> : null}
         {trips.map((trip) => {
@@ -1885,23 +1924,24 @@ function formatTripOrigin(origin: string): string {
   return origin === DEFAULT_TRIP_ORIGIN ? "" : origin || "";
 }
 
-function formatTripDateTime(trip: Trip, field: "startTime" | "endTime"): string {
+export function formatTripCopyDateTime(trip: Pick<Trip, "date" | "startTime" | "endTime">, field: "startTime" | "endTime"): string {
   const time = trip[field];
-  return time ? `${formatDateKey(trip.date)}, ${time}` : "";
+  const [year, month, day] = trip.date.split("-");
+  return time && year && month && day ? `${day}.${month}.${year}, ${time}` : "";
 }
 
-function openTripFields(trip: Trip): Array<{ label: string; value: string; ready: boolean }> {
+export function openTripFields(trip: Trip): Array<{ label: string; value: string; ready: boolean }> {
   const isPublicTransport = trip.transportType === "oeffi-zuschuss";
   const fields = [
-    { label: "Zeit von", value: formatTripDateTime(trip, "startTime"), ready: Boolean(trip.startTime) },
-    { label: "Zeit bis", value: formatTripDateTime(trip, "endTime"), ready: Boolean(trip.endTime) },
+    { label: "Zeit von", value: formatTripCopyDateTime(trip, "startTime"), ready: Boolean(trip.startTime) },
+    { label: "Zeit bis", value: formatTripCopyDateTime(trip, "endTime"), ready: Boolean(trip.endTime) },
     { label: "Grund", value: trip.reason, ready: Boolean(trip.reason.trim()) },
     { label: "Gemeindekennzahl", value: trip.municipalityCode ?? "", ready: Boolean(trip.municipalityCode?.trim()) }
   ];
   if (isPublicTransport) {
     fields.push(
-      { label: "Beschreibung", value: "Fahrt Öffis", ready: true },
-      { label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()) },
+      { label: "Beschreibung", value: "Fahrt Oeffis", ready: true },
+      { label: "Bemerkungen", value: `Fahrt wurde mit oeffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()) },
       { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0 }
     );
   }

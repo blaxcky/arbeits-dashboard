@@ -184,6 +184,25 @@ button:disabled {
   line-height: 1.55;
 }
 
+.trips-overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.trips-overview-actions span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
 .dashboard-workflow-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.75fr) minmax(0, 0.8fr);
@@ -1268,6 +1287,10 @@ button:disabled {
   margin-top: 16px;
 }
 
+.open-trips-worklist .open-trip-list {
+  margin-top: 0;
+}
+
 .open-trip-card,
 .destination-row {
   display: grid;
@@ -1486,6 +1509,10 @@ button:disabled {
   background: #fff;
   padding: 16px;
   box-shadow: 0 28px 70px -24px rgba(17, 24, 39, 0.55);
+}
+
+.open-trips-dialog {
+  width: min(1180px, 100%);
 }
 
 .trip-file-modal-card .panel-heading {
