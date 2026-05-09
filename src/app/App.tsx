@@ -24,7 +24,7 @@ import {
   Warning
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { HashRouter, Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import type { SavedDestination, Settings, TimeEntry, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
@@ -121,6 +121,7 @@ export function App() {
             <Route path="/" element={<Dashboard data={data} showToast={showToast} />} />
             <Route path="/reisekosten" element={<TripsView data={data} showToast={showToast} />} />
             <Route path="/reisekosten/jahr" element={<TripsYearView data={data} showToast={showToast} />} />
+            <Route path="/reisekosten/jahr/:year" element={<TripsYearView data={data} showToast={showToast} />} />
             <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Fälligkeiten", "Prioritäten", "Tags", "Filter und Suche"]} />} />
             <Route path="/einstellungen" element={<SettingsView data={data} showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -1423,7 +1424,10 @@ function TripCostPanel({
 }
 
 function TripsYearView({ data }: { data: WorkData; showToast: ShowToast }) {
-  const year = currentYear();
+  const navigate = useNavigate();
+  const params = useParams();
+  const year = yearFromUrlParam(params.year);
+  const yearOptions = tripYearOptions(data.trips, currentYear(), year);
   const summary = summarizeTripsByYear(data.trips, year);
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
 
@@ -1432,7 +1436,17 @@ function TripsYearView({ data }: { data: WorkData; showToast: ShowToast }) {
       <Header eyebrow="Reisekosten" title="Jahresübersicht" />
       <div className="settings-grid">
         <div className="panel">
-          <span className="section-label">Jahreswerte {year}</span>
+          <div className="panel-heading year-overview-heading">
+            <span className="section-label">Jahreswerte {year}</span>
+            <label className="year-select">
+              <span>Jahr</span>
+              <select value={year} onChange={(event) => navigate(`/reisekosten/jahr/${event.target.value}`)}>
+                {yearOptions.map((optionYear) => (
+                  <option key={optionYear} value={optionYear}>{optionYear}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <dl className="detail-list">
             <div><dt>Reisen</dt><dd>{summary.count}</dd></div>
             <div><dt>Erledigt</dt><dd>{summary.doneCount}</dd></div>
@@ -1760,6 +1774,23 @@ function Header({ eyebrow, title, description }: { eyebrow: string; title: strin
       {description ? <p>{description}</p> : null}
     </header>
   );
+}
+
+export function yearFromUrlParam(yearParam: string | undefined, fallbackYear = currentYear()): number {
+  if (!yearParam || !/^\d{4}$/.test(yearParam)) return fallbackYear;
+  return Number(yearParam);
+}
+
+export function tripYearOptions(trips: Pick<Trip, "date">[], fallbackYear = currentYear(), selectedYear?: number): number[] {
+  const years = new Set<number>([fallbackYear]);
+  if (selectedYear !== undefined) years.add(selectedYear);
+
+  trips.forEach((trip) => {
+    const match = /^(\d{4})-/.exec(trip.date);
+    if (match) years.add(Number(match[1]));
+  });
+
+  return Array.from(years).sort((left, right) => right - left);
 }
 
 type MetricProgress = {

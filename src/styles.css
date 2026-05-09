@@ -369,6 +369,35 @@ button:disabled {
   gap: 12px;
 }
 
+.year-overview-heading {
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.year-select {
+  display: grid;
+  gap: 5px;
+  min-width: 112px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.year-select select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  color: #1f2937;
+  padding: 8px 10px;
+  outline: none;
+}
+
+.year-select select:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+
 .date-row {
   align-items: flex-end;
 }

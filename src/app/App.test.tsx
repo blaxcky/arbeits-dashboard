@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../db/schema";
-import { destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields } from "./App";
+import { destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, tripYearOptions, yearFromUrlParam } from "./App";
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -82,5 +82,27 @@ describe("destination import draft", () => {
       address: "Stephansplatz 1, 1010 Wien",
       municipalityCode: "90001"
     });
+  });
+});
+
+describe("trip year navigation helpers", () => {
+  it("deduplicates trip years with the current year and sorts descending", () => {
+    expect(
+      tripYearOptions(
+        [
+          { date: "2025-01-12" },
+          { date: "2024-11-03" },
+          { date: "2025-08-21" }
+        ],
+        2026
+      )
+    ).toEqual([2026, 2025, 2024]);
+  });
+
+  it("falls back to the current year for missing or invalid URL parameters", () => {
+    expect(yearFromUrlParam(undefined, 2026)).toBe(2026);
+    expect(yearFromUrlParam("abcd", 2026)).toBe(2026);
+    expect(yearFromUrlParam("202", 2026)).toBe(2026);
+    expect(yearFromUrlParam("2025", 2026)).toBe(2025);
   });
 });
