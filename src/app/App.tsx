@@ -101,6 +101,7 @@ export function App() {
                 </NavLink>
                 {item.to === "/reisekosten" ? (
                   <NavLink to="/reisekosten/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
+                    <CalendarCheck size={15} weight="duotone" />
                     <span>Jahresübersicht</span>
                   </NavLink>
                 ) : null}
