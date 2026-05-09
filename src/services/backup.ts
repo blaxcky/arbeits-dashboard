@@ -32,7 +32,8 @@ export async function exportBackup(): Promise<Blob> {
       flexCorrections: data.flexCorrections.length,
       trips: data.trips.length,
       todos: 0,
-      files: data.files.length
+      files: data.files.length,
+      savedDestinations: data.savedDestinations.length
     }
   };
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
@@ -93,11 +94,13 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   if (!("vacationSummary" in value)) throw new Error("Urlaubswerte fehlen.");
   if (!Array.isArray(value.trips)) throw new Error("Reisekosten fehlen.");
   if (!Array.isArray(value.files)) throw new Error("Nachweise fehlen.");
+  if (value.savedDestinations !== undefined && !Array.isArray(value.savedDestinations)) throw new Error("Gespeicherte Zieladressen sind ungültig.");
   if (value.settings !== null) validateSettings(value.settings);
   value.timeEntries.forEach(validateTimeEntry);
   value.flexCorrections.forEach(validateFlexCorrection);
   if (value.vacationSummary !== null) validateVacationSummary(value.vacationSummary);
   value.trips.forEach(validateTrip);
+  (value.savedDestinations ?? []).forEach(validateSavedDestination);
   value.files.forEach(validateTripFile);
 }
 
@@ -158,12 +161,13 @@ function validateTrip(value: unknown): void {
   if (!isObject(value)) throw new Error("Reise ist ungültig.");
   requireString(value, "id", "Reise-ID fehlt.");
   requireString(value, "date", "Reisedatum fehlt.");
-  requireString(value, "startTime", "Reisebeginn fehlt.");
-  requireString(value, "endTime", "Reiseende fehlt.");
+  requireOptionalString(value, "startTime", "Reisebeginn ist ungültig.");
+  requireOptionalString(value, "endTime", "Reiseende ist ungültig.");
   requireNumber(value, "durationMinutes", "Reisedauer fehlt.");
   requireString(value, "reason", "Reisegrund fehlt.");
   requireString(value, "origin", "Startort fehlt.");
   requireString(value, "destination", "Zieladresse fehlt.");
+  requireOptionalString(value, "municipalityCode", "Gemeindekennzahl ist ungültig.");
   requireString(value, "transportType", "Fahrtkostenart fehlt.");
   requireNumber(value, "oneWayKilometers", "Einfache Strecke fehlt.");
   requireNumber(value, "perDiemCents", "Diäten fehlen.");
@@ -176,6 +180,16 @@ function validateTrip(value: unknown): void {
   if (typeof value.done !== "boolean") throw new Error("Reise-Erledigt-Status fehlt.");
   requireString(value, "createdAt", "Reise-Erstellt-Zeit fehlt.");
   requireString(value, "updatedAt", "Reise-Aktualisiert-Zeit fehlt.");
+}
+
+function validateSavedDestination(value: unknown): void {
+  if (!isObject(value)) throw new Error("Gespeicherte Zieladresse ist ungültig.");
+  requireString(value, "id", "Zieladress-ID fehlt.");
+  requireString(value, "name", "Zieladress-Name fehlt.");
+  requireString(value, "address", "Zieladresse fehlt.");
+  requireOptionalString(value, "municipalityCode", "Gemeindekennzahl ist ungültig.");
+  requireString(value, "createdAt", "Zieladresse-Erstellt-Zeit fehlt.");
+  requireString(value, "updatedAt", "Zieladresse-Aktualisiert-Zeit fehlt.");
 }
 
 function validateTripFile(value: unknown): void {
@@ -209,7 +223,7 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
       };
     })
   );
-  return { ...data, files };
+  return { ...data, files, savedDestinations: data.savedDestinations ?? [] };
 }
 
 function backupFilePath(file: TripFile, index: number): string {

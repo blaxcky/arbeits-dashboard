@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addFlexCorrection,
   addTripFile,
+  deleteSavedDestination,
   deleteAllLocalData,
   deleteFlexCorrection,
   deleteTimeEntry,
@@ -11,13 +12,15 @@ import {
   getTimeEntryByDate,
   listFlexCorrections,
   listTripFiles,
+  listSavedDestinations,
   listTimeEntries,
   listTrips,
   updateSettings,
   upsertTimeEntry,
-  upsertTrip
+  upsertTrip,
+  upsertSavedDestination
 } from "../db/database";
-import type { FlexCorrection, Settings, TimeEntry, Trip, TripFile } from "../db/schema";
+import type { FlexCorrection, SavedDestination, Settings, TimeEntry, Trip, TripFile } from "../db/schema";
 import { todayKey } from "../lib/dates";
 
 export interface WorkDataState {
@@ -28,6 +31,7 @@ export interface WorkDataState {
   flexCorrections: FlexCorrection[];
   trips: Trip[];
   files: TripFile[];
+  savedDestinations: SavedDestination[];
 }
 
 export function useWorkData() {
@@ -38,15 +42,16 @@ export function useWorkData() {
     timeEntries: [],
     flexCorrections: [],
     trips: [],
-    files: []
+    files: [],
+    savedDestinations: []
   });
   const [clock, setClock] = useState(new Date());
 
   const refresh = useCallback(async () => {
     try {
       const settings = await ensureDefaults();
-      const [timeEntries, flexCorrections, trips, files] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripFiles()]);
-      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, files });
+      const [timeEntries, flexCorrections, trips, files, savedDestinations] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripFiles(), listSavedDestinations()]);
+      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, files, savedDestinations });
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Daten konnten nicht geladen werden." }));
     }
@@ -104,6 +109,14 @@ export function useWorkData() {
     },
     removeTripFile: async (id: string) => {
       await deleteTripFile(id);
+      await refresh();
+    },
+    saveDestination: async (input: Omit<SavedDestination, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
+      await upsertSavedDestination(input);
+      await refresh();
+    },
+    removeDestination: async (id: string) => {
+      await deleteSavedDestination(id);
       await refresh();
     },
     wipeData: async () => {

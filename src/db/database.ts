@@ -5,6 +5,7 @@ import {
   type BackupData,
   type AppMeta,
   type FlexCorrection,
+  type SavedDestination,
   type Settings,
   type TimeEntry,
   type Trip,
@@ -21,6 +22,7 @@ class WorkDashboardDb extends Dexie {
   appMeta!: Table<AppMeta, string>;
   trips!: Table<Trip, string>;
   files!: Table<TripFile, string>;
+  savedDestinations!: Table<SavedDestination, string>;
 
   constructor() {
     super("arbeits-dashboard");
@@ -47,6 +49,23 @@ class WorkDashboardDb extends Dexie {
       appMeta: "id",
       trips: "id, date, done, transportType",
       files: "id, tripId, type, createdAt"
+    });
+    this.version(4).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt"
+    }).upgrade(async (tx) => {
+      const trips = tx.table<Trip, string>("trips");
+      await trips.toCollection().modify((trip) => {
+        trip.durationMinutes = trip.startTime && trip.endTime ? trip.durationMinutes : 0;
+        trip.perDiemCents = trip.startTime && trip.endTime ? trip.perDiemCents : 0;
+        trip.transportSubsidyTaxCents = 0;
+      });
     });
   }
 }
@@ -153,12 +172,36 @@ export async function upsertTrip(input: Omit<Trip, "id" | "createdAt" | "updated
   const trip: Trip = {
     ...input,
     ticketPriceCents: input.ticketPriceCents ?? 0,
+    transportSubsidyTaxCents: 0,
     id: input.id ?? crypto.randomUUID(),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now
   };
   await db.trips.put(trip);
   return trip;
+}
+
+export async function listSavedDestinations(): Promise<SavedDestination[]> {
+  return db.savedDestinations.orderBy("updatedAt").reverse().toArray();
+}
+
+export async function upsertSavedDestination(input: Omit<SavedDestination, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<SavedDestination> {
+  const existing = input.id ? await db.savedDestinations.get(input.id) : undefined;
+  const now = new Date().toISOString();
+  const destination: SavedDestination = {
+    id: input.id ?? crypto.randomUUID(),
+    name: input.name.trim(),
+    address: input.address.trim(),
+    municipalityCode: input.municipalityCode?.trim() || undefined,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+  await db.savedDestinations.put(destination);
+  return destination;
+}
+
+export async function deleteSavedDestination(id: string): Promise<void> {
+  await db.savedDestinations.delete(id);
 }
 
 export async function deleteTrip(id: string): Promise<void> {
@@ -195,27 +238,41 @@ export async function readAllData(): Promise<BackupData> {
     vacationSummary: (await db.vacationSummary.get("current")) ?? null,
     appMeta: (await db.appMeta.get("main")) ?? null,
     trips: await db.trips.toArray(),
+    savedDestinations: await db.savedDestinations.toArray(),
     todos: [],
     files: await db.files.toArray()
   };
 }
 
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear()]);
     if (data.settings) await db.settings.put(data.settings);
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
     if (data.vacationSummary) await db.vacationSummary.put(data.vacationSummary);
     if (data.appMeta) await db.appMeta.put(data.appMeta);
-    await db.trips.bulkPut(data.trips);
+    await db.trips.bulkPut(data.trips.map(normalizeTrip));
     await db.files.bulkPut(data.files);
+    await db.savedDestinations.bulkPut(data.savedDestinations ?? []);
   });
   await ensureDefaults();
 }
 
 export async function deleteAllLocalData(): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear()]);
   });
+}
+
+function normalizeTrip(trip: Trip): Trip {
+  return {
+    ...trip,
+    durationMinutes: trip.startTime && trip.endTime ? trip.durationMinutes : 0,
+    perDiemCents: trip.startTime && trip.endTime ? trip.perDiemCents : 0,
+    taxableTransportSubsidyCents: trip.taxableTransportSubsidyCents ?? 0,
+    transportSubsidyTaxCents: 0,
+    ticketPriceCents: trip.ticketPriceCents ?? 0,
+    note: trip.note ?? ""
+  };
 }

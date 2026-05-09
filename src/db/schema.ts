@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.1.0";
-export const DB_SCHEMA_VERSION = 3;
+export const BACKUP_SCHEMA_VERSION = "1.2.0";
+export const DB_SCHEMA_VERSION = 4;
 
 export interface Settings {
   id: "main";
@@ -56,12 +56,13 @@ export type TripTransportType = "kilometergeld" | "befoerderungszuschuss" | "oef
 export interface Trip {
   id: string;
   date: string;
-  startTime: string;
-  endTime: string;
+  startTime?: string;
+  endTime?: string;
   durationMinutes: number;
   reason: string;
   origin: string;
   destination: string;
+  municipalityCode?: string;
   transportType: TripTransportType;
   oneWayKilometers: number;
   perDiemCents: number;
@@ -69,9 +70,18 @@ export interface Trip {
   otherCostsDescription: string;
   ticketPriceCents?: number;
   taxableTransportSubsidyCents: number;
-  transportSubsidyTaxCents: number;
+  transportSubsidyTaxCents?: number;
   note: string;
   done: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedDestination {
+  id: string;
+  name: string;
+  address: string;
+  municipalityCode?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -104,6 +114,7 @@ export interface BackupData {
   vacationSummary: VacationSummary | null;
   appMeta: AppMeta | null;
   trips: Trip[];
+  savedDestinations: SavedDestination[];
   todos: unknown[];
   files: TripFile[];
 }

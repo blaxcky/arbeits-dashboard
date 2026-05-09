@@ -45,6 +45,7 @@ function backupData(): BackupData {
         updatedAt: "2026-05-07T08:00:00.000Z"
       }
     ],
+    savedDestinations: [],
     todos: [],
     files: [
       {

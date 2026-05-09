@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateDomesticPerDiemCents,
+  calculatePublicTransportPayoutCents,
   calculatePerDiemDifferentialCents,
   calculateTaxablePublicTransportSubsidyCents,
   calculateTaxPerDiemCents,
@@ -76,8 +77,26 @@ describe("expense calculations", () => {
 
   it("calculates transport differential against fictional kilometer allowance", () => {
     expect(calculateTransportDifferentialCents({ ...baseTrip, transportType: "befoerderungszuschuss", oneWayKilometers: 10 })).toBe(480);
-    expect(calculateTransportDifferentialCents({ ...baseTrip, transportType: "befoerderungszuschuss", oneWayKilometers: 10, transportSubsidyTaxCents: 100 })).toBe(580);
     expect(calculateTransportDifferentialCents({ ...baseTrip, transportType: "kilometergeld", oneWayKilometers: 10 })).toBe(0);
+  });
+
+  it("uses ticket price as tax-free amount for public transport advertising costs", () => {
+    const normal = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 60, ticketPriceCents: 500 };
+    expect(calculateTripTravelCostCents(normal)).toBe(5400);
+    expect(calculatePublicTransportPayoutCents(normal)).toBe(5400);
+    expect(calculateTaxablePublicTransportSubsidyCents(normal)).toBe(4900);
+    expect(calculateTransportDifferentialCents(normal)).toBe(5500);
+
+    const ticketAboveSubsidy = { ...normal, ticketPriceCents: 5500 };
+    expect(calculatePublicTransportPayoutCents(ticketAboveSubsidy)).toBe(5500);
+    expect(calculateTaxablePublicTransportSubsidyCents(ticketAboveSubsidy)).toBe(0);
+    expect(calculateTransportDifferentialCents(ticketAboveSubsidy)).toBe(500);
+  });
+
+  it("does not add taxable public transport subsidy to the differential", () => {
+    const trip = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 60, durationMinutes: 301, perDiemCents: 1000, ticketPriceCents: 500 };
+    expect(calculateTaxablePublicTransportSubsidyCents(trip)).toBe(4900);
+    expect(calculateTripDifferentialCents(trip)).toBe(6000);
   });
 
   it("calculates taxable public transport subsidy from ticket price without going below zero", () => {
@@ -113,6 +132,9 @@ describe("expense calculations", () => {
     expect(summary.perDiemDifferentialCents).toBe(500);
     expect(summary.transportDifferentialCents).toBe(480);
     expect(summary.differentialCents).toBe(980);
+    expect(summary.openCount).toBe(0);
+    expect(summary.openTotalCents).toBe(0);
+    expect(summary.openTransportDifferentialCents).toBe(0);
     expect(remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents)).toBe(244480);
   });
 });
