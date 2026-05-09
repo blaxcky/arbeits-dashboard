@@ -1152,9 +1152,18 @@ button:disabled {
 .auto-fit-input {
   height: 45px;
   min-height: 45px;
-  line-height: 19px;
-  white-space: normal;
+  max-height: 45px;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  resize: none;
+  white-space: nowrap;
+}
+
+.auto-fit-input-multiline {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  line-height: 15px;
+  white-space: normal;
 }
 
 .auto-fit-measure {

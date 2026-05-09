@@ -1754,9 +1754,10 @@ function Field({ label, children, error, className = "" }: { label: string; chil
 }
 
 function AutoFitInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(16);
+  const [multiLine, setMultiLine] = useState(false);
 
   useLayoutEffect(() => {
     const input = inputRef.current;
@@ -1764,12 +1765,16 @@ function AutoFitInput({ value, onChange }: { value: string; onChange: (value: st
     if (!input || !measure) return;
 
     const updateFontSize = () => {
-      const availableWidth = input.clientWidth - 26;
+      const styles = window.getComputedStyle(input);
+      const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+      const availableWidth = input.clientWidth - horizontalPadding;
       if (availableWidth <= 0) return;
       measure.textContent = value || input.placeholder || "";
       const fullSizeWidth = measure.scrollWidth;
-      const nextFontSize = fullSizeWidth > availableWidth ? Math.max(8, Math.floor((availableWidth / fullSizeWidth) * 16)) : 16;
-      setFontSize(nextFontSize);
+      const singleLineFontSize = fullSizeWidth > availableWidth ? Math.floor((availableWidth / fullSizeWidth) * 16) : 16;
+      const shouldUseTwoLines = singleLineFontSize < 11 && fullSizeWidth > availableWidth * 1.35;
+      setMultiLine(shouldUseTwoLines);
+      setFontSize(shouldUseTwoLines ? 12 : Math.max(11, singleLineFontSize));
     };
 
     updateFontSize();
@@ -1780,13 +1785,14 @@ function AutoFitInput({ value, onChange }: { value: string; onChange: (value: st
 
   return (
     <span className="auto-fit-input-wrap">
-      <input
+      <textarea
         ref={inputRef}
-        className="auto-fit-input"
+        className={`auto-fit-input ${multiLine ? "auto-fit-input-multiline" : ""}`.trim()}
         style={{ fontSize: `${fontSize}px` }}
         value={value}
         title={value}
-        onChange={(event) => onChange(event.target.value)}
+        rows={multiLine ? 2 : 1}
+        onChange={(event) => onChange(event.target.value.replace(/\s*\n+\s*/g, " "))}
       />
       <span ref={measureRef} className="auto-fit-measure" aria-hidden="true" />
     </span>
