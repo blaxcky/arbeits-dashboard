@@ -698,6 +698,9 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [municipalityError, setMunicipalityError] = useState<string | null>(null);
   const latestTripDraft = useRef({ form, editingId });
   const saveTripRef = useRef(data.saveTrip);
+  const saveDestinationRef = useRef(data.saveDestination);
+  const savedDestinationsRef = useRef(data.savedDestinations);
+  const municipalitiesRef = useRef(municipalities);
   const previewStartTime = previewTime(form.startTime) ?? "";
   const previewEndTime = previewTime(form.endTime) ?? "";
   const previewDurationMinutes = calculateTripDurationMinutes(previewStartTime, previewEndTime);
@@ -738,7 +741,10 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   useEffect(() => {
     latestTripDraft.current = { form, editingId };
     saveTripRef.current = data.saveTrip;
-  }, [form, editingId, data.saveTrip]);
+    saveDestinationRef.current = data.saveDestination;
+    savedDestinationsRef.current = data.savedDestinations;
+    municipalitiesRef.current = municipalities;
+  }, [form, editingId, data.saveTrip, data.saveDestination, data.savedDestinations, municipalities]);
 
   useEffect(() => {
     return () => {
@@ -776,6 +782,9 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         transportSubsidyTaxCents: 0,
         note: draft.form.note.trim(),
         done: draft.form.done
+      }).then(() => {
+        const destinationDraft = automaticDestinationDraft(draft.form.destination, draft.form.reason, draft.form.municipalityCode, savedDestinationsRef.current, municipalitiesRef.current);
+        if (destinationDraft) void saveDestinationRef.current(destinationDraft);
       });
     };
   }, []);
@@ -896,6 +905,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
       note: form.note.trim(),
       done: form.done
     });
+    const destinationDraft = automaticDestinationDraft(form.destination, form.reason, form.municipalityCode, data.savedDestinations, municipalities);
+    if (destinationDraft) await data.saveDestination(destinationDraft);
     if (closeAfterSave) {
       setEditingId(null);
       setForm(tripToForm());
@@ -1720,6 +1731,15 @@ export function destinationImportDraft(destination: string, municipalityCode: st
   const municipality = municipalityCode.trim() || findMunicipalityForAddress(address, municipalities)?.code || "";
   const name = address.split(",").map((part) => part.trim()).find(Boolean) || address;
   return { name, address, municipalityCode: municipality };
+}
+
+export function automaticDestinationDraft(destination: string, reason: string, municipalityCode: string, destinations: Pick<SavedDestination, "address">[], municipalities: Municipality[]) {
+  const address = destination.trim();
+  const trimmedReason = reason.trim();
+  if (!address || !trimmedReason) return null;
+  if (destinations.some((savedDestination) => savedDestination.address.trim() === address)) return null;
+  const municipality = municipalityCode.trim() || findMunicipalityForAddress(address, municipalities)?.code || "";
+  return { name: `(${trimmedReason})`, address, municipalityCode: municipality };
 }
 
 function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWeek>; onWeekChange: (offsetDays: number) => void }) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../db/schema";
-import { destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, tripYearOptions, yearFromUrlParam } from "./App";
+import { automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, tripYearOptions, yearFromUrlParam } from "./App";
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -92,6 +92,32 @@ describe("destination import draft", () => {
       name: "Ernst-Mach-Straße 1",
       address: "Ernst-Mach-Straße 1, 7100 Neusiedl am See",
       municipalityCode: "10713"
+    });
+  });
+});
+
+describe("automatic destination draft", () => {
+  it("uses the trip reason in brackets as name and keeps an existing GKZ", () => {
+    expect(automaticDestinationDraft(" Stephansplatz 1, 1010 Wien ", " Besprechung ", "90101", [], [])).toEqual({
+      name: "(Besprechung)",
+      address: "Stephansplatz 1, 1010 Wien",
+      municipalityCode: "90101"
+    });
+  });
+
+  it("skips empty addresses", () => {
+    expect(automaticDestinationDraft("   ", "Besprechung", "90101", [], [])).toBeNull();
+  });
+
+  it("skips already saved trimmed addresses", () => {
+    expect(automaticDestinationDraft("Stephansplatz 1, 1010 Wien", "Besprechung", "90101", [{ address: " Stephansplatz 1, 1010 Wien " }], [])).toBeNull();
+  });
+
+  it("derives the GKZ from municipalities when the form value is empty", () => {
+    expect(automaticDestinationDraft("Stephansplatz 1, 1010 Wien", "Besprechung", "", [], [{ code: "90001", name: "Wien", postalCodes: "1010", localityName: "Wien" }])).toEqual({
+      name: "(Besprechung)",
+      address: "Stephansplatz 1, 1010 Wien",
+      municipalityCode: "90001"
     });
   });
 });
