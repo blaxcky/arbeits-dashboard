@@ -29,13 +29,47 @@ const baseCase: AuditPointCase = {
 };
 
 describe("audit point calculations", () => {
-  it("uses all configured category base values and yearly supplements", () => {
-    for (const [category, rule] of Object.entries(AUDIT_POINT_CATEGORY_RULES)) {
-      expect(calculateAuditPointBreakdown({ ...baseCase, category: category as AuditPointCase["category"], periodStartYear: 2020, periodEndYear: 2021 })).toMatchObject({
+  it("uses all category base values and yearly supplements from the points table", () => {
+    const expectedRules: typeof AUDIT_POINT_CATEGORY_RULES = {
+      K3: { label: "K3", baseTenths: 30, yearlyTenths: 5 },
+      K2: { label: "K2", baseTenths: 35, yearlyTenths: 10 },
+      K1: { label: "K1", baseTenths: 40, yearlyTenths: 10 },
+      K0: { label: "K0", baseTenths: 50, yearlyTenths: 10 },
+      M2: { label: "M2", baseTenths: 50, yearlyTenths: 15 },
+      M1: { label: "M1", baseTenths: 55, yearlyTenths: 15 },
+      M0: { label: "M0", baseTenths: 65, yearlyTenths: 15 },
+      G2: { label: "G2", baseTenths: 120, yearlyTenths: 20 },
+      G1: { label: "G1", baseTenths: 170, yearlyTenths: 20 },
+      G0: { label: "G0", baseTenths: 310, yearlyTenths: 20 }
+    };
+
+    expect(AUDIT_POINT_CATEGORY_RULES).toEqual(expectedRules);
+
+    for (const [category, rule] of Object.entries(expectedRules)) {
+      expect(calculateAuditPointBreakdown({ ...baseCase, category: category as AuditPointCase["category"], periodStartYear: 2020, periodEndYear: 2020 })).toMatchObject({
         categoryTenths: rule.baseTenths,
-        periodTenths: rule.yearlyTenths
+        periodTenths: rule.yearlyTenths,
+        totalTenths: rule.baseTenths + rule.yearlyTenths
       });
     }
+  });
+
+  it("adds the yearly supplement for each counted audit year", () => {
+    expect(calculateAuditPointBreakdown({ ...baseCase, category: "M1", periodStartYear: 2020, periodEndYear: 2020 })).toMatchObject({
+      categoryTenths: 55,
+      periodTenths: 15,
+      totalTenths: 70
+    });
+    expect(calculateAuditPointBreakdown({ ...baseCase, category: "M1", periodStartYear: 2020, periodEndYear: 2022 })).toMatchObject({
+      categoryTenths: 55,
+      periodTenths: 45,
+      totalTenths: 100
+    });
+    expect(calculateAuditPointBreakdown({ ...baseCase, category: "M1", periodStartYear: 2015, periodEndYear: 2026 })).toMatchObject({
+      categoryTenths: 55,
+      periodTenths: 105,
+      totalTenths: 160
+    });
   });
 
   it("counts inclusive periods and caps them at seven years", () => {

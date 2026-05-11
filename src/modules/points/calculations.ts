@@ -28,16 +28,16 @@ export interface AuditPointSummary {
 }
 
 export const AUDIT_POINT_CATEGORY_RULES: Record<AuditPointCategory, AuditPointCategoryRule> = {
-  K3: { label: "K3", baseTenths: 25, yearlyTenths: 5 },
-  K2: { label: "K2", baseTenths: 20, yearlyTenths: 5 },
-  K1: { label: "K1", baseTenths: 15, yearlyTenths: 5 },
-  K0: { label: "K0", baseTenths: 10, yearlyTenths: 0 },
-  M2: { label: "M2", baseTenths: 50, yearlyTenths: 10 },
-  M1: { label: "M1", baseTenths: 40, yearlyTenths: 10 },
-  M0: { label: "M0", baseTenths: 30, yearlyTenths: 10 },
-  G2: { label: "G2", baseTenths: 100, yearlyTenths: 20 },
-  G1: { label: "G1", baseTenths: 80, yearlyTenths: 15 },
-  G0: { label: "G0", baseTenths: 60, yearlyTenths: 15 }
+  K3: { label: "K3", baseTenths: 30, yearlyTenths: 5 },
+  K2: { label: "K2", baseTenths: 35, yearlyTenths: 10 },
+  K1: { label: "K1", baseTenths: 40, yearlyTenths: 10 },
+  K0: { label: "K0", baseTenths: 50, yearlyTenths: 10 },
+  M2: { label: "M2", baseTenths: 50, yearlyTenths: 15 },
+  M1: { label: "M1", baseTenths: 55, yearlyTenths: 15 },
+  M0: { label: "M0", baseTenths: 65, yearlyTenths: 15 },
+  G2: { label: "G2", baseTenths: 120, yearlyTenths: 20 },
+  G1: { label: "G1", baseTenths: 170, yearlyTenths: 20 },
+  G0: { label: "G0", baseTenths: 310, yearlyTenths: 20 }
 };
 
 export const AUDIT_POINT_CATEGORIES = Object.keys(AUDIT_POINT_CATEGORY_RULES) as AuditPointCategory[];
@@ -70,7 +70,7 @@ export function calculateAuditPointBreakdown(input: Pick<AuditPointCase, "catego
   if (!rule) throw new Error("Betriebskategorie ist ungültig.");
   const cappedYears = cappedAuditPeriodYears(input.periodStartYear, input.periodEndYear);
   const categoryTenths = rule.baseTenths;
-  const periodTenths = Math.max(cappedYears - 1, 0) * rule.yearlyTenths;
+  const periodTenths = cappedYears * rule.yearlyTenths;
   const section99Tenths = input.section99 ? categoryTenths + periodTenths : 0;
   const additionalResultTenths = calculateAdditionalResultBonusTenths(input.additionalResultCents);
   return {
