@@ -57,7 +57,7 @@ import {
   TRANSPORT_LABELS,
   TRIP_RULES
 } from "../modules/expenses/calculations";
-import { findMunicipalityForAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
+import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
 
@@ -1350,7 +1350,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         <MunicipalityPicker
           municipalities={municipalities}
           municipalityError={municipalityError}
-          initialQuery={form.destination}
+          initialQuery={municipalityQueryFromAddress(form.destination)}
           onPick={(municipality) => {
             setForm((current) => ({ ...current, municipalityCode: municipality.code }));
             setMunicipalityPickerOpen(false);

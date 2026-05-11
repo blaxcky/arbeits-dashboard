@@ -83,6 +83,17 @@ describe("destination import draft", () => {
       municipalityCode: "90001"
     });
   });
+
+  it("derives the GKZ from the municipality name when a postal code matches multiple municipalities", () => {
+    expect(destinationImportDraft("Ernst-Mach-Straße 1, 7100 Neusiedl am See", "", [
+      { code: "10722", name: "Weiden am See", postalCodes: "7121, 7100", localityName: "Weiden am See" },
+      { code: "10713", name: "Neusiedl am See", postalCodes: "7100", localityName: "Neusiedl am See" }
+    ])).toEqual({
+      name: "Ernst-Mach-Straße 1",
+      address: "Ernst-Mach-Straße 1, 7100 Neusiedl am See",
+      municipalityCode: "10713"
+    });
+  });
 });
 
 describe("trip year navigation helpers", () => {

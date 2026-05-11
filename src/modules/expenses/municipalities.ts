@@ -27,9 +27,17 @@ export function findMunicipalityForAddress(address: string, municipalities: Muni
   const normalizedAddress = normalizeSearchText(address);
   if (!normalizedAddress) return null;
 
+  const municipalityQuery = municipalityQueryFromAddress(address);
+  const normalizedMunicipalityQuery = normalizeSearchText(municipalityQuery);
   const postalMatches = address.match(/\b\d{4}\b/g) ?? [];
   for (const postalCode of postalMatches) {
     const matches = municipalities.filter((municipality) => municipality.postalCodes?.split(",").map((code) => code.trim()).includes(postalCode));
+    const queryMatches = normalizedMunicipalityQuery
+      ? matches.filter((municipality) => municipalitySearchText(municipality).includes(normalizedMunicipalityQuery))
+      : [];
+    const uniqueQueryCodes = new Set(queryMatches.map((municipality) => municipality.code));
+    if (queryMatches.length > 0 && uniqueQueryCodes.size === 1) return queryMatches[0];
+
     const uniqueCodes = new Set(matches.map((municipality) => municipality.code));
     if (matches.length > 0 && uniqueCodes.size === 1) return matches[0];
   }
@@ -38,6 +46,13 @@ export function findMunicipalityForAddress(address: string, municipalities: Muni
   if (exactLocality) return exactLocality;
 
   return municipalities.find((municipality) => normalizedAddress.includes(normalizeSearchText(municipality.name))) ?? null;
+}
+
+export function municipalityQueryFromAddress(address: string): string {
+  const trimmedAddress = address.trim();
+  const postalCodeMatch = trimmedAddress.match(/\b\d{4}\b\s*(.*)$/);
+  const query = postalCodeMatch?.[1]?.replace(/^[\s,.;:!?-]+|[\s,.;:!?-]+$/g, "").trim();
+  return query || trimmedAddress;
 }
 
 export function municipalitySearchText(municipality: Municipality): string {
