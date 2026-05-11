@@ -42,6 +42,7 @@ import {
 } from "../modules/time/calculations";
 import {
   calculateDomesticPerDiemCents,
+  calculateOtherCostsDifferentialCents,
   calculatePerDiemDifferentialCents,
   calculatePublicTransportPayoutCents,
   calculateTaxablePublicTransportSubsidyCents,
@@ -709,17 +710,19 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     oneWayKilometers: parseDecimalNumber(form.oneWayKilometers),
     perDiemCents: calculateDomesticPerDiemCents(previewDurationMinutes),
     otherCostsCents: eurosToCents(form.otherCostsEuros),
+    employerReimbursedCosts: !form.employerDoesNotReimburseCosts,
     ticketPriceCents: form.transportType === "oeffi-zuschuss" ? eurosToCents(form.ticketPriceEuros) : 0
   };
   const summary = summarizeTripsByYear(data.trips, currentYear());
   const previewTravelCostCents = calculateTripTravelCostCents(previewTripCosts);
   const previewPayoutCents = calculatePublicTransportPayoutCents(previewTripCosts);
   const previewTaxPerDiemCents = calculateTaxPerDiemCents(previewDurationMinutes);
-  const previewPerDiemDifferentialCents = calculatePerDiemDifferentialCents(previewDurationMinutes, previewTripCosts.perDiemCents);
+  const previewPerDiemDifferentialCents = calculatePerDiemDifferentialCents(previewDurationMinutes, previewTripCosts.perDiemCents, previewTripCosts.employerReimbursedCosts);
   const previewTransportDifferentialCents = calculateTransportDifferentialCents(previewTripCosts);
+  const previewOtherCostsDifferentialCents = calculateOtherCostsDifferentialCents(previewTripCosts);
   const previewTaxableTransportSubsidyCents = calculateTaxablePublicTransportSubsidyCents(previewTripCosts);
   const previewDifferentialCents = calculateTripDifferentialCents({ ...previewTripCosts, durationMinutes: previewDurationMinutes });
-  const publicTicketAboveSubsidy = form.transportType === "oeffi-zuschuss" && previewTripCosts.ticketPriceCents > previewTravelCostCents;
+  const publicTicketAboveSubsidy = previewTripCosts.employerReimbursedCosts && form.transportType === "oeffi-zuschuss" && previewTripCosts.ticketPriceCents > previewTravelCostCents;
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
   const mapsUrl = buildGoogleMapsUrl(form.origin, form.destination);
   const mapsEmbedUrl = buildGoogleMapsEmbedUrl(form.origin, form.destination);
@@ -760,6 +763,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         oneWayKilometers: parseDecimalNumber(draft.form.oneWayKilometers),
         perDiemCents: calculateDomesticPerDiemCents(durationMinutes),
         otherCostsCents: eurosToCents(draft.form.otherCostsEuros),
+        employerReimbursedCosts: !draft.form.employerDoesNotReimburseCosts,
         ticketPriceCents: draft.form.transportType === "oeffi-zuschuss" ? eurosToCents(draft.form.ticketPriceEuros) : 0
       };
       void saveTripRef.current({
@@ -777,6 +781,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         perDiemCents: tripCosts.perDiemCents,
         otherCostsCents: tripCosts.otherCostsCents,
         otherCostsDescription: draft.form.otherCostsDescription.trim(),
+        employerReimbursedCosts: tripCosts.employerReimbursedCosts,
         ticketPriceCents: tripCosts.ticketPriceCents,
         taxableTransportSubsidyCents: calculateTaxablePublicTransportSubsidyCents(tripCosts),
         transportSubsidyTaxCents: 0,
@@ -899,6 +904,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
       perDiemCents,
       otherCostsCents: eurosToCents(form.otherCostsEuros),
       otherCostsDescription: form.otherCostsDescription.trim(),
+      employerReimbursedCosts: !form.employerDoesNotReimburseCosts,
       ticketPriceCents: previewTripCosts.ticketPriceCents,
       taxableTransportSubsidyCents: previewTaxableTransportSubsidyCents,
       transportSubsidyTaxCents: 0,
@@ -1097,6 +1103,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <h3 id="trip-section-other" className="trip-form-section-title">Sonstiges</h3>
               <Field label="Sonstige Kosten (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
               <Field label="Beschreibung sonstige Kosten" className="trip-field-half"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
+              <label className="check-row field-wide"><input type="checkbox" checked={form.employerDoesNotReimburseCosts} onChange={(event) => updateTripField("employerDoesNotReimburseCosts", event.target.checked)} /> Arbeitgeber ersetzt keine Kosten</label>
               <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
             </section>
           </div>
@@ -1127,6 +1134,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 <div className="trip-preview-separator" aria-hidden="true" />
                 <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(previewPerDiemDifferentialCents)}</dd></div>
                 <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(previewTransportDifferentialCents)}</dd></div>
+                <div><dt>Werbungskosten Sonstiges</dt><dd>{formatEuroCents(previewOtherCostsDifferentialCents)}</dd></div>
                 <div className="trip-preview-grand-total"><dt>Differenz gesamt</dt><dd>{formatEuroCents(previewDifferentialCents)}</dd></div>
               </dl>
             </div>
@@ -1228,6 +1236,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             taxableTransportSubsidyCents={previewTaxableTransportSubsidyCents}
             perDiemDifferentialCents={previewPerDiemDifferentialCents}
             transportDifferentialCents={previewTransportDifferentialCents}
+            otherCostsDifferentialCents={previewOtherCostsDifferentialCents}
             differentialCents={previewDifferentialCents}
           />
           {largeMapPreviewOpen && mapsEmbedUrl ? (
@@ -1384,6 +1393,7 @@ function TripCostPanel({
   taxableTransportSubsidyCents,
   perDiemDifferentialCents,
   transportDifferentialCents,
+  otherCostsDifferentialCents,
   differentialCents
 }: {
   durationMinutes: number;
@@ -1396,6 +1406,7 @@ function TripCostPanel({
   taxableTransportSubsidyCents: number;
   perDiemDifferentialCents: number;
   transportDifferentialCents: number;
+  otherCostsDifferentialCents: number;
   differentialCents: number;
 }) {
   return (
@@ -1426,6 +1437,7 @@ function TripCostPanel({
             <div className="trip-preview-separator" aria-hidden="true" />
             <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(perDiemDifferentialCents)}</dd></div>
             <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(transportDifferentialCents)}</dd></div>
+            <div><dt>Werbungskosten Sonstiges</dt><dd>{formatEuroCents(otherCostsDifferentialCents)}</dd></div>
             <div className="trip-preview-grand-total"><dt>Differenz gesamt</dt><dd>{formatEuroCents(differentialCents)}</dd></div>
           </dl>
         </div>
@@ -1468,6 +1480,7 @@ function TripsYearView({ data }: { data: WorkData; showToast: ShowToast }) {
             <div><dt>BEZU Restgrenze</dt><dd>{formatEuroCents(transportSubsidyRemainingCents)}</dd></div>
             <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(summary.perDiemDifferentialCents)}</dd></div>
             <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(summary.transportDifferentialCents)}</dd></div>
+            <div><dt>Werbungskosten Sonstiges</dt><dd>{formatEuroCents(summary.otherCostsDifferentialCents)}</dd></div>
             <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(summary.differentialCents)}</dd></div>
           </dl>
           <div className="limit-bar" aria-label={`Beförderungszuschuss Jahresgrenze: ${formatEuroCents(summary.transportSubsidyCents)} von ${formatEuroCents(TRIP_RULES.transportSubsidyYearLimitCents)}`}>
@@ -1481,6 +1494,7 @@ function TripsYearView({ data }: { data: WorkData; showToast: ShowToast }) {
             <div><dt>Offene Anzahl</dt><dd>{summary.openCount}</dd></div>
             <div><dt>Offener Gesamtbetrag</dt><dd>{formatEuroCents(summary.openTotalCents)}</dd></div>
             <div><dt>Offene Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(summary.openTransportDifferentialCents)}</dd></div>
+            <div><dt>Offene Werbungskosten Sonstiges</dt><dd>{formatEuroCents(summary.openOtherCostsDifferentialCents)}</dd></div>
             <div><dt>Älteste offene Reise</dt><dd>{summary.oldestOpenTrip ? formatDateKey(summary.oldestOpenTrip.date) : "-"}</dd></div>
           </dl>
         </div>
@@ -2003,7 +2017,7 @@ function settingsToForm(settings: Settings | null) {
   };
 }
 
-function tripToForm(trip?: Trip) {
+export function tripToForm(trip?: Trip) {
   return {
     date: trip?.date ?? todayKey(),
     startTime: trip?.startTime ?? "",
@@ -2016,13 +2030,14 @@ function tripToForm(trip?: Trip) {
     oneWayKilometers: trip ? String(trip.oneWayKilometers) : "",
     otherCostsEuros: trip ? centsToEuroInput(trip.otherCostsCents) : "0",
     otherCostsDescription: trip?.otherCostsDescription ?? "",
+    employerDoesNotReimburseCosts: trip?.employerReimbursedCosts === false,
     ticketPriceEuros: trip ? centsToEuroInput(trip.ticketPriceCents ?? 0) : "0",
     note: trip?.note ?? "",
     done: trip?.done ?? false
   };
 }
 
-function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt"> {
+export function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt"> {
   return {
     date: trip.date,
     startTime: trip.startTime,
@@ -2037,6 +2052,7 @@ function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt">
     perDiemCents: trip.perDiemCents,
     otherCostsCents: trip.otherCostsCents,
     otherCostsDescription: trip.otherCostsDescription ?? "",
+    employerReimbursedCosts: trip.employerReimbursedCosts ?? true,
     ticketPriceCents: trip.ticketPriceCents ?? 0,
     taxableTransportSubsidyCents: trip.taxableTransportSubsidyCents ?? 0,
     transportSubsidyTaxCents: 0,

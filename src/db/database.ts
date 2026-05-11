@@ -67,6 +67,21 @@ class WorkDashboardDb extends Dexie {
         trip.transportSubsidyTaxCents = 0;
       });
     });
+    this.version(5).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt"
+    }).upgrade(async (tx) => {
+      const trips = tx.table<Trip, string>("trips");
+      await trips.toCollection().modify((trip) => {
+        trip.employerReimbursedCosts = trip.employerReimbursedCosts ?? true;
+      });
+    });
   }
 }
 
@@ -171,6 +186,7 @@ export async function upsertTrip(input: Omit<Trip, "id" | "createdAt" | "updated
   const now = new Date().toISOString();
   const trip: Trip = {
     ...input,
+    employerReimbursedCosts: input.employerReimbursedCosts ?? true,
     ticketPriceCents: input.ticketPriceCents ?? 0,
     transportSubsidyTaxCents: 0,
     id: input.id ?? crypto.randomUUID(),
@@ -268,6 +284,7 @@ export async function deleteAllLocalData(): Promise<void> {
 function normalizeTrip(trip: Trip): Trip {
   return {
     ...trip,
+    employerReimbursedCosts: trip.employerReimbursedCosts ?? true,
     durationMinutes: trip.startTime && trip.endTime ? trip.durationMinutes : 0,
     perDiemCents: trip.startTime && trip.endTime ? trip.perDiemCents : 0,
     taxableTransportSubsidyCents: trip.taxableTransportSubsidyCents ?? 0,

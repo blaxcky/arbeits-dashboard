@@ -36,6 +36,7 @@ function backupData(): BackupData {
         perDiemCents: 0,
         otherCostsCents: 0,
         otherCostsDescription: "",
+        employerReimbursedCosts: true,
         ticketPriceCents: 0,
         taxableTransportSubsidyCents: 0,
         transportSubsidyTaxCents: 0,

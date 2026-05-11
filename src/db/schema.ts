@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.2.0";
-export const DB_SCHEMA_VERSION = 4;
+export const BACKUP_SCHEMA_VERSION = "1.3.0";
+export const DB_SCHEMA_VERSION = 5;
 
 export interface Settings {
   id: "main";
@@ -68,6 +68,7 @@ export interface Trip {
   perDiemCents: number;
   otherCostsCents: number;
   otherCostsDescription: string;
+  employerReimbursedCosts: boolean;
   ticketPriceCents?: number;
   taxableTransportSubsidyCents: number;
   transportSubsidyTaxCents?: number;

@@ -173,6 +173,7 @@ function validateTrip(value: unknown): void {
   requireNumber(value, "perDiemCents", "Diäten fehlen.");
   requireNumber(value, "otherCostsCents", "Sonstige Kosten fehlen.");
   requireOptionalString(value, "otherCostsDescription", "Beschreibung sonstige Kosten ist ungültig.");
+  requireOptionalBoolean(value, "employerReimbursedCosts", "Arbeitgeber-Erstattung ist ungültig.");
   requireOptionalNumber(value, "ticketPriceCents", "Ticketpreis ist ungültig.");
   requireOptionalNumber(value, "taxableTransportSubsidyCents", "Steuerpflichtiger Beförderungszuschuss ist ungültig.");
   requireOptionalNumber(value, "transportSubsidyTaxCents", "Altes Steuerfeld ist ungültig.");
@@ -287,6 +288,10 @@ function requireNumber(value: Record<string, unknown>, key: string, message: str
 
 function requireOptionalNumber(value: Record<string, unknown>, key: string, message: string): void {
   if (value[key] !== undefined && (typeof value[key] !== "number" || !Number.isFinite(value[key]))) throw new Error(message);
+}
+
+function requireOptionalBoolean(value: Record<string, unknown>, key: string, message: string): void {
+  if (value[key] !== undefined && typeof value[key] !== "boolean") throw new Error(message);
 }
 
 function requireNullableNumber(value: Record<string, unknown>, key: string, message: string): void {

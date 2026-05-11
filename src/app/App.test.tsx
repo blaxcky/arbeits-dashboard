@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../db/schema";
-import { automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, tripYearOptions, yearFromUrlParam } from "./App";
+import { automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, stripTripMeta, tripToForm, tripYearOptions, yearFromUrlParam } from "./App";
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -37,6 +37,7 @@ describe("trip copy fields", () => {
     perDiemCents: 0,
     otherCostsCents: 0,
     otherCostsDescription: "",
+    employerReimbursedCosts: true,
     ticketPriceCents: 0,
     taxableTransportSubsidyCents: 0,
     transportSubsidyTaxCents: 0,
@@ -64,6 +65,17 @@ describe("trip copy fields", () => {
       ready: true
     });
     expect(fields.find((field) => field.label === "Anzahl")).toMatchObject({ value: "60", ready: true });
+  });
+
+  it("loads the non-reimbursed checkbox state from saved trips", () => {
+    expect(tripToForm(baseTrip).employerDoesNotReimburseCosts).toBe(false);
+    expect(tripToForm({ ...baseTrip, employerReimbursedCosts: false }).employerDoesNotReimburseCosts).toBe(true);
+  });
+
+  it("keeps the reimbursement flag when saving existing trips without metadata", () => {
+    expect(stripTripMeta({ ...baseTrip, employerReimbursedCosts: false })).toMatchObject({
+      employerReimbursedCosts: false
+    });
   });
 });
 
