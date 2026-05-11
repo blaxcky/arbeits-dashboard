@@ -13,7 +13,7 @@ import {
   remainingTransportSubsidyYearLimitCents,
   summarizeTripsByYear
 } from "./calculations";
-import type { Trip } from "../../db/schema";
+import type { TravelExpensePayment, Trip } from "../../db/schema";
 
 const baseTrip: Trip = {
   id: "trip-1",
@@ -37,6 +37,16 @@ const baseTrip: Trip = {
   done: false,
   createdAt: "2026-05-06T08:00:00.000Z",
   updatedAt: "2026-05-06T08:00:00.000Z"
+};
+
+const basePayment: TravelExpensePayment = {
+  id: "payment-1",
+  year: 2026,
+  date: "2026-05-10",
+  amountCents: 1000,
+  note: "",
+  createdAt: "2026-05-10T08:00:00.000Z",
+  updatedAt: "2026-05-10T08:00:00.000Z"
 };
 
 describe("expense calculations", () => {
@@ -189,5 +199,26 @@ describe("expense calculations", () => {
     expect(summary.openTotalCents).toBe(0);
     expect(summary.openTransportDifferentialCents).toBe(1000);
     expect(summary.openOtherCostsDifferentialCents).toBe(850);
+  });
+
+  it("subtracts trip payments for the selected year from total payout", () => {
+    const summary = summarizeTripsByYear([baseTrip], 2026, [basePayment, { ...basePayment, id: "payment-2", amountCents: 500 }]);
+
+    expect(summary.totalCents).toBe(2700);
+    expect(summary.paidCents).toBe(1500);
+    expect(summary.remainingPayoutCents).toBe(1200);
+  });
+
+  it("ignores trip payments from other years", () => {
+    const summary = summarizeTripsByYear([baseTrip], 2026, [basePayment, { ...basePayment, id: "payment-2", year: 2025, amountCents: 5000 }]);
+
+    expect(summary.paidCents).toBe(1000);
+    expect(summary.remainingPayoutCents).toBe(1700);
+  });
+
+  it("keeps overpaid trip years visible as negative remaining payout", () => {
+    const summary = summarizeTripsByYear([baseTrip], 2026, [{ ...basePayment, amountCents: 3000 }]);
+
+    expect(summary.remainingPayoutCents).toBe(-300);
   });
 });

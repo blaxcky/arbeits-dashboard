@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../db/schema";
-import { automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, yearFromUrlParam } from "./App";
+import { automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, yearFromUrlParam } from "./App";
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -18,6 +18,20 @@ describe("normalizeTimeInput", () => {
     expect(normalizeTimeInput("24")).toBeNull();
     expect(normalizeTimeInput("1760")).toBeNull();
     expect(normalizeTimeInput("abc")).toBeNull();
+  });
+});
+
+describe("parseEuroCentsInput", () => {
+  it("parses comma and dot euro amounts into cents", () => {
+    expect(parseEuroCentsInput("123,45")).toBe(12345);
+    expect(parseEuroCentsInput("123.45")).toBe(12345);
+    expect(parseEuroCentsInput("12")).toBe(1200);
+  });
+
+  it("rejects empty or invalid euro amounts", () => {
+    expect(parseEuroCentsInput("")).toBeNull();
+    expect(parseEuroCentsInput("abc")).toBeNull();
+    expect(parseEuroCentsInput("12,345")).toBeNull();
   });
 });
 

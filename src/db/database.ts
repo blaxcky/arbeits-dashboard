@@ -10,6 +10,7 @@ import {
   type TimeEntry,
   type Trip,
   type TripFile,
+  type TravelExpensePayment,
   type VacationSummary,
   defaultSettings
 } from "./schema";
@@ -23,6 +24,7 @@ class WorkDashboardDb extends Dexie {
   trips!: Table<Trip, string>;
   files!: Table<TripFile, string>;
   savedDestinations!: Table<SavedDestination, string>;
+  tripPayments!: Table<TravelExpensePayment, string>;
 
   constructor() {
     super("arbeits-dashboard");
@@ -82,6 +84,17 @@ class WorkDashboardDb extends Dexie {
         trip.employerReimbursedCosts = trip.employerReimbursedCosts ?? true;
       });
     });
+    this.version(6).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt",
+      tripPayments: "id, year, date"
+    });
   }
 }
 
@@ -98,6 +111,8 @@ export async function ensureDefaults(): Promise<Settings> {
   const meta = await db.appMeta.get("main");
   if (!meta) {
     await db.appMeta.put({ id: "main", dbSchemaVersion: DB_SCHEMA_VERSION, createdAt: now, updatedAt: now });
+  } else if (meta.dbSchemaVersion !== DB_SCHEMA_VERSION) {
+    await db.appMeta.put({ ...meta, dbSchemaVersion: DB_SCHEMA_VERSION, updatedAt: now });
   }
 
   const vacation = await db.vacationSummary.get("current");
@@ -245,6 +260,30 @@ export async function deleteTripFile(id: string): Promise<void> {
   await db.files.delete(id);
 }
 
+export async function listTripPayments(): Promise<TravelExpensePayment[]> {
+  return db.tripPayments.orderBy("date").reverse().toArray();
+}
+
+export async function upsertTripPayment(input: Omit<TravelExpensePayment, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<TravelExpensePayment> {
+  const existing = input.id ? await db.tripPayments.get(input.id) : undefined;
+  const now = new Date().toISOString();
+  const payment: TravelExpensePayment = {
+    id: input.id ?? crypto.randomUUID(),
+    year: input.year,
+    date: input.date,
+    amountCents: Math.max(Math.round(input.amountCents), 0),
+    note: input.note.trim(),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+  await db.tripPayments.put(payment);
+  return payment;
+}
+
+export async function deleteTripPayment(id: string): Promise<void> {
+  await db.tripPayments.delete(id);
+}
+
 export async function readAllData(): Promise<BackupData> {
   await ensureDefaults();
   return {
@@ -254,6 +293,7 @@ export async function readAllData(): Promise<BackupData> {
     vacationSummary: (await db.vacationSummary.get("current")) ?? null,
     appMeta: (await db.appMeta.get("main")) ?? null,
     trips: await db.trips.toArray(),
+    tripPayments: await db.tripPayments.toArray(),
     savedDestinations: await db.savedDestinations.toArray(),
     todos: [],
     files: await db.files.toArray()
@@ -261,8 +301,8 @@ export async function readAllData(): Promise<BackupData> {
 }
 
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear()]);
     if (data.settings) await db.settings.put(data.settings);
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
@@ -271,13 +311,14 @@ export async function replaceAllData(data: BackupData): Promise<void> {
     await db.trips.bulkPut(data.trips.map(normalizeTrip));
     await db.files.bulkPut(data.files);
     await db.savedDestinations.bulkPut(data.savedDestinations ?? []);
+    await db.tripPayments.bulkPut((data.tripPayments ?? []).map(normalizeTripPayment));
   });
   await ensureDefaults();
 }
 
 export async function deleteAllLocalData(): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear()]);
   });
 }
 
@@ -291,5 +332,17 @@ function normalizeTrip(trip: Trip): Trip {
     transportSubsidyTaxCents: 0,
     ticketPriceCents: trip.ticketPriceCents ?? 0,
     note: trip.note ?? ""
+  };
+}
+
+function normalizeTripPayment(payment: TravelExpensePayment): TravelExpensePayment {
+  return {
+    ...payment,
+    year: payment.year,
+    date: payment.date,
+    amountCents: Math.max(Math.round(payment.amountCents), 0),
+    note: payment.note ?? "",
+    createdAt: payment.createdAt,
+    updatedAt: payment.updatedAt
   };
 }

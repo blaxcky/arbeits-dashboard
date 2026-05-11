@@ -7,6 +7,7 @@ import {
   deleteFlexCorrection,
   deleteTimeEntry,
   deleteTripFile,
+  deleteTripPayment,
   deleteTrip,
   ensureDefaults,
   getTimeEntryByDate,
@@ -14,13 +15,15 @@ import {
   listTripFiles,
   listSavedDestinations,
   listTimeEntries,
+  listTripPayments,
   listTrips,
   updateSettings,
   upsertTimeEntry,
   upsertTrip,
+  upsertTripPayment,
   upsertSavedDestination
 } from "../db/database";
-import type { FlexCorrection, SavedDestination, Settings, TimeEntry, Trip, TripFile } from "../db/schema";
+import type { FlexCorrection, SavedDestination, Settings, TimeEntry, Trip, TripFile, TravelExpensePayment } from "../db/schema";
 import { todayKey } from "../lib/dates";
 
 export interface WorkDataState {
@@ -30,6 +33,7 @@ export interface WorkDataState {
   timeEntries: TimeEntry[];
   flexCorrections: FlexCorrection[];
   trips: Trip[];
+  tripPayments: TravelExpensePayment[];
   files: TripFile[];
   savedDestinations: SavedDestination[];
 }
@@ -42,6 +46,7 @@ export function useWorkData() {
     timeEntries: [],
     flexCorrections: [],
     trips: [],
+    tripPayments: [],
     files: [],
     savedDestinations: []
   });
@@ -50,8 +55,8 @@ export function useWorkData() {
   const refresh = useCallback(async () => {
     try {
       const settings = await ensureDefaults();
-      const [timeEntries, flexCorrections, trips, files, savedDestinations] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripFiles(), listSavedDestinations()]);
-      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, files, savedDestinations });
+      const [timeEntries, flexCorrections, trips, tripPayments, files, savedDestinations] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripPayments(), listTripFiles(), listSavedDestinations()]);
+      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, tripPayments, files, savedDestinations });
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Daten konnten nicht geladen werden." }));
     }
@@ -102,6 +107,14 @@ export function useWorkData() {
     },
     removeTrip: async (id: string) => {
       await deleteTrip(id);
+      await refresh();
+    },
+    saveTripPayment: async (input: Omit<TravelExpensePayment, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
+      await upsertTripPayment(input);
+      await refresh();
+    },
+    removeTripPayment: async (id: string) => {
+      await deleteTripPayment(id);
       await refresh();
     },
     saveTripFile: async (input: Omit<TripFile, "id" | "createdAt">) => {

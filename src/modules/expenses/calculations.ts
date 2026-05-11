@@ -1,4 +1,4 @@
-import type { Trip, TripTransportType } from "../../db/schema";
+import type { TravelExpensePayment, Trip, TripTransportType } from "../../db/schema";
 
 export const TRANSPORT_LABELS: Record<TripTransportType, string> = {
   kilometergeld: "Kilometergeld",
@@ -110,15 +110,19 @@ export function calculateTripDifferentialCents(trip: Pick<Trip, "durationMinutes
   return calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursesCosts(trip)) + calculateTransportDifferentialCents(trip) + calculateOtherCostsDifferentialCents({ otherCostsCents: trip.otherCostsCents ?? 0, employerReimbursedCosts: trip.employerReimbursedCosts });
 }
 
-export function summarizeTripsByYear(trips: Trip[], year: number) {
+export function summarizeTripsByYear(trips: Trip[], year: number, payments: TravelExpensePayment[] = []) {
   const yearTrips = trips.filter((trip) => trip.date.startsWith(`${year}-`));
+  const paidCents = payments.filter((payment) => payment.year === year).reduce((sum, payment) => sum + Math.max(payment.amountCents, 0), 0);
+  const totalCents = yearTrips.reduce((sum, trip) => sum + calculateTripTotalCents(trip), 0);
   return {
     year,
     count: yearTrips.length,
     doneCount: yearTrips.filter((trip) => trip.done).length,
     durationMinutes: yearTrips.reduce((sum, trip) => sum + trip.durationMinutes, 0),
     kilometers: yearTrips.reduce((sum, trip) => sum + trip.oneWayKilometers * 2, 0),
-    totalCents: yearTrips.reduce((sum, trip) => sum + calculateTripTotalCents(trip), 0),
+    totalCents,
+    paidCents,
+    remainingPayoutCents: totalCents - paidCents,
     transportSubsidyCents: yearTrips.reduce((sum, trip) => sum + (isTransportSubsidy(trip.transportType) ? calculateTripTravelCostCents(trip) : 0), 0),
     perDiemDifferentialCents: yearTrips.reduce((sum, trip) => sum + calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursesCosts(trip)), 0),
     transportDifferentialCents: yearTrips.reduce((sum, trip) => sum + calculateTransportDifferentialCents(trip), 0),

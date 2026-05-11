@@ -827,6 +827,56 @@ button:disabled {
   text-align: right;
 }
 
+.trip-payment-box {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #eef1f5;
+}
+
+.trip-payment-form {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(130px, 0.8fr);
+  gap: 12px;
+}
+
+.trip-payment-save {
+  justify-self: start;
+}
+
+.trip-payment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.trip-payment-list p {
+  margin: 0;
+}
+
+.trip-payment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #e5ebf2;
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 10px;
+}
+
+.trip-payment-row div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.trip-payment-row span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
 .primary-button,
 .secondary-button,
 .danger-button,
@@ -1825,6 +1875,7 @@ button:disabled {
   .trip-side-layout-map-open,
   .trip-form-section,
   .trip-form-grid,
+  .trip-payment-form,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -1893,6 +1944,15 @@ button:disabled {
 
   .trip-evidence-actions {
     justify-content: flex-start;
+  }
+
+  .trip-payment-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .trip-payment-row .icon-button {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 
   .date-row,

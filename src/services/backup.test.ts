@@ -46,6 +46,17 @@ function backupData(): BackupData {
         updatedAt: "2026-05-07T08:00:00.000Z"
       }
     ],
+    tripPayments: [
+      {
+        id: "payment-1",
+        year: 2026,
+        date: "2026-05-10",
+        amountCents: 12000,
+        note: "Teilzahlung",
+        createdAt: "2026-05-10T08:00:00.000Z",
+        updatedAt: "2026-05-10T08:00:00.000Z"
+      }
+    ],
     savedDestinations: [],
     todos: [],
     files: [
@@ -103,6 +114,18 @@ describe("backup service", () => {
     expect(await zip.file("files/file-1-screenshot.png")?.async("uint8array")).toEqual(screenshotBytes);
   });
 
+  it("exports trip payments in the backup counts and data", async () => {
+    dbMocks.readAllData.mockResolvedValue(backupData());
+
+    const blob = await exportBackup();
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { tripPayments: number } };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { tripPayments: unknown[] };
+
+    expect(manifest.counts.tripPayments).toBe(1);
+    expect(data.tripPayments).toHaveLength(1);
+  });
+
   it("imports new backups and restores TripFile dataUrl for IndexedDB", async () => {
     const data = backupData();
     const { dataUrl: _dataUrl, ...fileMetadata } = data.files[0];
@@ -130,6 +153,14 @@ describe("backup service", () => {
     await importBackup(await makeZip(data, "1.0.0"));
 
     expect(dbMocks.replaceAllData).toHaveBeenCalledWith(data);
+  });
+
+  it("normalizes old backups without trip payments to an empty list", async () => {
+    const { tripPayments: _tripPayments, ...oldData } = backupData();
+
+    await importBackup(await makeZip(oldData, "1.3.0"));
+
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, tripPayments: [] });
   });
 
   it("rejects new backups when the referenced evidence file is missing", async () => {

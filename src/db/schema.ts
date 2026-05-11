@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.3.0";
-export const DB_SCHEMA_VERSION = 5;
+export const BACKUP_SCHEMA_VERSION = "1.4.0";
+export const DB_SCHEMA_VERSION = 6;
 
 export interface Settings {
   id: "main";
@@ -101,6 +101,16 @@ export interface TripFile {
   createdAt: string;
 }
 
+export interface TravelExpensePayment {
+  id: string;
+  year: number;
+  date: string;
+  amountCents: number;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BackupManifest {
   appName: typeof APP_NAME;
   schemaVersion: string;
@@ -115,6 +125,7 @@ export interface BackupData {
   vacationSummary: VacationSummary | null;
   appMeta: AppMeta | null;
   trips: Trip[];
+  tripPayments: TravelExpensePayment[];
   savedDestinations: SavedDestination[];
   todos: unknown[];
   files: TripFile[];

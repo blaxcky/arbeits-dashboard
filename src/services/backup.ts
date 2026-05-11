@@ -1,9 +1,9 @@
 import JSZip from "jszip";
 import { readAllData, replaceAllData } from "../db/database";
-import { APP_NAME, BACKUP_SCHEMA_VERSION, type BackupData, type BackupManifest, type BackupPayload, type TripFile } from "../db/schema";
+import { APP_NAME, BACKUP_SCHEMA_VERSION, type BackupData, type BackupManifest, type BackupPayload, type TravelExpensePayment, type TripFile } from "../db/schema";
 
 type SerializedTripFile = Omit<TripFile, "dataUrl"> & ({ dataUrl: string; path?: never } | { path: string; dataUrl?: never });
-type SerializedBackupData = Omit<BackupData, "files"> & { files: SerializedTripFile[] };
+type SerializedBackupData = Omit<BackupData, "files" | "tripPayments"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[] };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -31,6 +31,7 @@ export async function exportBackup(): Promise<Blob> {
       timeEntries: data.timeEntries.length,
       flexCorrections: data.flexCorrections.length,
       trips: data.trips.length,
+      tripPayments: data.tripPayments.length,
       todos: 0,
       files: data.files.length,
       savedDestinations: data.savedDestinations.length
@@ -93,6 +94,7 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   if (!("settings" in value)) throw new Error("Einstellungen fehlen.");
   if (!("vacationSummary" in value)) throw new Error("Urlaubswerte fehlen.");
   if (!Array.isArray(value.trips)) throw new Error("Reisekosten fehlen.");
+  if (value.tripPayments !== undefined && !Array.isArray(value.tripPayments)) throw new Error("Reisekosten-Zahlungen sind ungültig.");
   if (!Array.isArray(value.files)) throw new Error("Nachweise fehlen.");
   if (value.savedDestinations !== undefined && !Array.isArray(value.savedDestinations)) throw new Error("Gespeicherte Zieladressen sind ungültig.");
   if (value.settings !== null) validateSettings(value.settings);
@@ -100,6 +102,7 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   value.flexCorrections.forEach(validateFlexCorrection);
   if (value.vacationSummary !== null) validateVacationSummary(value.vacationSummary);
   value.trips.forEach(validateTrip);
+  (value.tripPayments ?? []).forEach(validateTripPayment);
   (value.savedDestinations ?? []).forEach(validateSavedDestination);
   value.files.forEach(validateTripFile);
 }
@@ -183,6 +186,17 @@ function validateTrip(value: unknown): void {
   requireString(value, "updatedAt", "Reise-Aktualisiert-Zeit fehlt.");
 }
 
+function validateTripPayment(value: unknown): void {
+  if (!isObject(value)) throw new Error("Reisekosten-Zahlung ist ungültig.");
+  requireString(value, "id", "Zahlungs-ID fehlt.");
+  requireNumber(value, "year", "Zahlungsjahr fehlt.");
+  requireString(value, "date", "Zahlungsdatum fehlt.");
+  requireNumber(value, "amountCents", "Zahlungsbetrag fehlt.");
+  requireString(value, "note", "Zahlungsnotiz fehlt.");
+  requireString(value, "createdAt", "Zahlung-Erstellt-Zeit fehlt.");
+  requireString(value, "updatedAt", "Zahlung-Aktualisiert-Zeit fehlt.");
+}
+
 function validateSavedDestination(value: unknown): void {
   if (!isObject(value)) throw new Error("Gespeicherte Zieladresse ist ungültig.");
   requireString(value, "id", "Zieladress-ID fehlt.");
@@ -224,7 +238,7 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
       };
     })
   );
-  return { ...data, files, savedDestinations: data.savedDestinations ?? [] };
+  return { ...data, files, savedDestinations: data.savedDestinations ?? [], tripPayments: data.tripPayments ?? [] };
 }
 
 function backupFilePath(file: TripFile, index: number): string {

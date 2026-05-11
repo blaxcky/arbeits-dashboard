@@ -25,7 +25,7 @@ import {
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { SavedDestination, Settings, TimeEntry, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
+import type { SavedDestination, Settings, TimeEntry, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
@@ -1453,13 +1453,40 @@ function TripCostPanel({
   );
 }
 
-function TripsYearView({ data }: { data: WorkData; showToast: ShowToast }) {
+function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const navigate = useNavigate();
   const params = useParams();
   const year = yearFromUrlParam(params.year);
   const yearOptions = tripYearOptions(data.trips, currentYear(), year);
-  const summary = summarizeTripsByYear(data.trips, year);
+  const summary = summarizeTripsByYear(data.trips, year, data.tripPayments);
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
+  const [paymentForm, setPaymentForm] = useState(() => tripPaymentToForm());
+  const [paymentAmountError, setPaymentAmountError] = useState<string | undefined>();
+  const yearPayments = data.tripPayments.filter((payment) => payment.year === year);
+
+  async function savePayment() {
+    const amountCents = parseEuroCentsInput(paymentForm.amountEuros);
+    if (amountCents === null || amountCents <= 0) {
+      setPaymentAmountError("Bitte einen Betrag größer 0 eingeben.");
+      return;
+    }
+
+    setPaymentAmountError(undefined);
+    await data.saveTripPayment({
+      year,
+      date: paymentForm.date || todayKey(),
+      amountCents,
+      note: paymentForm.note.trim()
+    });
+    setPaymentForm(tripPaymentToForm());
+    showToast("Überweisung gespeichert.");
+  }
+
+  async function removePayment(payment: TravelExpensePayment) {
+    if (!window.confirm(`Überweisung ${formatEuroCents(payment.amountCents)} löschen?`)) return;
+    await data.removeTripPayment(payment.id);
+    showToast("Überweisung gelöscht.");
+  }
 
   return (
     <section className="page-stack">
@@ -1500,10 +1527,53 @@ function TripsYearView({ data }: { data: WorkData; showToast: ShowToast }) {
           <dl className="detail-list">
             <div><dt>Offene Anzahl</dt><dd>{summary.openCount}</dd></div>
             <div><dt>Offener Gesamtbetrag</dt><dd>{formatEuroCents(summary.openTotalCents)}</dd></div>
+            <div><dt>Überwiesen</dt><dd>{formatEuroCents(summary.paidCents)}</dd></div>
+            <div><dt>Offen nach Überweisung</dt><dd>{formatEuroCents(summary.remainingPayoutCents)}</dd></div>
             <div><dt>Offene Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(summary.openTransportDifferentialCents)}</dd></div>
             <div><dt>Offene Werbungskosten Sonstiges</dt><dd>{formatEuroCents(summary.openOtherCostsDifferentialCents)}</dd></div>
             <div><dt>Älteste offene Reise</dt><dd>{summary.oldestOpenTrip ? formatDateKey(summary.oldestOpenTrip.date) : "-"}</dd></div>
           </dl>
+          <div className="trip-payment-box">
+            <div className="trip-payment-form">
+              <Field label="Datum">
+                <input type="date" value={paymentForm.date} onChange={(event) => setPaymentForm((current) => ({ ...current, date: event.target.value }))} />
+              </Field>
+              <Field label="Betrag (EUR)" error={paymentAmountError}>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={paymentForm.amountEuros}
+                  aria-invalid={Boolean(paymentAmountError)}
+                  onChange={(event) => {
+                    setPaymentAmountError(undefined);
+                    setPaymentForm((current) => ({ ...current, amountEuros: event.target.value }));
+                  }}
+                />
+              </Field>
+              <Field label="Notiz" className="field-wide">
+                <input value={paymentForm.note} onChange={(event) => setPaymentForm((current) => ({ ...current, note: event.target.value }))} />
+              </Field>
+              <button className="secondary-button trip-payment-save" type="button" onClick={() => void savePayment()}>
+                <Plus size={17} /> Überweisung speichern
+              </button>
+            </div>
+            <div className="trip-payment-list">
+              {yearPayments.length === 0 ? <p className="muted">Noch keine Überweisungen erfasst.</p> : null}
+              {yearPayments.map((payment) => (
+                <div key={payment.id} className="trip-payment-row">
+                  <div>
+                    <strong>{formatDateKey(payment.date)}</strong>
+                    {payment.note ? <span>{payment.note}</span> : null}
+                  </div>
+                  <strong>{formatEuroCents(payment.amountCents)}</strong>
+                  <button className="icon-button" type="button" title="Überweisung löschen" aria-label="Überweisung löschen" onClick={() => void removePayment(payment)}>
+                    <Trash size={17} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -2047,6 +2117,14 @@ export function tripToForm(trip?: Trip) {
   };
 }
 
+function tripPaymentToForm() {
+  return {
+    date: todayKey(),
+    amountEuros: "",
+    note: ""
+  };
+}
+
 export function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt"> {
   return {
     date: trip.date,
@@ -2122,6 +2200,16 @@ function clampHoursToMinutes(value: string, minMinutes: number, maxMinutes: numb
 function parseDecimalNumber(value: string): number {
   const numeric = Number(value.trim().replace(",", "."));
   return Number.isFinite(numeric) ? Math.max(numeric, 0) : 0;
+}
+
+export function parseEuroCentsInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  const numeric = Number(normalized);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(numeric * 100);
 }
 
 function eurosToCents(value: string): number {
