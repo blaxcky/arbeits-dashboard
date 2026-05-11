@@ -57,6 +57,33 @@ function backupData(): BackupData {
         updatedAt: "2026-05-10T08:00:00.000Z"
       }
     ],
+    auditPointCases: [
+      {
+        id: "point-1",
+        name: "BP Muster",
+        taxNumber: "12 345/6789",
+        firm: "Kanzlei",
+        category: "M1",
+        periodStartYear: 2020,
+        periodEndYear: 2022,
+        additionalResultCents: 12500000,
+        section99: false,
+        submissionMonth: "2026-05",
+        status: "completed",
+        submittedPointsTenths: 60,
+        submittedAt: "2026-05-10T08:00:00.000Z",
+        createdAt: "2026-05-10T08:00:00.000Z",
+        updatedAt: "2026-05-10T08:00:00.000Z"
+      }
+    ],
+    auditPointGoals: [
+      {
+        id: "goal-2026",
+        year: 2026,
+        targetPointsTenths: 300,
+        updatedAt: "2026-05-10T08:00:00.000Z"
+      }
+    ],
     savedDestinations: [],
     todos: [],
     files: [
@@ -126,6 +153,20 @@ describe("backup service", () => {
     expect(data.tripPayments).toHaveLength(1);
   });
 
+  it("exports audit point cases and goals in the backup counts and data", async () => {
+    dbMocks.readAllData.mockResolvedValue(backupData());
+
+    const blob = await exportBackup();
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { auditPointCases: number; auditPointGoals: number } };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { auditPointCases: unknown[]; auditPointGoals: unknown[] };
+
+    expect(manifest.counts.auditPointCases).toBe(1);
+    expect(manifest.counts.auditPointGoals).toBe(1);
+    expect(data.auditPointCases).toHaveLength(1);
+    expect(data.auditPointGoals).toHaveLength(1);
+  });
+
   it("imports new backups and restores TripFile dataUrl for IndexedDB", async () => {
     const data = backupData();
     const { dataUrl: _dataUrl, ...fileMetadata } = data.files[0];
@@ -161,6 +202,14 @@ describe("backup service", () => {
     await importBackup(await makeZip(oldData, "1.3.0"));
 
     expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, tripPayments: [] });
+  });
+
+  it("normalizes old backups without audit points to empty lists", async () => {
+    const { auditPointCases: _auditPointCases, auditPointGoals: _auditPointGoals, ...oldData } = backupData();
+
+    await importBackup(await makeZip(oldData, "1.4.0"));
+
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, auditPointCases: [], auditPointGoals: [] });
   });
 
   it("rejects new backups when the referenced evidence file is missing", async () => {

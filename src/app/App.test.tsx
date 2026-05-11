@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../db/schema";
-import { automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
+import { summarizeAuditPoints } from "../modules/points/calculations";
+import type { AuditPointCase } from "../db/schema";
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -32,6 +34,69 @@ describe("parseEuroCentsInput", () => {
     expect(parseEuroCentsInput("")).toBeNull();
     expect(parseEuroCentsInput("abc")).toBeNull();
     expect(parseEuroCentsInput("12,345")).toBeNull();
+  });
+});
+
+describe("audit point helpers", () => {
+  const baseForm = {
+    name: "BP Muster",
+    taxNumber: "12 345/6789",
+    firm: "",
+    category: "M1" as const,
+    periodStartYear: "2020",
+    periodEndYear: "2022",
+    additionalResultEuros: "125.000,50",
+    section99: false,
+    submissionMonth: "2026-05",
+    status: "in_progress" as const
+  };
+
+  const baseCase: AuditPointCase = {
+    id: "point-1",
+    name: "BP Muster",
+    taxNumber: "12 345/6789",
+    firm: "",
+    category: "M1",
+    periodStartYear: 2020,
+    periodEndYear: 2022,
+    additionalResultCents: 12500050,
+    section99: false,
+    submissionMonth: "2026-05",
+    status: "completed",
+    submittedPointsTenths: 60,
+    submittedAt: "2026-05-01T08:00:00.000Z",
+    createdAt: "2026-05-01T08:00:00.000Z",
+    updatedAt: "2026-05-01T08:00:00.000Z"
+  };
+
+  it("parses point goals with German decimals into tenths", () => {
+    expect(parsePointTenthsInput("12,5")).toBe(125);
+    expect(parsePointTenthsInput("12.5")).toBe(125);
+    expect(parsePointTenthsInput("12,55")).toBeNull();
+  });
+
+  it("parses audit additional result input with comma or point into cents", () => {
+    expect(validateAuditPointCaseForm(baseForm)).toMatchObject({ valid: true, additionalResultCents: 12500050 });
+    expect(validateAuditPointCaseForm({ ...baseForm, additionalResultEuros: "125000.50" })).toMatchObject({ valid: true, additionalResultCents: 12500050 });
+  });
+
+  it("rejects invalid years, categories and amounts", () => {
+    expect(validateAuditPointCaseForm({ ...baseForm, periodEndYear: "2019" }).valid).toBe(false);
+    expect(validateAuditPointCaseForm({ ...baseForm, category: "X1" as "M1" }).valid).toBe(false);
+    expect(validateAuditPointCaseForm({ ...baseForm, additionalResultEuros: "12,345" }).valid).toBe(false);
+  });
+
+  it("summarizes audit points by submission month", () => {
+    const summary = summarizeAuditPoints([baseCase, { ...baseCase, id: "point-2", submissionMonth: "2026-06", status: "in_progress", submittedPointsTenths: null }], 2026, "2026-05");
+
+    expect(summary.count).toBe(1);
+    expect(summary.completedPointsTenths).toBe(60);
+    expect(summary.additionalResultCents).toBe(12500050);
+  });
+
+  it("keeps selected and existing months available", () => {
+    expect(auditPointMonthOptions([{ submissionMonth: "2026-04" }], "2026-05")).toContain("2026-04");
+    expect(auditPointMonthOptions([{ submissionMonth: "2026-04" }], "2026-05")).toContain("2026-05");
   });
 });
 

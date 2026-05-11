@@ -5,6 +5,7 @@ import {
   Briefcase,
   CalendarCheck,
   CalendarPlus,
+  ChartBar,
   CheckCircle,
   ClipboardText,
   Copy,
@@ -25,7 +26,7 @@ import {
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { SavedDestination, Settings, TimeEntry, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
+import type { AuditPointCase, AuditPointCategory, AuditPointStatus, SavedDestination, Settings, TimeEntry, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
@@ -58,6 +59,14 @@ import {
   TRANSPORT_LABELS,
   TRIP_RULES
 } from "../modules/expenses/calculations";
+import {
+  AUDIT_POINT_CATEGORIES,
+  AUDIT_POINT_CATEGORY_RULES,
+  calculateAuditPointBreakdown,
+  isAuditPointCategory,
+  pointsForAuditCase,
+  summarizeAuditPoints
+} from "../modules/points/calculations";
 import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
@@ -65,6 +74,7 @@ import { useWorkData } from "./useWorkData";
 const navItems = [
   { to: "/", label: "Dashboard", icon: House },
   { to: "/reisekosten", label: "Reisekosten", icon: Briefcase },
+  { to: "/punkte", label: "Punkte", icon: ChartBar },
   { to: "/aufgaben", label: "Aufgaben", icon: ListChecks },
   { to: "/einstellungen", label: "Einstellungen", icon: Gear }
 ];
@@ -130,6 +140,7 @@ export function App() {
             <Route path="/reisekosten" element={<TripsView data={data} showToast={showToast} />} />
             <Route path="/reisekosten/jahr" element={<TripsYearView data={data} showToast={showToast} />} />
             <Route path="/reisekosten/jahr/:year" element={<TripsYearView data={data} showToast={showToast} />} />
+            <Route path="/punkte" element={<AuditPointsView data={data} showToast={showToast} />} />
             <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Fälligkeiten", "Prioritäten", "Tags", "Filter und Suche"]} />} />
             <Route path="/einstellungen" element={<SettingsView data={data} showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -145,6 +156,7 @@ type WorkData = ReturnType<typeof useWorkData>;
 type ShowToast = (message: string) => void;
 type SettingsForm = ReturnType<typeof settingsToForm>;
 type SettingsErrors = Partial<Record<keyof SettingsForm, string>>;
+type AuditPointCaseForm = ReturnType<typeof auditPointCaseToForm>;
 
 function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const settings = data.settings;
@@ -685,6 +697,230 @@ function RoadmapView({ title, icon, items }: { title: string; icon: React.ReactN
             {items.map((item) => <li key={item}>{item}</li>)}
           </ul>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(() => auditPointCaseToForm());
+  const [errors, setErrors] = useState<Partial<Record<keyof AuditPointCaseForm, string>>>({});
+  const [selectedMonth, setSelectedMonth] = useState(() => todayKey().slice(0, 7));
+  const selectedYear = Number(selectedMonth.slice(0, 4)) || currentYear();
+  const [goalInput, setGoalInput] = useState("");
+  const currentGoal = data.auditPointGoals.find((goal) => goal.year === selectedYear);
+  const previewCase = auditPointCaseDraftForPreview(form);
+  const previewBreakdown = previewCase ? calculateAuditPointBreakdown(previewCase) : null;
+  const monthOptions = auditPointMonthOptions(data.auditPointCases, selectedMonth);
+  const yearSummary = summarizeAuditPoints(data.auditPointCases, selectedYear, null, data.auditPointGoals);
+  const monthSummary = summarizeAuditPoints(data.auditPointCases, selectedYear, selectedMonth, data.auditPointGoals);
+  const selectedMonthCases = data.auditPointCases.filter((pointCase) => pointCase.submissionMonth === selectedMonth);
+
+  useEffect(() => {
+    setGoalInput(currentGoal ? formatPointInput(currentGoal.targetPointsTenths) : "");
+  }, [currentGoal, selectedYear]);
+
+  function updateField(field: keyof AuditPointCaseForm, value: string | boolean) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  async function saveCase() {
+    const validation = validateAuditPointCaseForm(form);
+    setErrors(validation.errors);
+    if (!validation.valid) {
+      showToast("Bitte die markierten Felder prüfen.");
+      return;
+    }
+
+    await data.saveAuditPointCase({
+      id: editingId ?? undefined,
+      name: form.name.trim(),
+      taxNumber: form.taxNumber.trim(),
+      firm: form.firm.trim(),
+      category: validation.category,
+      periodStartYear: validation.periodStartYear,
+      periodEndYear: validation.periodEndYear,
+      additionalResultCents: validation.additionalResultCents,
+      section99: form.section99,
+      submissionMonth: form.submissionMonth,
+      status: form.status
+    });
+    setEditingId(null);
+    setForm(auditPointCaseToForm(undefined, form.submissionMonth));
+    showToast("Punkte-Fall gespeichert.");
+  }
+
+  async function saveGoal() {
+    const targetPointsTenths = parsePointTenthsInput(goalInput);
+    if (targetPointsTenths === null) {
+      showToast("Bitte ein gültiges Jahresziel eingeben.");
+      return;
+    }
+    await data.saveAuditPointGoal({ id: currentGoal?.id, year: selectedYear, targetPointsTenths });
+    showToast("Jahresziel gespeichert.");
+  }
+
+  function editCase(pointCase: AuditPointCase) {
+    setEditingId(pointCase.id);
+    setForm(auditPointCaseToForm(pointCase));
+    setErrors({});
+  }
+
+  async function removeCase(pointCase: AuditPointCase) {
+    if (!window.confirm(`Punkte-Fall "${pointCase.name}" löschen?`)) return;
+    await data.removeAuditPointCase(pointCase.id);
+    if (editingId === pointCase.id) {
+      setEditingId(null);
+      setForm(auditPointCaseToForm());
+    }
+    showToast("Punkte-Fall gelöscht.");
+  }
+
+  return (
+    <section className="page-stack">
+      <Header eyebrow="Betriebsprüfungen" title="Punkte" />
+      <div className="settings-grid">
+        <div className="panel form-panel">
+          <div className="panel-heading">
+            <span className="section-label">{editingId ? "Fall bearbeiten" : "Neuer Fall"}</span>
+            <button className="secondary-button" type="button" onClick={() => {
+              setEditingId(null);
+              setForm(auditPointCaseToForm(undefined, selectedMonth));
+              setErrors({});
+            }}>Neu</button>
+          </div>
+          <div className="form-grid">
+            <Field label="Name" className="field-wide" error={errors.name}>
+              <input value={form.name} aria-invalid={Boolean(errors.name)} onChange={(event) => updateField("name", event.target.value)} />
+            </Field>
+            <Field label="Steuernummer" error={errors.taxNumber}>
+              <input value={form.taxNumber} aria-invalid={Boolean(errors.taxNumber)} onChange={(event) => updateField("taxNumber", event.target.value)} />
+            </Field>
+            <Field label="Kanzlei">
+              <input value={form.firm} onChange={(event) => updateField("firm", event.target.value)} />
+            </Field>
+            <Field label="Betriebskategorie" error={errors.category}>
+              <select value={form.category} aria-invalid={Boolean(errors.category)} onChange={(event) => updateField("category", event.target.value)}>
+                {AUDIT_POINT_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>{AUDIT_POINT_CATEGORY_RULES[category].label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Abgabemonat" error={errors.submissionMonth}>
+              <input type="month" value={form.submissionMonth} aria-invalid={Boolean(errors.submissionMonth)} onChange={(event) => updateField("submissionMonth", event.target.value)} />
+            </Field>
+            <Field label="Zeitraum von" error={errors.periodStartYear}>
+              <input inputMode="numeric" value={form.periodStartYear} aria-invalid={Boolean(errors.periodStartYear)} onChange={(event) => updateField("periodStartYear", event.target.value)} />
+            </Field>
+            <Field label="Zeitraum bis" error={errors.periodEndYear}>
+              <input inputMode="numeric" value={form.periodEndYear} aria-invalid={Boolean(errors.periodEndYear)} onChange={(event) => updateField("periodEndYear", event.target.value)} />
+            </Field>
+            <Field label="Mehrergebnis (EUR)" className="field-wide" error={errors.additionalResultEuros}>
+              <input inputMode="decimal" placeholder="0,00" value={form.additionalResultEuros} aria-invalid={Boolean(errors.additionalResultEuros)} onChange={(event) => updateField("additionalResultEuros", event.target.value)} />
+            </Field>
+            <label className="check-row"><input type="checkbox" checked={form.section99} onChange={(event) => updateField("section99", event.target.checked)} /> §99-Zuschlag</label>
+            <Field label="Status">
+              <select value={form.status} onChange={(event) => updateField("status", event.target.value as AuditPointStatus)}>
+                <option value="in_progress">Offen</option>
+                <option value="completed">Erledigt</option>
+              </select>
+            </Field>
+          </div>
+          <AuditPointBreakdownPreview breakdown={previewBreakdown} />
+          <div className="button-row trip-save-actions">
+            <button className="primary-button" type="button" onClick={() => void saveCase()}>{editingId ? "Änderungen speichern" : "Fall speichern"}</button>
+          </div>
+        </div>
+        <div className="panel">
+          <div className="panel-heading year-overview-heading">
+            <span className="section-label">Statistik</span>
+            <label className="year-select">
+              <span>Monat</span>
+              <select value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}>
+                {monthOptions.map((month) => <option key={month} value={month}>{month}</option>)}
+              </select>
+            </label>
+          </div>
+          <dl className="detail-list">
+            <div><dt>Jahr Ist</dt><dd>{formatPointTenths(yearSummary.pointsTenths)}</dd></div>
+            <div><dt>Jahr erledigt/offen</dt><dd>{formatPointTenths(yearSummary.completedPointsTenths)} / {formatPointTenths(yearSummary.openPointsTenths)}</dd></div>
+            <div><dt>Jahr Fälle</dt><dd>{yearSummary.count}</dd></div>
+            <div><dt>Monat Ist</dt><dd>{formatPointTenths(monthSummary.pointsTenths)}</dd></div>
+            <div><dt>Monat erledigt/offen</dt><dd>{monthSummary.completedCount} / {monthSummary.openCount}</dd></div>
+            <div><dt>Mehrergebnis Monat</dt><dd>{formatEuroCents(monthSummary.additionalResultCents)}</dd></div>
+            <div><dt>Jahresziel</dt><dd>{yearSummary.targetPointsTenths === null ? "-" : formatPointTenths(yearSummary.targetPointsTenths)}</dd></div>
+          </dl>
+          {yearSummary.progressRatio !== null ? (
+            <div className="limit-bar" aria-label={`Punkte-Fortschritt ${Math.round(yearSummary.progressRatio * 100)} Prozent`}>
+              <span style={{ width: `${Math.min(yearSummary.progressRatio, 1) * 100}%` }} />
+            </div>
+          ) : null}
+          <div className="trip-payment-box">
+            <Field label={`Jahresziel ${selectedYear}`}>
+              <input inputMode="decimal" placeholder="0" value={goalInput} onChange={(event) => setGoalInput(event.target.value)} />
+            </Field>
+            <button className="secondary-button trip-payment-save" type="button" onClick={() => void saveGoal()}>
+              <Plus size={17} /> Ziel speichern
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel-heading">
+          <span className="section-label">Fälle im Monat {selectedMonth}</span>
+          <strong>{monthSummary.count}</strong>
+        </div>
+        <div className="trip-list">
+          {selectedMonthCases.length === 0 ? <p className="muted">Noch keine Fälle für diesen Monat erfasst.</p> : null}
+          {selectedMonthCases.map((pointCase) => (
+            <article key={pointCase.id} className={`trip-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
+              <div>
+                <strong>{pointCase.name} · {pointCase.taxNumber}</strong>
+                <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
+                <span className="trip-badges"><em>{pointCase.status === "completed" ? "Erledigt" : "Offen"}</em>{pointCase.status === "completed" && pointCase.submittedPointsTenths !== null ? <em>fixiert</em> : null}</span>
+              </div>
+              <div className="trip-row-metrics">
+                <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
+                <span>{formatEuroCents(pointCase.additionalResultCents)}</span>
+                <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
+              </div>
+              <div className="trip-actions">
+                <button className="secondary-button" type="button" onClick={() => editCase(pointCase)}>Bearbeiten</button>
+                <button className="danger-button" type="button" onClick={() => void removeCase(pointCase)}>Löschen</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AuditPointBreakdownPreview({ breakdown }: { breakdown: ReturnType<typeof calculateAuditPointBreakdown> | null }) {
+  return (
+    <section className="trip-preview audit-point-preview" aria-label="Punkte-Vorschau">
+      <div className="trip-preview-group trip-preview-group-primary">
+        <span className="trip-preview-title">Punkte</span>
+        <dl className="trip-preview-list">
+          <div><dt>Gesamt</dt><dd>{breakdown ? formatPointTenths(breakdown.totalTenths) : "-"}</dd></div>
+          <div><dt>Jahre</dt><dd>{breakdown ? breakdown.cappedYears : "-"}</dd></div>
+        </dl>
+      </div>
+      <div className="trip-preview-group">
+        <span className="trip-preview-title">Regel</span>
+        <dl className="trip-preview-list">
+          <div><dt>Kategorie</dt><dd>{breakdown ? formatPointTenths(breakdown.categoryTenths) : "-"}</dd></div>
+          <div><dt>Zeitraum</dt><dd>{breakdown ? formatPointTenths(breakdown.periodTenths) : "-"}</dd></div>
+        </dl>
+      </div>
+      <div className="trip-preview-group trip-preview-group-tax">
+        <span className="trip-preview-title">Zuschläge</span>
+        <dl className="trip-preview-list">
+          <div><dt>§99</dt><dd>{breakdown ? formatPointTenths(breakdown.section99Tenths) : "-"}</dd></div>
+          <div><dt>Mehrergebnis</dt><dd>{breakdown ? formatPointTenths(breakdown.additionalResultTenths) : "-"}</dd></div>
+        </dl>
       </div>
     </section>
   );
@@ -2097,6 +2333,80 @@ function settingsToForm(settings: Settings | null) {
   };
 }
 
+function auditPointCaseToForm(pointCase?: AuditPointCase, fallbackMonth = todayKey().slice(0, 7)) {
+  return {
+    name: pointCase?.name ?? "",
+    taxNumber: pointCase?.taxNumber ?? "",
+    firm: pointCase?.firm ?? "",
+    category: pointCase?.category ?? "K0" as AuditPointCategory,
+    periodStartYear: pointCase ? String(pointCase.periodStartYear) : String(currentYear()),
+    periodEndYear: pointCase ? String(pointCase.periodEndYear) : String(currentYear()),
+    additionalResultEuros: pointCase ? centsToEuroInput(pointCase.additionalResultCents) : "0",
+    section99: pointCase?.section99 ?? false,
+    submissionMonth: pointCase?.submissionMonth ?? fallbackMonth,
+    status: pointCase?.status ?? "in_progress" as AuditPointStatus
+  };
+}
+
+export function parsePointTenthsInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(",", ".");
+  if (!/^\d+(\.\d{1})?$/.test(normalized)) return null;
+  const numeric = Number(normalized);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(numeric * 10);
+}
+
+export function validateAuditPointCaseForm(form: AuditPointCaseForm):
+  | { valid: true; errors: Partial<Record<keyof AuditPointCaseForm, string>>; category: AuditPointCategory; periodStartYear: number; periodEndYear: number; additionalResultCents: number }
+  | { valid: false; errors: Partial<Record<keyof AuditPointCaseForm, string>> } {
+  const errors: Partial<Record<keyof AuditPointCaseForm, string>> = {};
+  const category = form.category;
+  const periodStartYear = Number(form.periodStartYear);
+  const periodEndYear = Number(form.periodEndYear);
+  const additionalResultCents = form.additionalResultEuros.trim() === "" ? 0 : parseEuroCentsInput(form.additionalResultEuros);
+
+  if (!form.name.trim()) errors.name = "Bitte einen Namen eingeben.";
+  if (!form.taxNumber.trim()) errors.taxNumber = "Bitte eine Steuernummer eingeben.";
+  if (!isAuditPointCategory(category)) errors.category = "Bitte eine gültige Betriebskategorie wählen.";
+  if (!Number.isInteger(periodStartYear) || periodStartYear < 1900 || periodStartYear > 2200) errors.periodStartYear = "Bitte ein gültiges Jahr eingeben.";
+  if (!Number.isInteger(periodEndYear) || periodEndYear < 1900 || periodEndYear > 2200) errors.periodEndYear = "Bitte ein gültiges Jahr eingeben.";
+  if (Number.isInteger(periodStartYear) && Number.isInteger(periodEndYear) && periodEndYear < periodStartYear) errors.periodEndYear = "Bis-Jahr darf nicht vor Von-Jahr liegen.";
+  if (additionalResultCents === null) errors.additionalResultEuros = "Bitte einen Betrag mit maximal zwei Dezimalstellen eingeben.";
+  if (!/^\d{4}-\d{2}$/.test(form.submissionMonth)) errors.submissionMonth = "Bitte einen gültigen Abgabemonat wählen.";
+
+  if (Object.keys(errors).length > 0 || !isAuditPointCategory(category) || additionalResultCents === null) {
+    return { valid: false, errors };
+  }
+
+  return { valid: true, errors, category, periodStartYear, periodEndYear, additionalResultCents };
+}
+
+function auditPointCaseDraftForPreview(form: AuditPointCaseForm): Pick<AuditPointCase, "category" | "periodStartYear" | "periodEndYear" | "additionalResultCents" | "section99"> | null {
+  const validation = validateAuditPointCaseForm({ ...form, name: form.name || "x", taxNumber: form.taxNumber || "x", submissionMonth: form.submissionMonth || todayKey().slice(0, 7) });
+  if (!validation.valid) return null;
+  return {
+    category: validation.category,
+    periodStartYear: validation.periodStartYear,
+    periodEndYear: validation.periodEndYear,
+    additionalResultCents: validation.additionalResultCents,
+    section99: form.section99
+  };
+}
+
+export function auditPointMonthOptions(cases: Pick<AuditPointCase, "submissionMonth">[], selectedMonth: string): string[] {
+  return [...new Set([selectedMonth, todayKey().slice(0, 7), ...cases.map((pointCase) => pointCase.submissionMonth)])].sort((a, b) => b.localeCompare(a));
+}
+
+function formatPointTenths(tenths: number): string {
+  return (tenths / 10).toLocaleString("de-AT", { minimumFractionDigits: tenths % 10 === 0 ? 0 : 1, maximumFractionDigits: 1 });
+}
+
+function formatPointInput(tenths: number): string {
+  return (tenths / 10).toLocaleString("de-AT", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+}
+
 export function tripToForm(trip?: Trip) {
   return {
     date: trip?.date ?? todayKey(),
@@ -2205,7 +2515,16 @@ function parseDecimalNumber(value: string): number {
 export function parseEuroCentsInput(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  const normalized = trimmed.replace(",", ".");
+  const compact = trimmed.replace(/\s/g, "");
+  const lastComma = compact.lastIndexOf(",");
+  const lastDot = compact.lastIndexOf(".");
+  const decimalSeparator = lastComma > lastDot ? "," : ".";
+  const hasDecimalSeparator = lastComma !== -1 || lastDot !== -1;
+  const normalized = hasDecimalSeparator
+    ? compact
+      .replace(new RegExp(`\\${decimalSeparator === "," ? "." : ","}`, "g"), "")
+      .replace(decimalSeparator, ".")
+    : compact;
   if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
   const numeric = Number(normalized);
   if (!Number.isFinite(numeric)) return null;

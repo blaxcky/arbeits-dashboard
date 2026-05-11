@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.4.0";
-export const DB_SCHEMA_VERSION = 6;
+export const BACKUP_SCHEMA_VERSION = "1.5.0";
+export const DB_SCHEMA_VERSION = 7;
 
 export interface Settings {
   id: "main";
@@ -111,6 +111,34 @@ export interface TravelExpensePayment {
   updatedAt: string;
 }
 
+export type AuditPointCategory = "K3" | "K2" | "K1" | "K0" | "M2" | "M1" | "M0" | "G2" | "G1" | "G0";
+export type AuditPointStatus = "in_progress" | "completed";
+
+export interface AuditPointCase {
+  id: string;
+  name: string;
+  taxNumber: string;
+  firm: string;
+  category: AuditPointCategory;
+  periodStartYear: number;
+  periodEndYear: number;
+  additionalResultCents: number;
+  section99: boolean;
+  submissionMonth: string;
+  status: AuditPointStatus;
+  submittedPointsTenths: number | null;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuditPointGoal {
+  id: string;
+  year: number;
+  targetPointsTenths: number;
+  updatedAt: string;
+}
+
 export interface BackupManifest {
   appName: typeof APP_NAME;
   schemaVersion: string;
@@ -127,6 +155,8 @@ export interface BackupData {
   trips: Trip[];
   tripPayments: TravelExpensePayment[];
   savedDestinations: SavedDestination[];
+  auditPointCases: AuditPointCase[];
+  auditPointGoals: AuditPointGoal[];
   todos: unknown[];
   files: TripFile[];
 }

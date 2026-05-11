@@ -1,9 +1,9 @@
 import JSZip from "jszip";
 import { readAllData, replaceAllData } from "../db/database";
-import { APP_NAME, BACKUP_SCHEMA_VERSION, type BackupData, type BackupManifest, type BackupPayload, type TravelExpensePayment, type TripFile } from "../db/schema";
+import { APP_NAME, BACKUP_SCHEMA_VERSION, type AuditPointCase, type AuditPointGoal, type BackupData, type BackupManifest, type BackupPayload, type TravelExpensePayment, type TripFile } from "../db/schema";
 
 type SerializedTripFile = Omit<TripFile, "dataUrl"> & ({ dataUrl: string; path?: never } | { path: string; dataUrl?: never });
-type SerializedBackupData = Omit<BackupData, "files" | "tripPayments"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[] };
+type SerializedBackupData = Omit<BackupData, "files" | "tripPayments" | "auditPointCases" | "auditPointGoals"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[]; auditPointCases?: AuditPointCase[]; auditPointGoals?: AuditPointGoal[] };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -32,6 +32,8 @@ export async function exportBackup(): Promise<Blob> {
       flexCorrections: data.flexCorrections.length,
       trips: data.trips.length,
       tripPayments: data.tripPayments.length,
+      auditPointCases: data.auditPointCases.length,
+      auditPointGoals: data.auditPointGoals.length,
       todos: 0,
       files: data.files.length,
       savedDestinations: data.savedDestinations.length
@@ -95,6 +97,8 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   if (!("vacationSummary" in value)) throw new Error("Urlaubswerte fehlen.");
   if (!Array.isArray(value.trips)) throw new Error("Reisekosten fehlen.");
   if (value.tripPayments !== undefined && !Array.isArray(value.tripPayments)) throw new Error("Reisekosten-Zahlungen sind ungültig.");
+  if (value.auditPointCases !== undefined && !Array.isArray(value.auditPointCases)) throw new Error("Punkte-Fälle sind ungültig.");
+  if (value.auditPointGoals !== undefined && !Array.isArray(value.auditPointGoals)) throw new Error("Punkte-Jahresziele sind ungültig.");
   if (!Array.isArray(value.files)) throw new Error("Nachweise fehlen.");
   if (value.savedDestinations !== undefined && !Array.isArray(value.savedDestinations)) throw new Error("Gespeicherte Zieladressen sind ungültig.");
   if (value.settings !== null) validateSettings(value.settings);
@@ -103,6 +107,8 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   if (value.vacationSummary !== null) validateVacationSummary(value.vacationSummary);
   value.trips.forEach(validateTrip);
   (value.tripPayments ?? []).forEach(validateTripPayment);
+  (value.auditPointCases ?? []).forEach(validateAuditPointCase);
+  (value.auditPointGoals ?? []).forEach(validateAuditPointGoal);
   (value.savedDestinations ?? []).forEach(validateSavedDestination);
   value.files.forEach(validateTripFile);
 }
@@ -207,6 +213,33 @@ function validateSavedDestination(value: unknown): void {
   requireString(value, "updatedAt", "Zieladresse-Aktualisiert-Zeit fehlt.");
 }
 
+function validateAuditPointCase(value: unknown): void {
+  if (!isObject(value)) throw new Error("Punkte-Fall ist ungültig.");
+  requireString(value, "id", "Punkte-Fall-ID fehlt.");
+  requireString(value, "name", "Punkte-Fall-Name fehlt.");
+  requireString(value, "taxNumber", "Punkte-Fall-Steuernummer fehlt.");
+  requireString(value, "firm", "Punkte-Fall-Kanzlei fehlt.");
+  requireString(value, "category", "Punkte-Fall-Kategorie fehlt.");
+  requireNumber(value, "periodStartYear", "Punkte-Fall-Zeitraum von fehlt.");
+  requireNumber(value, "periodEndYear", "Punkte-Fall-Zeitraum bis fehlt.");
+  requireNumber(value, "additionalResultCents", "Punkte-Fall-Mehrergebnis fehlt.");
+  if (typeof value.section99 !== "boolean") throw new Error("Punkte-Fall-§99-Status fehlt.");
+  requireString(value, "submissionMonth", "Punkte-Fall-Abgabemonat fehlt.");
+  requireString(value, "status", "Punkte-Fall-Status fehlt.");
+  requireNullableNumber(value, "submittedPointsTenths", "Punkte-Fall-Abgabepunkte sind ungültig.");
+  requireNullableString(value, "submittedAt", "Punkte-Fall-Abgabezeit ist ungültig.");
+  requireString(value, "createdAt", "Punkte-Fall-Erstellt-Zeit fehlt.");
+  requireString(value, "updatedAt", "Punkte-Fall-Aktualisiert-Zeit fehlt.");
+}
+
+function validateAuditPointGoal(value: unknown): void {
+  if (!isObject(value)) throw new Error("Punkte-Jahresziel ist ungültig.");
+  requireString(value, "id", "Punkte-Jahresziel-ID fehlt.");
+  requireNumber(value, "year", "Punkte-Jahresziel-Jahr fehlt.");
+  requireNumber(value, "targetPointsTenths", "Punkte-Jahresziel-Wert fehlt.");
+  requireString(value, "updatedAt", "Punkte-Jahresziel-Zeitstempel fehlt.");
+}
+
 function validateTripFile(value: unknown): void {
   if (!isObject(value)) throw new Error("Nachweis ist ungültig.");
   requireString(value, "id", "Nachweis-ID fehlt.");
@@ -238,7 +271,7 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
       };
     })
   );
-  return { ...data, files, savedDestinations: data.savedDestinations ?? [], tripPayments: data.tripPayments ?? [] };
+  return { ...data, files, savedDestinations: data.savedDestinations ?? [], tripPayments: data.tripPayments ?? [], auditPointCases: data.auditPointCases ?? [], auditPointGoals: data.auditPointGoals ?? [] };
 }
 
 function backupFilePath(file: TripFile, index: number): string {
@@ -294,6 +327,10 @@ function requireString(value: Record<string, unknown>, key: string, message: str
 
 function requireOptionalString(value: Record<string, unknown>, key: string, message: string): void {
   if (value[key] !== undefined && typeof value[key] !== "string") throw new Error(message);
+}
+
+function requireNullableString(value: Record<string, unknown>, key: string, message: string): void {
+  if (value[key] !== null && typeof value[key] !== "string") throw new Error(message);
 }
 
 function requireNumber(value: Record<string, unknown>, key: string, message: string): void {

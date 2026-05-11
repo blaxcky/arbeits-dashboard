@@ -2,6 +2,8 @@ import Dexie, { type Table } from "dexie";
 import { currentYear } from "../lib/dates";
 import {
   DB_SCHEMA_VERSION,
+  type AuditPointCase,
+  type AuditPointGoal,
   type BackupData,
   type AppMeta,
   type FlexCorrection,
@@ -14,6 +16,7 @@ import {
   type VacationSummary,
   defaultSettings
 } from "./schema";
+import { calculateAuditPointBreakdown } from "../modules/points/calculations";
 
 class WorkDashboardDb extends Dexie {
   settings!: Table<Settings, string>;
@@ -25,6 +28,8 @@ class WorkDashboardDb extends Dexie {
   files!: Table<TripFile, string>;
   savedDestinations!: Table<SavedDestination, string>;
   tripPayments!: Table<TravelExpensePayment, string>;
+  auditPointCases!: Table<AuditPointCase, string>;
+  auditPointGoals!: Table<AuditPointGoal, string>;
 
   constructor() {
     super("arbeits-dashboard");
@@ -94,6 +99,19 @@ class WorkDashboardDb extends Dexie {
       files: "id, tripId, type, createdAt",
       savedDestinations: "id, name, updatedAt",
       tripPayments: "id, year, date"
+    });
+    this.version(7).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt",
+      tripPayments: "id, year, date",
+      auditPointCases: "id, submissionMonth, status, category",
+      auditPointGoals: "id, &year"
     });
   }
 }
@@ -284,6 +302,63 @@ export async function deleteTripPayment(id: string): Promise<void> {
   await db.tripPayments.delete(id);
 }
 
+export async function listAuditPointCases(): Promise<AuditPointCase[]> {
+  return db.auditPointCases.orderBy("submissionMonth").reverse().toArray();
+}
+
+export async function upsertAuditPointCase(input: Omit<AuditPointCase, "id" | "createdAt" | "updatedAt" | "submittedPointsTenths" | "submittedAt"> & { id?: string; submittedPointsTenths?: number | null; submittedAt?: string | null }): Promise<AuditPointCase> {
+  const existing = input.id ? await db.auditPointCases.get(input.id) : undefined;
+  const now = new Date().toISOString();
+  const statusChangedToCompleted = input.status === "completed" && existing?.status !== "completed";
+  const staysCompleted = input.status === "completed" && existing?.status === "completed";
+  const draft = {
+    id: input.id ?? crypto.randomUUID(),
+    name: input.name.trim(),
+    taxNumber: input.taxNumber.trim(),
+    firm: input.firm.trim(),
+    category: input.category,
+    periodStartYear: input.periodStartYear,
+    periodEndYear: input.periodEndYear,
+    additionalResultCents: Math.max(Math.round(input.additionalResultCents), 0),
+    section99: input.section99,
+    submissionMonth: input.submissionMonth,
+    status: input.status,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+  const submittedPointsTenths = statusChangedToCompleted
+    ? calculateAuditPointBreakdown(draft).totalTenths
+    : staysCompleted
+      ? existing.submittedPointsTenths
+      : input.submittedPointsTenths ?? null;
+  const pointCase: AuditPointCase = {
+    ...draft,
+    submittedPointsTenths,
+    submittedAt: input.status === "completed" ? (statusChangedToCompleted ? now : existing?.submittedAt ?? input.submittedAt ?? now) : null
+  };
+  await db.auditPointCases.put(pointCase);
+  return pointCase;
+}
+
+export async function deleteAuditPointCase(id: string): Promise<void> {
+  await db.auditPointCases.delete(id);
+}
+
+export async function listAuditPointGoals(): Promise<AuditPointGoal[]> {
+  return db.auditPointGoals.orderBy("year").reverse().toArray();
+}
+
+export async function upsertAuditPointGoal(input: Omit<AuditPointGoal, "id" | "updatedAt"> & { id?: string }): Promise<AuditPointGoal> {
+  const goal: AuditPointGoal = {
+    id: input.id ?? `goal-${input.year}`,
+    year: input.year,
+    targetPointsTenths: Math.max(Math.round(input.targetPointsTenths), 0),
+    updatedAt: new Date().toISOString()
+  };
+  await db.auditPointGoals.put(goal);
+  return goal;
+}
+
 export async function readAllData(): Promise<BackupData> {
   await ensureDefaults();
   return {
@@ -295,14 +370,16 @@ export async function readAllData(): Promise<BackupData> {
     trips: await db.trips.toArray(),
     tripPayments: await db.tripPayments.toArray(),
     savedDestinations: await db.savedDestinations.toArray(),
+    auditPointCases: await db.auditPointCases.toArray(),
+    auditPointGoals: await db.auditPointGoals.toArray(),
     todos: [],
     files: await db.files.toArray()
   };
 }
 
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear()]);
     if (data.settings) await db.settings.put(data.settings);
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
@@ -312,13 +389,15 @@ export async function replaceAllData(data: BackupData): Promise<void> {
     await db.files.bulkPut(data.files);
     await db.savedDestinations.bulkPut(data.savedDestinations ?? []);
     await db.tripPayments.bulkPut((data.tripPayments ?? []).map(normalizeTripPayment));
+    await db.auditPointCases.bulkPut((data.auditPointCases ?? []).map(normalizeAuditPointCase));
+    await db.auditPointGoals.bulkPut((data.auditPointGoals ?? []).map(normalizeAuditPointGoal));
   });
   await ensureDefaults();
 }
 
 export async function deleteAllLocalData(): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear()]);
   });
 }
 
@@ -344,5 +423,26 @@ function normalizeTripPayment(payment: TravelExpensePayment): TravelExpensePayme
     note: payment.note ?? "",
     createdAt: payment.createdAt,
     updatedAt: payment.updatedAt
+  };
+}
+
+function normalizeAuditPointCase(pointCase: AuditPointCase): AuditPointCase {
+  return {
+    ...pointCase,
+    name: pointCase.name ?? "",
+    taxNumber: pointCase.taxNumber ?? "",
+    firm: pointCase.firm ?? "",
+    additionalResultCents: Math.max(Math.round(pointCase.additionalResultCents), 0),
+    section99: Boolean(pointCase.section99),
+    submittedPointsTenths: pointCase.submittedPointsTenths ?? null,
+    submittedAt: pointCase.submittedAt ?? null
+  };
+}
+
+function normalizeAuditPointGoal(goal: AuditPointGoal): AuditPointGoal {
+  return {
+    ...goal,
+    id: goal.id || `goal-${goal.year}`,
+    targetPointsTenths: Math.max(Math.round(goal.targetPointsTenths), 0)
   };
 }
