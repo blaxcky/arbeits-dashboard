@@ -1390,6 +1390,14 @@ button:disabled {
   margin-top: 0;
 }
 
+.open-trip-empty {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: #fbfcfd;
+}
+
 .open-trip-card,
 .destination-row {
   display: grid;
@@ -1398,9 +1406,19 @@ button:disabled {
   padding-top: 14px;
 }
 
+.open-trips-worklist .open-trip-card {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.open-trip-active-heading {
+  border-bottom: 1px solid #eef1f5;
+  padding-bottom: 12px;
+}
+
 .copy-field-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1415,6 +1433,11 @@ button:disabled {
   background: #fbfcfd;
 }
 
+.copy-field-grid > .copy-field-wide {
+  grid-column: 1 / -1;
+  align-items: start;
+}
+
 .copy-field-grid span {
   color: var(--muted);
   font-size: 0.75rem;
@@ -1422,9 +1445,23 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.copy-field-grid strong {
+.copy-field-grid strong,
+.copy-field-grid textarea {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.copy-field-grid textarea {
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .copy-field-grid .icon-button {
@@ -1437,6 +1474,16 @@ button:disabled {
 
 .copy-field-missing {
   opacity: 0.68;
+}
+
+@media (max-width: 720px) {
+  .copy-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-field-grid > .copy-field-wide {
+    grid-column: auto;
+  }
 }
 
 .destination-picker {

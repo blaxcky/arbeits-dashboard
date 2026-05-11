@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../db/schema";
-import { automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, stripTripMeta, tripToForm, tripYearOptions, yearFromUrlParam } from "./App";
+import { automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, yearFromUrlParam } from "./App";
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -62,9 +62,34 @@ describe("trip copy fields", () => {
     expect(fields.find((field) => field.label === "Beschreibung")).toMatchObject({ value: "Fahrt Oeffis", ready: true });
     expect(fields.find((field) => field.label === "Bemerkungen")).toMatchObject({
       value: "Fahrt wurde mit oeffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien Kilometer lt. Google Maps",
-      ready: true
+      ready: true,
+      layout: "wide"
     });
     expect(fields.find((field) => field.label === "Anzahl")).toMatchObject({ value: "60", ready: true });
+  });
+
+  it("adds kilometer allowance copy fields with the exact remark", () => {
+    const fields = openTripFields({ ...baseTrip, transportType: "kilometergeld", oneWayKilometers: 60.25 });
+    expect(fields.find((field) => field.label === "Beschreibung")).toMatchObject({ value: "Kilometergeld", ready: true });
+    expect(fields.find((field) => field.label === "Bemerkungen")).toMatchObject({
+      value: "Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet",
+      ready: true,
+      layout: "wide"
+    });
+    expect(fields.find((field) => field.label === "Anzahl")).toMatchObject({ value: "120,5", ready: true, unit: "km" });
+  });
+
+  it("sorts open trips by date, start time, creation time, and id", () => {
+    const trips: Trip[] = [
+      { ...baseTrip, id: "done", date: "2026-05-01", startTime: "07:00", done: true },
+      { ...baseTrip, id: "third", date: "2026-05-08", startTime: "07:00", createdAt: "2026-05-01T08:00:00.000Z" },
+      { ...baseTrip, id: "first", date: "2026-05-07", startTime: "09:00", createdAt: "2026-05-01T09:00:00.000Z" },
+      { ...baseTrip, id: "second", date: "2026-05-07", startTime: "10:00", createdAt: "2026-05-01T07:00:00.000Z" },
+      { ...baseTrip, id: "tie-b", date: "2026-05-08", startTime: "07:00", createdAt: "2026-05-01T08:00:00.000Z" },
+      { ...baseTrip, id: "tie-a", date: "2026-05-08", startTime: "07:00", createdAt: "2026-05-01T08:00:00.000Z" }
+    ];
+
+    expect(sortedOpenTrips(trips).map((trip) => trip.id)).toEqual(["first", "second", "third", "tie-a", "tie-b"]);
   });
 
   it("loads the non-reimbursed checkbox state from saved trips", () => {

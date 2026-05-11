@@ -71,6 +71,13 @@ const navItems = [
 
 const DEFAULT_TRIP_ORIGIN = "Finanzamt Österreich - Dienststelle Bruck Eisenstadt Oberwart, Neusiedler Str. 46, 7001 Eisenstadt";
 type Toast = { id: string; text: string };
+type OpenTripField = {
+  label: string;
+  value: string;
+  ready: boolean;
+  layout: "short" | "wide";
+  unit?: string;
+};
 
 export function App() {
   const data = useWorkData();
@@ -1532,6 +1539,9 @@ function OpenTripsDialog({ trips, showToast, onClose, onDone }: { trips: Trip[];
 }
 
 function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showToast: ShowToast; onDone: (trip: Trip) => Promise<unknown> }) {
+  const openTrips = sortedOpenTrips(trips);
+  const activeTrip = openTrips[0];
+
   async function copyValue(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -1543,37 +1553,37 @@ function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showTo
 
   return (
     <div className="open-trips-worklist">
-      <div className="open-trip-list">
-        {trips.length === 0 ? <p className="muted">Keine offenen Reisekosten vorhanden.</p> : null}
-        {trips.map((trip) => {
-          const fields = openTripFields(trip);
-          return (
-            <article key={trip.id} className={`open-trip-card ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`}>
-              <div className="panel-heading">
-                <div>
-                  <strong>{formatDateKey(trip.date)} · {trip.reason || "Ohne Grund"}</strong>
-                  <span className="trip-badges">{isTripIncomplete(trip) ? <em>Unvollständig</em> : null}<em>Offen</em></span>
-                </div>
-                <strong>{formatEuroCents(calculateTripTotalCents(trip))}</strong>
+      {!activeTrip ? <p className="open-trip-empty muted">Keine offenen Reisekosten vorhanden.</p> : null}
+      {activeTrip ? (
+        <article className={`open-trip-card ${isTripIncomplete(activeTrip) ? "trip-row-incomplete" : ""}`}>
+          <div className="panel-heading open-trip-active-heading">
+            <div>
+              <span className="section-label">1 von {openTrips.length} offen</span>
+              <strong>{formatDateKey(activeTrip.date)} · {activeTrip.reason || "Ohne Grund"}</strong>
+              <span className="trip-badges">{isTripIncomplete(activeTrip) ? <em>Unvollständig</em> : null}<em>Offen</em></span>
+            </div>
+            <strong>{formatEuroCents(calculateTripTotalCents(activeTrip))}</strong>
+          </div>
+          <div className="copy-field-grid">
+            {openTripFields(activeTrip).map((field) => (
+              <div key={field.label} className={`${field.ready ? "" : "copy-field-missing"} copy-field-${field.layout}`}>
+                <span>{field.label}{field.unit ? ` · ${field.unit}` : ""}</span>
+                {field.layout === "wide" ? (
+                  <textarea value={field.value || "Nicht kopierfertig"} readOnly rows={3} aria-label={field.label} />
+                ) : (
+                  <strong>{field.value || "Nicht kopierfertig"}</strong>
+                )}
+                <button className="icon-button" type="button" title={`${field.label} kopieren`} aria-label={`${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value)}>
+                  <Copy size={16} />
+                </button>
               </div>
-              <div className="copy-field-grid">
-                {fields.map((field) => (
-                  <div key={field.label} className={field.ready ? "" : "copy-field-missing"}>
-                    <span>{field.label}</span>
-                    <strong>{field.value || "Nicht kopierfertig"}</strong>
-                    <button className="icon-button" type="button" title={`${field.label} kopieren`} aria-label={`${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value)}>
-                      <Copy size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button className="secondary-button" type="button" onClick={() => void onDone(trip)}>
-                <CheckCircle size={17} /> Als erledigt markieren
-              </button>
-            </article>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+          <button className="secondary-button" type="button" onClick={() => void onDone(activeTrip)}>
+            <CheckCircle size={17} /> Als erledigt markieren
+          </button>
+        </article>
+      ) : null}
     </div>
   );
 }
@@ -2144,19 +2154,38 @@ export function formatTripCopyDateTime(trip: Pick<Trip, "date" | "startTime" | "
   return time && year && month && day ? `${day}.${month}.${year}, ${time}` : "";
 }
 
-export function openTripFields(trip: Trip): Array<{ label: string; value: string; ready: boolean }> {
+export function sortedOpenTrips(trips: Trip[]): Trip[] {
+  return trips
+    .filter((trip) => !trip.done)
+    .sort((a, b) => (
+      a.date.localeCompare(b.date)
+      || (a.startTime ?? "").localeCompare(b.startTime ?? "")
+      || a.createdAt.localeCompare(b.createdAt)
+      || a.id.localeCompare(b.id)
+    ));
+}
+
+export function openTripFields(trip: Trip): OpenTripField[] {
   const isPublicTransport = trip.transportType === "oeffi-zuschuss";
-  const fields = [
-    { label: "Zeit von", value: formatTripCopyDateTime(trip, "startTime"), ready: Boolean(trip.startTime) },
-    { label: "Zeit bis", value: formatTripCopyDateTime(trip, "endTime"), ready: Boolean(trip.endTime) },
-    { label: "Grund", value: trip.reason, ready: Boolean(trip.reason.trim()) },
-    { label: "Gemeindekennzahl", value: trip.municipalityCode ?? "", ready: Boolean(trip.municipalityCode?.trim()) }
+  const isKilometerAllowance = trip.transportType === "kilometergeld";
+  const fields: OpenTripField[] = [
+    { label: "Zeit von", value: formatTripCopyDateTime(trip, "startTime"), ready: Boolean(trip.startTime), layout: "short" },
+    { label: "Zeit bis", value: formatTripCopyDateTime(trip, "endTime"), ready: Boolean(trip.endTime), layout: "short" },
+    { label: "Grund", value: trip.reason, ready: Boolean(trip.reason.trim()), layout: "short" },
+    { label: "Gemeindekennzahl", value: trip.municipalityCode ?? "", ready: Boolean(trip.municipalityCode?.trim()), layout: "short" }
   ];
   if (isPublicTransport) {
     fields.push(
-      { label: "Beschreibung", value: "Fahrt Oeffis", ready: true },
-      { label: "Bemerkungen", value: `Fahrt wurde mit oeffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()) },
-      { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0 }
+      { label: "Beschreibung", value: "Fahrt Oeffis", ready: true, layout: "short" },
+      { label: "Bemerkungen", value: `Fahrt wurde mit oeffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()), layout: "wide" },
+      { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }
+    );
+  }
+  if (isKilometerAllowance) {
+    fields.push(
+      { label: "Beschreibung", value: "Kilometergeld", ready: true, layout: "short" },
+      { label: "Bemerkungen", value: "Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet", ready: true, layout: "wide" },
+      { label: "Anzahl", value: (trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }
     );
   }
   return fields;
