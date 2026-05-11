@@ -80,10 +80,16 @@ describe("audit point helpers", () => {
     expect(validateAuditPointCaseForm({ ...baseForm, additionalResultEuros: "125000.50" })).toMatchObject({ valid: true, additionalResultCents: 12500050 });
   });
 
+  it("accepts an empty audit point submission month", () => {
+    expect(validateAuditPointCaseForm({ ...baseForm, submissionMonth: "" })).toMatchObject({ valid: true });
+  });
+
   it("rejects invalid years, categories and amounts", () => {
     expect(validateAuditPointCaseForm({ ...baseForm, periodEndYear: "2019" }).valid).toBe(false);
     expect(validateAuditPointCaseForm({ ...baseForm, category: "X1" as "M1" }).valid).toBe(false);
     expect(validateAuditPointCaseForm({ ...baseForm, additionalResultEuros: "12,345" }).valid).toBe(false);
+    expect(validateAuditPointCaseForm({ ...baseForm, submissionMonth: "2026-13" }).valid).toBe(false);
+    expect(validateAuditPointCaseForm({ ...baseForm, submissionMonth: "Mai 2026" }).valid).toBe(false);
   });
 
   it("summarizes audit points by submission month", () => {
@@ -94,9 +100,12 @@ describe("audit point helpers", () => {
     expect(summary.additionalResultCents).toBe(12500050);
   });
 
-  it("keeps selected and existing months available", () => {
-    expect(auditPointMonthOptions([{ submissionMonth: "2026-04" }], "2026-05")).toContain("2026-04");
-    expect(auditPointMonthOptions([{ submissionMonth: "2026-04" }], "2026-05")).toContain("2026-05");
+  it("keeps selected and existing months available without blank entries", () => {
+    const options = auditPointMonthOptions([{ submissionMonth: "2026-04" }, { submissionMonth: "" }], "2026-05");
+
+    expect(options).toContain("2026-04");
+    expect(options).toContain("2026-05");
+    expect(options).not.toContain("");
   });
 });
 

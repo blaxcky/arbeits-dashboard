@@ -80,4 +80,11 @@ describe("audit point calculations", () => {
     expect(summary.pointsTenths).toBe(80);
     expect(summary.progressRatio).toBe(0.4);
   });
+
+  it("ignores cases without submission month in month and year summaries", () => {
+    const unsubmittedCase = { ...baseCase, id: "case-2", submissionMonth: "", status: "completed" as const, submittedPointsTenths: 120 };
+
+    expect(summarizeAuditPoints([baseCase, unsubmittedCase], 2026).count).toBe(1);
+    expect(summarizeAuditPoints([unsubmittedCase], 2026, "2026-05").pointsTenths).toBe(0);
+  });
 });

@@ -716,6 +716,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
   const yearSummary = summarizeAuditPoints(data.auditPointCases, selectedYear, null, data.auditPointGoals);
   const monthSummary = summarizeAuditPoints(data.auditPointCases, selectedYear, selectedMonth, data.auditPointGoals);
   const selectedMonthCases = data.auditPointCases.filter((pointCase) => pointCase.submissionMonth === selectedMonth);
+  const unsubmittedCases = data.auditPointCases.filter((pointCase) => pointCase.submissionMonth === "");
 
   useEffect(() => {
     setGoalInput(currentGoal ? formatPointInput(currentGoal.targetPointsTenths) : "");
@@ -879,7 +880,34 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
               <div>
                 <strong>{pointCase.name} · {pointCase.taxNumber}</strong>
                 <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
-                <span className="trip-badges"><em>{pointCase.status === "completed" ? "Erledigt" : "Offen"}</em>{pointCase.status === "completed" && pointCase.submittedPointsTenths !== null ? <em>fixiert</em> : null}</span>
+                <span className="trip-badges"><em>{pointCase.status === "completed" ? "Erledigt" : "Offen"}</em>{pointCase.submissionMonth === "" ? <em>ohne Abgabemonat</em> : null}{pointCase.status === "completed" && pointCase.submittedPointsTenths !== null ? <em>fixiert</em> : null}</span>
+              </div>
+              <div className="trip-row-metrics">
+                <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
+                <span>{formatEuroCents(pointCase.additionalResultCents)}</span>
+                <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
+              </div>
+              <div className="trip-actions">
+                <button className="secondary-button" type="button" onClick={() => editCase(pointCase)}>Bearbeiten</button>
+                <button className="danger-button" type="button" onClick={() => void removeCase(pointCase)}>Löschen</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel-heading">
+          <span className="section-label">Fälle ohne Abgabemonat</span>
+          <strong>{unsubmittedCases.length}</strong>
+        </div>
+        <div className="trip-list">
+          {unsubmittedCases.length === 0 ? <p className="muted">Keine Fälle ohne Abgabemonat erfasst.</p> : null}
+          {unsubmittedCases.map((pointCase) => (
+            <article key={pointCase.id} className={`trip-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
+              <div>
+                <strong>{pointCase.name} · {pointCase.taxNumber}</strong>
+                <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
+                <span className="trip-badges"><em>ohne Abgabemonat</em><em>{pointCase.status === "completed" ? "Erledigt" : "Offen"}</em>{pointCase.status === "completed" && pointCase.submittedPointsTenths !== null ? <em>fixiert</em> : null}</span>
               </div>
               <div className="trip-row-metrics">
                 <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
@@ -2374,7 +2402,7 @@ export function validateAuditPointCaseForm(form: AuditPointCaseForm):
   if (!Number.isInteger(periodEndYear) || periodEndYear < 1900 || periodEndYear > 2200) errors.periodEndYear = "Bitte ein gültiges Jahr eingeben.";
   if (Number.isInteger(periodStartYear) && Number.isInteger(periodEndYear) && periodEndYear < periodStartYear) errors.periodEndYear = "Bis-Jahr darf nicht vor Von-Jahr liegen.";
   if (additionalResultCents === null) errors.additionalResultEuros = "Bitte einen Betrag mit maximal zwei Dezimalstellen eingeben.";
-  if (!/^\d{4}-\d{2}$/.test(form.submissionMonth)) errors.submissionMonth = "Bitte einen gültigen Abgabemonat wählen.";
+  if (form.submissionMonth !== "" && !isValidAuditPointMonth(form.submissionMonth)) errors.submissionMonth = "Bitte einen gültigen Abgabemonat wählen.";
 
   if (Object.keys(errors).length > 0 || !isAuditPointCategory(category) || additionalResultCents === null) {
     return { valid: false, errors };
@@ -2384,7 +2412,7 @@ export function validateAuditPointCaseForm(form: AuditPointCaseForm):
 }
 
 function auditPointCaseDraftForPreview(form: AuditPointCaseForm): Pick<AuditPointCase, "category" | "periodStartYear" | "periodEndYear" | "additionalResultCents" | "section99"> | null {
-  const validation = validateAuditPointCaseForm({ ...form, name: form.name || "x", taxNumber: form.taxNumber || "x", submissionMonth: form.submissionMonth || todayKey().slice(0, 7) });
+  const validation = validateAuditPointCaseForm({ ...form, name: form.name || "x", taxNumber: form.taxNumber || "x" });
   if (!validation.valid) return null;
   return {
     category: validation.category,
@@ -2395,8 +2423,12 @@ function auditPointCaseDraftForPreview(form: AuditPointCaseForm): Pick<AuditPoin
   };
 }
 
+function isValidAuditPointMonth(value: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
 export function auditPointMonthOptions(cases: Pick<AuditPointCase, "submissionMonth">[], selectedMonth: string): string[] {
-  return [...new Set([selectedMonth, todayKey().slice(0, 7), ...cases.map((pointCase) => pointCase.submissionMonth)])].sort((a, b) => b.localeCompare(a));
+  return [...new Set([selectedMonth, todayKey().slice(0, 7), ...cases.map((pointCase) => pointCase.submissionMonth)].filter(isValidAuditPointMonth))].sort((a, b) => b.localeCompare(a));
 }
 
 function formatPointTenths(tenths: number): string {
