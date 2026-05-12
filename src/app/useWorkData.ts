@@ -3,6 +3,7 @@ import {
   addFlexCorrection,
   addTripFile,
   deleteAuditPointCase,
+  deleteUsoCase,
   deleteSavedDestination,
   deleteAllLocalData,
   deleteFlexCorrection,
@@ -15,6 +16,8 @@ import {
   listFlexCorrections,
   listAuditPointCases,
   listAuditPointGoals,
+  listUsoCases,
+  listUsoGoals,
   listTripFiles,
   listSavedDestinations,
   listTimeEntries,
@@ -23,12 +26,14 @@ import {
   updateSettings,
   upsertAuditPointCase,
   upsertAuditPointGoal,
+  upsertUsoCase,
+  upsertUsoGoal,
   upsertTimeEntry,
   upsertTrip,
   upsertTripPayment,
   upsertSavedDestination
 } from "../db/database";
-import type { AuditPointCase, AuditPointGoal, FlexCorrection, SavedDestination, Settings, TimeEntry, Trip, TripFile, TravelExpensePayment } from "../db/schema";
+import type { AuditPointCase, AuditPointGoal, FlexCorrection, SavedDestination, Settings, TimeEntry, Trip, TripFile, UsoCase, UsoGoal, TravelExpensePayment } from "../db/schema";
 import { todayKey } from "../lib/dates";
 
 export interface WorkDataState {
@@ -41,6 +46,8 @@ export interface WorkDataState {
   tripPayments: TravelExpensePayment[];
   auditPointCases: AuditPointCase[];
   auditPointGoals: AuditPointGoal[];
+  usoCases: UsoCase[];
+  usoGoals: UsoGoal[];
   files: TripFile[];
   savedDestinations: SavedDestination[];
 }
@@ -56,6 +63,8 @@ export function useWorkData() {
     tripPayments: [],
     auditPointCases: [],
     auditPointGoals: [],
+    usoCases: [],
+    usoGoals: [],
     files: [],
     savedDestinations: []
   });
@@ -64,8 +73,8 @@ export function useWorkData() {
   const refresh = useCallback(async () => {
     try {
       const settings = await ensureDefaults();
-      const [timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, files, savedDestinations] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripPayments(), listAuditPointCases(), listAuditPointGoals(), listTripFiles(), listSavedDestinations()]);
-      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, files, savedDestinations });
+      const [timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, files, savedDestinations] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripPayments(), listAuditPointCases(), listAuditPointGoals(), listUsoCases(), listUsoGoals(), listTripFiles(), listSavedDestinations()]);
+      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, files, savedDestinations });
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Daten konnten nicht geladen werden." }));
     }
@@ -136,6 +145,18 @@ export function useWorkData() {
     },
     saveAuditPointGoal: async (input: Omit<AuditPointGoal, "id" | "updatedAt"> & { id?: string }) => {
       await upsertAuditPointGoal(input);
+      await refresh();
+    },
+    saveUsoCase: async (input: Omit<UsoCase, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
+      await upsertUsoCase(input);
+      await refresh();
+    },
+    removeUsoCase: async (id: string) => {
+      await deleteUsoCase(id);
+      await refresh();
+    },
+    saveUsoGoal: async (input: Omit<UsoGoal, "id" | "updatedAt"> & { id?: string }) => {
+      await upsertUsoGoal(input);
       await refresh();
     },
     saveTripFile: async (input: Omit<TripFile, "id" | "createdAt">) => {

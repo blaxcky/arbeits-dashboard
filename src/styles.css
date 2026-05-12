@@ -827,6 +827,74 @@ button:disabled {
   text-align: right;
 }
 
+.points-year-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 18px;
+}
+
+.points-year-summary div {
+  min-width: 0;
+}
+
+.points-goal-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.points-goal-form .field {
+  min-width: 150px;
+}
+
+.points-year-table-wrap {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+
+.points-year-table {
+  width: 100%;
+  min-width: 580px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.points-year-table th,
+.points-year-table td {
+  border: 1px solid #e5ebf2;
+  padding: 9px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.points-year-table thead th {
+  background: #f4f7fa;
+  color: #56657a;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.points-year-table th:first-child,
+.points-year-table td:first-child {
+  text-align: left;
+}
+
+.points-year-table tbody th {
+  color: #334155;
+  font-weight: 900;
+}
+
+.points-year-ok {
+  color: #16734d;
+  font-weight: 900;
+}
+
+.points-uso-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .trip-payment-box {
   display: grid;
   gap: 14px;
@@ -1876,6 +1944,7 @@ button:disabled {
   .trip-form-section,
   .trip-form-grid,
   .trip-payment-form,
+  .points-year-summary,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -1936,6 +2005,14 @@ button:disabled {
 
   .trip-row-metrics {
     text-align: left;
+  }
+
+  .points-goal-form {
+    justify-content: flex-start;
+  }
+
+  .points-uso-row {
+    grid-template-columns: 1fr;
   }
 
   .trip-evidence-item {

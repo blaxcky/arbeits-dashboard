@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Trip } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
+import type { Trip, UsoCase } from "../db/schema";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase } from "../db/schema";
 
@@ -106,6 +106,12 @@ describe("audit point helpers", () => {
     expect(options).toContain("2026-04");
     expect(options).toContain("2026-05");
     expect(options).not.toContain("");
+  });
+
+  it("builds point year options from BP and USO submission months", () => {
+    const usoCase: Pick<UsoCase, "submissionMonth"> = { submissionMonth: "2024-12" };
+
+    expect(pointYearOptions([baseCase], [usoCase], 2026, 2027)).toEqual([2027, 2026, 2024]);
   });
 });
 

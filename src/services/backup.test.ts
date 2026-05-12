@@ -84,6 +84,24 @@ function backupData(): BackupData {
         updatedAt: "2026-05-10T08:00:00.000Z"
       }
     ],
+    usoCases: [
+      {
+        id: "uso-1",
+        title: "USO Muster",
+        submissionMonth: "2026-05",
+        status: "completed",
+        createdAt: "2026-05-10T08:00:00.000Z",
+        updatedAt: "2026-05-10T08:00:00.000Z"
+      }
+    ],
+    usoGoals: [
+      {
+        id: "uso-goal-2026",
+        year: 2026,
+        targetCount: 8,
+        updatedAt: "2026-05-10T08:00:00.000Z"
+      }
+    ],
     savedDestinations: [],
     todos: [],
     files: [
@@ -167,6 +185,20 @@ describe("backup service", () => {
     expect(data.auditPointGoals).toHaveLength(1);
   });
 
+  it("exports USO cases and goals in the backup counts and data", async () => {
+    dbMocks.readAllData.mockResolvedValue(backupData());
+
+    const blob = await exportBackup();
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { usoCases: number; usoGoals: number } };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { usoCases: unknown[]; usoGoals: unknown[] };
+
+    expect(manifest.counts.usoCases).toBe(1);
+    expect(manifest.counts.usoGoals).toBe(1);
+    expect(data.usoCases).toHaveLength(1);
+    expect(data.usoGoals).toHaveLength(1);
+  });
+
   it("imports new backups and restores TripFile dataUrl for IndexedDB", async () => {
     const data = backupData();
     const { dataUrl: _dataUrl, ...fileMetadata } = data.files[0];
@@ -210,6 +242,14 @@ describe("backup service", () => {
     await importBackup(await makeZip(oldData, "1.4.0"));
 
     expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, auditPointCases: [], auditPointGoals: [] });
+  });
+
+  it("normalizes old backups without USO data to empty lists", async () => {
+    const { usoCases: _usoCases, usoGoals: _usoGoals, ...oldData } = backupData();
+
+    await importBackup(await makeZip(oldData, "1.5.0"));
+
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, usoCases: [], usoGoals: [] });
   });
 
   it("rejects new backups when the referenced evidence file is missing", async () => {

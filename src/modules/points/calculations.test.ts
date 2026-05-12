@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { AuditPointCase } from "../../db/schema";
+import type { AuditPointCase, UsoCase } from "../../db/schema";
 import {
   ADDITIONAL_RESULT_BONUSES,
   AUDIT_POINT_CATEGORY_RULES,
+  DEFAULT_USO_TARGET_COUNT,
+  buildAuditPointYearRows,
+  buildUsoYearRows,
   calculateAdditionalResultBonusTenths,
   calculateAuditPointBreakdown,
   cappedAuditPeriodYears,
@@ -24,6 +27,15 @@ const baseCase: AuditPointCase = {
   status: "in_progress",
   submittedPointsTenths: null,
   submittedAt: null,
+  createdAt: "2026-05-01T08:00:00.000Z",
+  updatedAt: "2026-05-01T08:00:00.000Z"
+};
+
+const baseUsoCase: UsoCase = {
+  id: "uso-1",
+  title: "USO Muster",
+  submissionMonth: "2026-05",
+  status: "completed",
   createdAt: "2026-05-01T08:00:00.000Z",
   updatedAt: "2026-05-01T08:00:00.000Z"
 };
@@ -120,5 +132,37 @@ describe("audit point calculations", () => {
 
     expect(summarizeAuditPoints([baseCase, unsubmittedCase], 2026).count).toBe(1);
     expect(summarizeAuditPoints([unsubmittedCase], 2026, "2026-05").pointsTenths).toBe(0);
+  });
+
+  it("builds BP yearly rows from completed fixed values only", () => {
+    const rows = buildAuditPointYearRows([
+      { ...baseCase, status: "completed", submittedPointsTenths: 60, submissionMonth: "2026-01" },
+      { ...baseCase, id: "case-2", status: "in_progress", submittedPointsTenths: null, submissionMonth: "2026-01" },
+      { ...baseCase, id: "case-3", status: "completed", submittedPointsTenths: 40, submissionMonth: "2026-02" }
+    ], 2026, [{ id: "goal-2026", year: 2026, targetPointsTenths: 120, updatedAt: "2026-05-01T08:00:00.000Z" }]);
+
+    expect(rows[0]).toMatchObject({ submissionValue: 60, openValue: calculateAuditPointBreakdown(baseCase).totalTenths, targetValue: 10, cumulativeValue: 60, remainingValue: 0, targetReached: true });
+    expect(rows[1]).toMatchObject({ submissionValue: 40, targetValue: 20, cumulativeValue: 100, remainingValue: 0, targetReached: true });
+    expect(rows[11]).toMatchObject({ targetValue: 120, cumulativeValue: 100, remainingValue: 20, targetReached: false });
+  });
+
+  it("builds USO yearly rows with one completed case as one count and default target eight", () => {
+    const rows = buildUsoYearRows([
+      baseUsoCase,
+      { ...baseUsoCase, id: "uso-2", status: "in_progress", submissionMonth: "2026-05" },
+      { ...baseUsoCase, id: "uso-3", status: "completed", submissionMonth: "2026-06" }
+    ], 2026);
+
+    expect(DEFAULT_USO_TARGET_COUNT).toBe(8);
+    expect(rows[4]).toMatchObject({ submissionValue: 1, openValue: 1, cumulativeValue: 1, targetValue: 4, remainingValue: 3, targetReached: false });
+    expect(rows[5]).toMatchObject({ submissionValue: 1, openValue: 0, cumulativeValue: 2, targetValue: 4, remainingValue: 2, targetReached: false });
+    expect(rows[11]).toMatchObject({ targetValue: 8, cumulativeValue: 2, remainingValue: 6 });
+  });
+
+  it("uses saved USO targets for yearly rows", () => {
+    const rows = buildUsoYearRows([baseUsoCase], 2026, [{ id: "uso-goal-2026", year: 2026, targetCount: 12, updatedAt: "2026-05-01T08:00:00.000Z" }]);
+
+    expect(rows[0].targetValue).toBe(1);
+    expect(rows[11].targetValue).toBe(12);
   });
 });

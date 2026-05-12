@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.5.0";
-export const DB_SCHEMA_VERSION = 7;
+export const BACKUP_SCHEMA_VERSION = "1.6.0";
+export const DB_SCHEMA_VERSION = 8;
 
 export interface Settings {
   id: "main";
@@ -139,6 +139,24 @@ export interface AuditPointGoal {
   updatedAt: string;
 }
 
+export type UsoCaseStatus = "in_progress" | "completed";
+
+export interface UsoCase {
+  id: string;
+  title: string;
+  submissionMonth: string;
+  status: UsoCaseStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UsoGoal {
+  id: string;
+  year: number;
+  targetCount: number;
+  updatedAt: string;
+}
+
 export interface BackupManifest {
   appName: typeof APP_NAME;
   schemaVersion: string;
@@ -157,6 +175,8 @@ export interface BackupData {
   savedDestinations: SavedDestination[];
   auditPointCases: AuditPointCase[];
   auditPointGoals: AuditPointGoal[];
+  usoCases: UsoCase[];
+  usoGoals: UsoGoal[];
   todos: unknown[];
   files: TripFile[];
 }

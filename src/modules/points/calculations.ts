@@ -1,4 +1,4 @@
-import type { AuditPointCase, AuditPointCategory, AuditPointGoal } from "../../db/schema";
+import type { AuditPointCase, AuditPointCategory, AuditPointGoal, UsoCase, UsoGoal } from "../../db/schema";
 
 export interface AuditPointCategoryRule {
   label: string;
@@ -26,6 +26,18 @@ export interface AuditPointSummary {
   targetPointsTenths: number | null;
   progressRatio: number | null;
 }
+
+export interface YearlyMonthlyRow {
+  month: string;
+  submissionValue: number;
+  openValue: number;
+  targetValue: number | null;
+  cumulativeValue: number;
+  remainingValue: number | null;
+  targetReached: boolean | null;
+}
+
+export const DEFAULT_USO_TARGET_COUNT = 8;
 
 export const AUDIT_POINT_CATEGORY_RULES: Record<AuditPointCategory, AuditPointCategoryRule> = {
   K3: { label: "K3", baseTenths: 30, yearlyTenths: 5 },
@@ -123,4 +135,55 @@ export function summarizeAuditPoints(cases: AuditPointCase[], year: number, mont
     ...summary,
     progressRatio: summary.targetPointsTenths && summary.targetPointsTenths > 0 ? summary.pointsTenths / summary.targetPointsTenths : null
   };
+}
+
+export function buildAuditPointYearRows(cases: AuditPointCase[], year: number, goals: AuditPointGoal[] = []): YearlyMonthlyRow[] {
+  const targetPointsTenths = goals.find((goal) => goal.year === year)?.targetPointsTenths ?? null;
+  return buildYearRows(year, targetPointsTenths, (month) => {
+    const monthlyCases = cases.filter((pointCase) => pointCase.submissionMonth === month);
+    return monthlyCases.reduce((current, pointCase) => {
+      const pointsTenths = pointsForAuditCase(pointCase);
+      if (pointCase.status === "completed") {
+        return { ...current, submissionValue: current.submissionValue + pointsTenths };
+      }
+      return { ...current, openValue: current.openValue + pointsTenths };
+    }, { submissionValue: 0, openValue: 0 });
+  });
+}
+
+export function usoTargetForYear(goals: UsoGoal[], year: number): number {
+  return goals.find((goal) => goal.year === year)?.targetCount ?? DEFAULT_USO_TARGET_COUNT;
+}
+
+export function buildUsoYearRows(cases: UsoCase[], year: number, goals: UsoGoal[] = []): YearlyMonthlyRow[] {
+  const targetCount = usoTargetForYear(goals, year);
+  return buildYearRows(year, targetCount, (month) => {
+    const monthlyCases = cases.filter((usoCase) => usoCase.submissionMonth === month);
+    return monthlyCases.reduce((current, usoCase) => {
+      if (usoCase.status === "completed") {
+        return { ...current, submissionValue: current.submissionValue + 1 };
+      }
+      return { ...current, openValue: current.openValue + 1 };
+    }, { submissionValue: 0, openValue: 0 });
+  });
+}
+
+function buildYearRows(year: number, targetValue: number | null, monthValue: (month: string) => { submissionValue: number; openValue: number }): YearlyMonthlyRow[] {
+  let cumulativeValue = 0;
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = `${year}-${String(index + 1).padStart(2, "0")}`;
+    const { submissionValue, openValue } = monthValue(month);
+    cumulativeValue += submissionValue;
+    const monthlyTarget = targetValue === null ? null : Math.ceil((targetValue * (index + 1)) / 12);
+    const remainingValue = monthlyTarget === null ? null : Math.max(monthlyTarget - cumulativeValue, 0);
+    return {
+      month,
+      submissionValue,
+      openValue,
+      targetValue: monthlyTarget,
+      cumulativeValue,
+      remainingValue,
+      targetReached: monthlyTarget === null ? null : cumulativeValue >= monthlyTarget
+    };
+  });
 }

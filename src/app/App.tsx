@@ -26,7 +26,7 @@ import {
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { AuditPointCase, AuditPointCategory, AuditPointStatus, SavedDestination, Settings, TimeEntry, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
+import type { AuditPointCase, AuditPointCategory, AuditPointStatus, SavedDestination, Settings, TimeEntry, UsoCase, UsoCaseStatus, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
@@ -63,9 +63,12 @@ import {
   AUDIT_POINT_CATEGORIES,
   AUDIT_POINT_CATEGORY_RULES,
   calculateAuditPointBreakdown,
+  buildAuditPointYearRows,
+  buildUsoYearRows,
   isAuditPointCategory,
   pointsForAuditCase,
-  summarizeAuditPoints
+  summarizeAuditPoints,
+  usoTargetForYear
 } from "../modules/points/calculations";
 import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
@@ -125,6 +128,12 @@ export function App() {
                     <span>Jahresübersicht</span>
                   </NavLink>
                 ) : null}
+                {item.to === "/punkte" ? (
+                  <NavLink to="/punkte/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
+                    <CalendarCheck size={15} weight="duotone" />
+                    <span>Jahresübersicht</span>
+                  </NavLink>
+                ) : null}
               </div>
             ))}
           </nav>
@@ -141,6 +150,8 @@ export function App() {
             <Route path="/reisekosten/jahr" element={<TripsYearView data={data} showToast={showToast} />} />
             <Route path="/reisekosten/jahr/:year" element={<TripsYearView data={data} showToast={showToast} />} />
             <Route path="/punkte" element={<AuditPointsView data={data} showToast={showToast} />} />
+            <Route path="/punkte/jahr" element={<PointsYearView data={data} showToast={showToast} />} />
+            <Route path="/punkte/jahr/:year" element={<PointsYearView data={data} showToast={showToast} />} />
             <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Fälligkeiten", "Prioritäten", "Tags", "Filter und Suche"]} />} />
             <Route path="/einstellungen" element={<SettingsView data={data} showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -951,6 +962,244 @@ function AuditPointBreakdownPreview({ breakdown }: { breakdown: ReturnType<typeo
         </dl>
       </div>
     </section>
+  );
+}
+
+function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
+  const navigate = useNavigate();
+  const params = useParams();
+  const year = yearFromUrlParam(params.year);
+  const yearOptions = pointYearOptions(data.auditPointCases, data.usoCases, currentYear(), year);
+  const auditRows = buildAuditPointYearRows(data.auditPointCases, year, data.auditPointGoals);
+  const usoRows = buildUsoYearRows(data.usoCases, year, data.usoGoals);
+  const auditGoal = data.auditPointGoals.find((goal) => goal.year === year);
+  const usoGoal = data.usoGoals.find((goal) => goal.year === year);
+  const auditCompleted = auditRows[auditRows.length - 1]?.cumulativeValue ?? 0;
+  const auditOpen = auditRows.reduce((sum, row) => sum + row.openValue, 0);
+  const usoCompleted = usoRows[usoRows.length - 1]?.cumulativeValue ?? 0;
+  const usoOpen = usoRows.reduce((sum, row) => sum + row.openValue, 0);
+  const [auditGoalInput, setAuditGoalInput] = useState("");
+  const [usoGoalInput, setUsoGoalInput] = useState("");
+  const [usoEditingId, setUsoEditingId] = useState<string | null>(null);
+  const [usoForm, setUsoForm] = useState(() => usoCaseToForm(undefined, `${year}-01`));
+  const [usoErrors, setUsoErrors] = useState<Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>>>({});
+  const yearUsoCases = data.usoCases.filter((usoCase) => usoCase.submissionMonth.startsWith(`${year}-`));
+
+  useEffect(() => {
+    setAuditGoalInput(auditGoal ? formatPointInput(auditGoal.targetPointsTenths) : "");
+  }, [auditGoal, year]);
+
+  useEffect(() => {
+    setUsoGoalInput(String(usoTargetForYear(data.usoGoals, year)));
+  }, [data.usoGoals, year]);
+
+  async function saveAuditGoal() {
+    const targetPointsTenths = parsePointTenthsInput(auditGoalInput);
+    if (targetPointsTenths === null) {
+      showToast("Bitte ein gültiges BP-Jahresziel eingeben.");
+      return;
+    }
+    await data.saveAuditPointGoal({ id: auditGoal?.id, year, targetPointsTenths });
+    showToast("BP-Jahresziel gespeichert.");
+  }
+
+  async function saveUsoGoal() {
+    const targetCount = parseUsoTargetInput(usoGoalInput);
+    if (targetCount === null) {
+      showToast("Bitte ein gültiges USO-Jahresziel eingeben.");
+      return;
+    }
+    await data.saveUsoGoal({ id: usoGoal?.id, year, targetCount });
+    showToast("USO-Jahresziel gespeichert.");
+  }
+
+  async function saveUsoCase() {
+    const validation = validateUsoCaseForm(usoForm);
+    setUsoErrors(validation.errors);
+    if (!validation.valid) {
+      showToast("Bitte die markierten USO-Felder prüfen.");
+      return;
+    }
+
+    await data.saveUsoCase({
+      id: usoEditingId ?? undefined,
+      title: usoForm.title.trim(),
+      submissionMonth: usoForm.submissionMonth,
+      status: usoForm.status
+    });
+    setUsoEditingId(null);
+    setUsoForm(usoCaseToForm(undefined, usoForm.submissionMonth));
+    showToast("USO-Fall gespeichert.");
+  }
+
+  function editUsoCase(usoCase: UsoCase) {
+    setUsoEditingId(usoCase.id);
+    setUsoForm(usoCaseToForm(usoCase));
+    setUsoErrors({});
+  }
+
+  async function removeUsoCase(usoCase: UsoCase) {
+    if (!window.confirm(`USO-Fall "${usoCase.title}" löschen?`)) return;
+    await data.removeUsoCase(usoCase.id);
+    if (usoEditingId === usoCase.id) {
+      setUsoEditingId(null);
+      setUsoForm(usoCaseToForm(undefined, `${year}-01`));
+    }
+    showToast("USO-Fall gelöscht.");
+  }
+
+  async function toggleUsoCase(usoCase: UsoCase) {
+    await data.saveUsoCase({
+      id: usoCase.id,
+      title: usoCase.title,
+      submissionMonth: usoCase.submissionMonth,
+      status: usoCase.status === "completed" ? "in_progress" : "completed"
+    });
+    showToast("USO-Status geändert.");
+  }
+
+  return (
+    <section className="page-stack">
+      <Header eyebrow="Punkte" title="Jahresübersicht" />
+      <div className="panel">
+        <div className="panel-heading year-overview-heading">
+          <span className="section-label">Jahreswerte {year}</span>
+          <label className="year-select">
+            <span>Jahr</span>
+            <select value={year} onChange={(event) => navigate(`/punkte/jahr/${event.target.value}`)}>
+              {yearOptions.map((optionYear) => (
+                <option key={optionYear} value={optionYear}>{optionYear}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <dl className="detail-list points-year-summary">
+          <div><dt>BP Ist</dt><dd>{formatPointTenths(auditCompleted)}</dd></div>
+          <div><dt>BP offen</dt><dd>{formatPointTenths(auditOpen)}</dd></div>
+          <div><dt>BP Jahresziel</dt><dd>{auditGoal ? formatPointTenths(auditGoal.targetPointsTenths) : "-"}</dd></div>
+          <div><dt>USO Ist</dt><dd>{usoCompleted}</dd></div>
+          <div><dt>USO offen</dt><dd>{usoOpen}</dd></div>
+          <div><dt>USO Jahresziel</dt><dd>{usoTargetForYear(data.usoGoals, year)}</dd></div>
+        </dl>
+      </div>
+      <div className="settings-grid">
+        <section className="panel">
+          <div className="panel-heading">
+            <span className="section-label">Betriebsprüfungen</span>
+            <div className="points-goal-form">
+              <Field label="Jahresziel BP">
+                <input inputMode="decimal" placeholder="0" value={auditGoalInput} onChange={(event) => setAuditGoalInput(event.target.value)} />
+              </Field>
+              <button className="secondary-button" type="button" onClick={() => void saveAuditGoal()}>
+                <Plus size={17} /> Ziel speichern
+              </button>
+            </div>
+          </div>
+          <PointsYearTable rows={auditRows} valueFormatter={formatPointTenths} />
+        </section>
+        <section className="panel">
+          <div className="panel-heading">
+            <span className="section-label">USO</span>
+            <div className="points-goal-form">
+              <Field label="Jahresziel USO">
+                <input inputMode="numeric" placeholder="8" value={usoGoalInput} onChange={(event) => setUsoGoalInput(event.target.value)} />
+              </Field>
+              <button className="secondary-button" type="button" onClick={() => void saveUsoGoal()}>
+                <Plus size={17} /> Ziel speichern
+              </button>
+            </div>
+          </div>
+          <PointsYearTable rows={usoRows} valueFormatter={(value) => String(value)} />
+        </section>
+      </div>
+      <div className="settings-grid">
+        <section className="panel form-panel">
+          <div className="panel-heading">
+            <span className="section-label">{usoEditingId ? "USO-Fall bearbeiten" : "Neuer USO-Fall"}</span>
+            <button className="secondary-button" type="button" onClick={() => {
+              setUsoEditingId(null);
+              setUsoForm(usoCaseToForm(undefined, `${year}-01`));
+              setUsoErrors({});
+            }}>Neu</button>
+          </div>
+          <div className="form-grid">
+            <Field label="Titel" className="field-wide" error={usoErrors.title}>
+              <input value={usoForm.title} aria-invalid={Boolean(usoErrors.title)} onChange={(event) => {
+                setUsoForm((current) => ({ ...current, title: event.target.value }));
+                setUsoErrors((current) => ({ ...current, title: undefined }));
+              }} />
+            </Field>
+            <Field label="Abgabemonat" error={usoErrors.submissionMonth}>
+              <input type="month" value={usoForm.submissionMonth} aria-invalid={Boolean(usoErrors.submissionMonth)} onChange={(event) => {
+                setUsoForm((current) => ({ ...current, submissionMonth: event.target.value }));
+                setUsoErrors((current) => ({ ...current, submissionMonth: undefined }));
+              }} />
+            </Field>
+            <Field label="Status">
+              <select value={usoForm.status} onChange={(event) => setUsoForm((current) => ({ ...current, status: event.target.value as UsoCaseStatus }))}>
+                <option value="in_progress">Offen</option>
+                <option value="completed">Erledigt</option>
+              </select>
+            </Field>
+          </div>
+          <button className="primary-button trip-payment-save" type="button" onClick={() => void saveUsoCase()}>{usoEditingId ? "Änderungen speichern" : "USO-Fall speichern"}</button>
+        </section>
+        <section className="panel">
+          <div className="panel-heading">
+            <span className="section-label">USO-Fälle {year}</span>
+            <strong>{yearUsoCases.length}</strong>
+          </div>
+          <div className="trip-list">
+            {yearUsoCases.length === 0 ? <p className="muted">Noch keine USO-Fälle für dieses Jahr erfasst.</p> : null}
+            {yearUsoCases.map((usoCase) => (
+              <article key={usoCase.id} className={`trip-row points-uso-row ${usoCase.status === "completed" ? "trip-row-done" : ""}`}>
+                <div>
+                  <strong>{usoCase.title}</strong>
+                  <span>{usoCase.submissionMonth}</span>
+                  <span className="trip-badges"><em>{usoCase.status === "completed" ? "Erledigt" : "Offen"}</em></span>
+                </div>
+                <div className="trip-actions">
+                  <button className="secondary-button" type="button" onClick={() => void toggleUsoCase(usoCase)}>{usoCase.status === "completed" ? "Auf offen setzen" : "Erledigt"}</button>
+                  <button className="secondary-button" type="button" onClick={() => editUsoCase(usoCase)}>Bearbeiten</button>
+                  <button className="danger-button" type="button" onClick={() => void removeUsoCase(usoCase)}>Löschen</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function PointsYearTable({ rows, valueFormatter }: { rows: ReturnType<typeof buildAuditPointYearRows>; valueFormatter: (value: number) => string }) {
+  return (
+    <div className="points-year-table-wrap">
+      <table className="points-year-table">
+        <thead>
+          <tr>
+            <th>Monat</th>
+            <th>Abgabe</th>
+            <th>Soll</th>
+            <th>Stand</th>
+            <th>noch offen</th>
+            <th>Offen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.month}>
+              <th scope="row">{row.month.slice(5)}</th>
+              <td>{valueFormatter(row.submissionValue)}</td>
+              <td>{row.targetValue === null ? "-" : valueFormatter(row.targetValue)}</td>
+              <td>{valueFormatter(row.cumulativeValue)}</td>
+              <td className={row.targetReached ? "points-year-ok" : ""}>{row.targetReached ? "OK" : row.remainingValue === null ? "-" : valueFormatter(row.remainingValue)}</td>
+              <td>{valueFormatter(row.openValue)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -2171,6 +2420,18 @@ export function tripYearOptions(trips: Pick<Trip, "date">[], fallbackYear = curr
   return Array.from(years).sort((left, right) => right - left);
 }
 
+export function pointYearOptions(auditCases: Pick<AuditPointCase, "submissionMonth">[], usoCases: Pick<UsoCase, "submissionMonth">[], fallbackYear = currentYear(), selectedYear?: number): number[] {
+  const years = new Set<number>([fallbackYear]);
+  if (selectedYear !== undefined) years.add(selectedYear);
+
+  [...auditCases, ...usoCases].forEach((pointCase) => {
+    const match = /^(\d{4})-/.exec(pointCase.submissionMonth);
+    if (match) years.add(Number(match[1]));
+  });
+
+  return Array.from(years).sort((left, right) => right - left);
+}
+
 type MetricProgress = {
   value: number;
   overflow?: number;
@@ -2376,6 +2637,14 @@ function auditPointCaseToForm(pointCase?: AuditPointCase, fallbackMonth = todayK
   };
 }
 
+function usoCaseToForm(usoCase?: UsoCase, fallbackMonth = todayKey().slice(0, 7)) {
+  return {
+    title: usoCase?.title ?? "",
+    submissionMonth: usoCase?.submissionMonth ?? fallbackMonth,
+    status: usoCase?.status ?? "in_progress" as UsoCaseStatus
+  };
+}
+
 export function parsePointTenthsInput(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -2384,6 +2653,14 @@ export function parsePointTenthsInput(value: string): number | null {
   const numeric = Number(normalized);
   if (!Number.isFinite(numeric)) return null;
   return Math.round(numeric * 10);
+}
+
+function parseUsoTargetInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const numeric = Number(trimmed);
+  if (!Number.isSafeInteger(numeric)) return null;
+  return numeric;
 }
 
 export function validateAuditPointCaseForm(form: AuditPointCaseForm):
@@ -2409,6 +2686,16 @@ export function validateAuditPointCaseForm(form: AuditPointCaseForm):
   }
 
   return { valid: true, errors, category, periodStartYear, periodEndYear, additionalResultCents };
+}
+
+function validateUsoCaseForm(form: ReturnType<typeof usoCaseToForm>):
+  | { valid: true; errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>> }
+  | { valid: false; errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>> } {
+  const errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>> = {};
+  if (!form.title.trim()) errors.title = "Bitte einen Titel eingeben.";
+  if (!isValidAuditPointMonth(form.submissionMonth)) errors.submissionMonth = "Bitte einen gültigen Abgabemonat wählen.";
+  if (Object.keys(errors).length > 0) return { valid: false, errors };
+  return { valid: true, errors };
 }
 
 function auditPointCaseDraftForPreview(form: AuditPointCaseForm): Pick<AuditPointCase, "category" | "periodStartYear" | "periodEndYear" | "additionalResultCents" | "section99"> | null {

@@ -12,6 +12,8 @@ import {
   type TimeEntry,
   type Trip,
   type TripFile,
+  type UsoCase,
+  type UsoGoal,
   type TravelExpensePayment,
   type VacationSummary,
   defaultSettings
@@ -30,6 +32,8 @@ class WorkDashboardDb extends Dexie {
   tripPayments!: Table<TravelExpensePayment, string>;
   auditPointCases!: Table<AuditPointCase, string>;
   auditPointGoals!: Table<AuditPointGoal, string>;
+  usoCases!: Table<UsoCase, string>;
+  usoGoals!: Table<UsoGoal, string>;
 
   constructor() {
     super("arbeits-dashboard");
@@ -112,6 +116,21 @@ class WorkDashboardDb extends Dexie {
       tripPayments: "id, year, date",
       auditPointCases: "id, submissionMonth, status, category",
       auditPointGoals: "id, &year"
+    });
+    this.version(8).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt",
+      tripPayments: "id, year, date",
+      auditPointCases: "id, submissionMonth, status, category",
+      auditPointGoals: "id, &year",
+      usoCases: "id, submissionMonth, status",
+      usoGoals: "id, &year"
     });
   }
 }
@@ -359,6 +378,44 @@ export async function upsertAuditPointGoal(input: Omit<AuditPointGoal, "id" | "u
   return goal;
 }
 
+export async function listUsoCases(): Promise<UsoCase[]> {
+  return db.usoCases.orderBy("submissionMonth").reverse().toArray();
+}
+
+export async function upsertUsoCase(input: Omit<UsoCase, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<UsoCase> {
+  const existing = input.id ? await db.usoCases.get(input.id) : undefined;
+  const now = new Date().toISOString();
+  const usoCase: UsoCase = {
+    id: input.id ?? crypto.randomUUID(),
+    title: input.title.trim(),
+    submissionMonth: input.submissionMonth,
+    status: input.status,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+  await db.usoCases.put(usoCase);
+  return usoCase;
+}
+
+export async function deleteUsoCase(id: string): Promise<void> {
+  await db.usoCases.delete(id);
+}
+
+export async function listUsoGoals(): Promise<UsoGoal[]> {
+  return db.usoGoals.orderBy("year").reverse().toArray();
+}
+
+export async function upsertUsoGoal(input: Omit<UsoGoal, "id" | "updatedAt"> & { id?: string }): Promise<UsoGoal> {
+  const goal: UsoGoal = {
+    id: input.id ?? `uso-goal-${input.year}`,
+    year: input.year,
+    targetCount: Math.max(Math.round(input.targetCount), 0),
+    updatedAt: new Date().toISOString()
+  };
+  await db.usoGoals.put(goal);
+  return goal;
+}
+
 export async function readAllData(): Promise<BackupData> {
   await ensureDefaults();
   return {
@@ -372,14 +429,16 @@ export async function readAllData(): Promise<BackupData> {
     savedDestinations: await db.savedDestinations.toArray(),
     auditPointCases: await db.auditPointCases.toArray(),
     auditPointGoals: await db.auditPointGoals.toArray(),
+    usoCases: await db.usoCases.toArray(),
+    usoGoals: await db.usoGoals.toArray(),
     todos: [],
     files: await db.files.toArray()
   };
 }
 
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear()]);
     if (data.settings) await db.settings.put(data.settings);
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
@@ -391,13 +450,15 @@ export async function replaceAllData(data: BackupData): Promise<void> {
     await db.tripPayments.bulkPut((data.tripPayments ?? []).map(normalizeTripPayment));
     await db.auditPointCases.bulkPut((data.auditPointCases ?? []).map(normalizeAuditPointCase));
     await db.auditPointGoals.bulkPut((data.auditPointGoals ?? []).map(normalizeAuditPointGoal));
+    await db.usoCases.bulkPut((data.usoCases ?? []).map(normalizeUsoCase));
+    await db.usoGoals.bulkPut((data.usoGoals ?? []).map(normalizeUsoGoal));
   });
   await ensureDefaults();
 }
 
 export async function deleteAllLocalData(): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear()]);
   });
 }
 
@@ -444,5 +505,22 @@ function normalizeAuditPointGoal(goal: AuditPointGoal): AuditPointGoal {
     ...goal,
     id: goal.id || `goal-${goal.year}`,
     targetPointsTenths: Math.max(Math.round(goal.targetPointsTenths), 0)
+  };
+}
+
+function normalizeUsoCase(usoCase: UsoCase): UsoCase {
+  return {
+    ...usoCase,
+    title: usoCase.title ?? "",
+    submissionMonth: usoCase.submissionMonth ?? "",
+    status: usoCase.status === "completed" ? "completed" : "in_progress"
+  };
+}
+
+function normalizeUsoGoal(goal: UsoGoal): UsoGoal {
+  return {
+    ...goal,
+    id: goal.id || `uso-goal-${goal.year}`,
+    targetCount: Math.max(Math.round(goal.targetCount), 0)
   };
 }
