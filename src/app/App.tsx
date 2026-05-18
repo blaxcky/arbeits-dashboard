@@ -2829,9 +2829,10 @@ export function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "upda
   };
 }
 
-export function duplicatedTripDraft(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt"> {
+export function duplicatedTripDraft(trip: Trip, date = todayKey()): Omit<Trip, "id" | "createdAt" | "updatedAt"> {
   return {
     ...stripTripMeta(trip),
+    date,
     startTime: undefined,
     endTime: undefined,
     durationMinutes: 0,

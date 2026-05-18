@@ -198,8 +198,8 @@ describe("trip copy fields", () => {
   });
 
   it("duplicates trips without time values or completed state", () => {
-    expect(duplicatedTripDraft({ ...baseTrip, done: true, perDiemCents: 2000 })).toMatchObject({
-      date: baseTrip.date,
+    expect(duplicatedTripDraft({ ...baseTrip, done: true, perDiemCents: 2000 }, "2026-05-18")).toMatchObject({
+      date: "2026-05-18",
       reason: baseTrip.reason,
       destination: baseTrip.destination,
       startTime: undefined,
