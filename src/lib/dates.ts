@@ -14,7 +14,13 @@ export function parseDateKey(dateKey: string): Date {
   return new Date(year, month - 1, day);
 }
 
+export function isValidDateKey(dateKey: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return false;
+  return toDateKey(parseDateKey(dateKey)) === dateKey;
+}
+
 export function formatDateKey(dateKey: string): string {
+  if (!isValidDateKey(dateKey)) return "-";
   return new Intl.DateTimeFormat("de-AT", {
     weekday: "short",
     day: "2-digit",
@@ -24,6 +30,7 @@ export function formatDateKey(dateKey: string): string {
 }
 
 export function weekdayName(dateKey: string): string {
+  if (!isValidDateKey(dateKey)) return "-";
   return new Intl.DateTimeFormat("de-AT", { weekday: "long" }).format(parseDateKey(dateKey));
 }
 

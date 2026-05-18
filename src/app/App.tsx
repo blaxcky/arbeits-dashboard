@@ -29,7 +29,7 @@ import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, usePar
 import type { AuditPointCase, AuditPointCategory, AuditPointStatus, SavedDestination, Settings, TimeEntry, UsoCase, UsoCaseStatus, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
-import { addDays, currentYear, formatDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
+import { addDays, currentYear, formatDateKey, isValidDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
 import { formatAbsoluteMinutes, formatDays, formatMinutes, formatSignedMinutes, formatWholeDays, minutesToHourInput, parseHoursToMinutes } from "../lib/format";
 import {
   calculateDay,
@@ -1208,6 +1208,7 @@ const transportOptions: TripTransportType[] = ["kilometergeld", "befoerderungszu
 function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(() => tripToForm());
+  const [tripDateError, setTripDateError] = useState<string | undefined>();
   const [tripTimeErrors, setTripTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
   const [openTripsDialogOpen, setOpenTripsDialogOpen] = useState(false);
   const [mapPreviewOpen, setMapPreviewOpen] = useState(false);
@@ -1273,6 +1274,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     return () => {
       const draft = latestTripDraft.current;
       if (!draft.form.reason.trim()) return;
+      if (!isValidDateKey(draft.form.date)) return;
       const startTime = normalizeTimeInput(draft.form.startTime);
       const endTime = normalizeTimeInput(draft.form.endTime);
       const savedStartTime = startTime === null ? undefined : startTime || undefined;
@@ -1370,6 +1372,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   }, [data.files, previewFile]);
 
   function updateTripField(field: keyof ReturnType<typeof tripToForm>, value: string | boolean) {
+    if (field === "date") setTripDateError(undefined);
     setForm((current) => {
       const next = { ...current, [field]: value };
       if (field === "destination" && typeof value === "string") {
@@ -1395,6 +1398,10 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     const startTime = normalizeTimeInput(form.startTime);
     const endTime = normalizeTimeInput(form.endTime);
     const nextErrors: Partial<Record<"startTime" | "endTime", string>> = {};
+    if (!isValidDateKey(form.date)) {
+      setTripDateError("Bitte ein gültiges Reisedatum eingeben.");
+      return;
+    }
     if (startTime === null) nextErrors.startTime = "Bitte als HH:MM eingeben, z.B. 07:30.";
     if (endTime === null) nextErrors.endTime = "Bitte als HH:MM eingeben, z.B. 15:30.";
     if (startTime === null || endTime === null) {
@@ -1440,6 +1447,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
       setEditingId(savedTrip.id);
     }
     setTripTimeErrors({});
+    setTripDateError(undefined);
     showToast("Reise gespeichert.");
   }
 
@@ -1448,12 +1456,14 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     setEditingId(null);
     setForm(tripToForm());
     setTripTimeErrors({});
+    setTripDateError(undefined);
   }
 
   function editTrip(trip: Trip) {
     setEditingId(trip.id);
     setForm(tripToForm(trip));
     setTripTimeErrors({});
+    setTripDateError(undefined);
   }
 
   async function removeTrip(id: string) {
@@ -1462,6 +1472,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     if (editingId === id) {
       setEditingId(null);
       setForm(tripToForm());
+      setTripDateError(undefined);
     }
     showToast("Reise gelöscht.");
   }
@@ -1565,7 +1576,9 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             <section className="trip-form-section" aria-labelledby="trip-section-dates">
               <h3 id="trip-section-dates" className="trip-form-section-title">Reisedaten</h3>
               <Field label="Grund" className="field-wide"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
-              <Field label="Datum"><input type="date" value={form.date} onChange={(event) => updateTripField("date", event.target.value)} /></Field>
+              <Field label="Datum" error={tripDateError}>
+                <input type="date" value={form.date} aria-invalid={Boolean(tripDateError)} onChange={(event) => updateTripField("date", event.target.value)} />
+              </Field>
               <Field label="Zeit von" error={tripTimeErrors.startTime}>
                 <input
                   type="text"
