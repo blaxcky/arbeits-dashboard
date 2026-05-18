@@ -1466,6 +1466,15 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     setTripDateError(undefined);
   }
 
+  async function duplicateTrip(trip: Trip) {
+    const savedTrip = await data.saveTrip(duplicatedTripDraft(trip));
+    setEditingId(savedTrip.id);
+    setForm(tripToForm(savedTrip));
+    setTripTimeErrors({});
+    setTripDateError(undefined);
+    showToast("Reise dupliziert.");
+  }
+
   async function removeTrip(id: string) {
     if (!window.confirm("Diese Reise löschen?")) return;
     await data.removeTrip(id);
@@ -1840,6 +1849,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <div className="trip-actions">
                 <button className="secondary-button" onClick={() => void toggleDone(trip)}>{trip.done ? "Offen" : "Erledigt"}</button>
                 <button className="secondary-button" onClick={() => editTrip(trip)}>Bearbeiten</button>
+                <button className="secondary-button" onClick={() => void duplicateTrip(trip)}>Duplizieren</button>
                 <button className="danger-button" onClick={() => void removeTrip(trip.id)}>Löschen</button>
               </div>
             </article>
@@ -2816,6 +2826,17 @@ export function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "upda
     transportSubsidyTaxCents: 0,
     note: trip.note ?? "",
     done: trip.done
+  };
+}
+
+export function duplicatedTripDraft(trip: Trip): Omit<Trip, "id" | "createdAt" | "updatedAt"> {
+  return {
+    ...stripTripMeta(trip),
+    startTime: undefined,
+    endTime: undefined,
+    durationMinutes: 0,
+    perDiemCents: 0,
+    done: false
   };
 }
 

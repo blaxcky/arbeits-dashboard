@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase } from "../db/schema";
 
@@ -194,6 +194,19 @@ describe("trip copy fields", () => {
   it("keeps the reimbursement flag when saving existing trips without metadata", () => {
     expect(stripTripMeta({ ...baseTrip, employerReimbursedCosts: false })).toMatchObject({
       employerReimbursedCosts: false
+    });
+  });
+
+  it("duplicates trips without time values or completed state", () => {
+    expect(duplicatedTripDraft({ ...baseTrip, done: true, perDiemCents: 2000 })).toMatchObject({
+      date: baseTrip.date,
+      reason: baseTrip.reason,
+      destination: baseTrip.destination,
+      startTime: undefined,
+      endTime: undefined,
+      durationMinutes: 0,
+      perDiemCents: 0,
+      done: false
     });
   });
 });
