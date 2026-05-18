@@ -24,7 +24,7 @@ import {
   UploadSimple,
   Warning
 } from "@phosphor-icons/react";
-import { type ClipboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ClipboardEvent, type PointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import type { AuditPointCase, AuditPointCategory, AuditPointStatus, SavedDestination, Settings, TimeEntry, UsoCase, UsoCaseStatus, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
@@ -1847,7 +1847,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         </div>
       </div>
       {previewFile ? (
-        <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="trip-file-preview-title" onClick={() => setPreviewFile(null)}>
+        <ModalOverlay labelledBy="trip-file-preview-title" onClose={() => setPreviewFile(null)}>
           <div className="trip-file-modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="panel-heading">
               <div>
@@ -1873,7 +1873,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <button className="danger-button" type="button" onClick={() => void removeTripFile(previewFile)}>Löschen</button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       ) : null}
       {openTripsDialogOpen ? (
         <OpenTripsDialog
@@ -2117,7 +2117,7 @@ function OpenTripsDialog({ trips, showToast, onClose, onDone }: { trips: Trip[];
   }, [onClose]);
 
   return (
-    <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="open-trips-dialog-title" onClick={onClose}>
+    <ModalOverlay labelledBy="open-trips-dialog-title" onClose={onClose}>
       <div className="trip-file-modal-card open-trips-dialog" onClick={(event) => event.stopPropagation()}>
         <div className="panel-heading">
           <div>
@@ -2130,7 +2130,7 @@ function OpenTripsDialog({ trips, showToast, onClose, onDone }: { trips: Trip[];
         </div>
         <OpenTripsWorklist trips={trips} showToast={showToast} onDone={onDone} />
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -2200,7 +2200,7 @@ function MunicipalityPicker({ municipalities, municipalityError, initialQuery, o
   }, [onClose]);
 
   return (
-    <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="municipality-picker-title" onClick={onClose}>
+    <ModalOverlay labelledBy="municipality-picker-title" onClose={onClose}>
       <div className="trip-file-modal-card municipality-picker" onClick={(event) => event.stopPropagation()}>
         <div className="panel-heading">
           <div>
@@ -2225,7 +2225,7 @@ function MunicipalityPicker({ municipalities, municipalityError, initialQuery, o
           ))}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -2290,7 +2290,7 @@ function DestinationPicker({
   }
 
   return (
-    <div className="trip-file-modal" role="dialog" aria-modal="true" aria-labelledby="destination-picker-title" onClick={onClose}>
+    <ModalOverlay labelledBy="destination-picker-title" onClose={onClose}>
       <div className="trip-file-modal-card destination-picker" onClick={(event) => event.stopPropagation()}>
         <div className="panel-heading">
           <div>
@@ -2341,7 +2341,7 @@ function DestinationPicker({
           ))}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -2533,6 +2533,34 @@ function Notice({ title, text, action, tone = "success" }: { title: string; text
     <div className={`notice notice-${tone}`}>
       <Warning size={20} weight="duotone" />
       <div><strong>{title}</strong><p>{text}</p>{action}</div>
+    </div>
+  );
+}
+
+function ModalOverlay({ labelledBy, onClose, children }: { labelledBy: string; onClose: () => void; children: React.ReactNode }) {
+  const pointerDownStartedOnBackdrop = useRef(false);
+
+  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    pointerDownStartedOnBackdrop.current = event.target === event.currentTarget;
+  }
+
+  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (pointerDownStartedOnBackdrop.current && event.target === event.currentTarget) {
+      onClose();
+    }
+    pointerDownStartedOnBackdrop.current = false;
+  }
+
+  return (
+    <div
+      className="trip-file-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={labelledBy}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+    >
+      {children}
     </div>
   );
 }
