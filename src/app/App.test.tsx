@@ -84,6 +84,10 @@ describe("audit point helpers", () => {
     expect(validateAuditPointCaseForm({ ...baseForm, submissionMonth: "" })).toMatchObject({ valid: true });
   });
 
+  it("accepts an empty audit point tax number", () => {
+    expect(validateAuditPointCaseForm({ ...baseForm, taxNumber: "" })).toMatchObject({ valid: true });
+  });
+
   it("rejects invalid years, categories and amounts", () => {
     expect(validateAuditPointCaseForm({ ...baseForm, periodEndYear: "2019" }).valid).toBe(false);
     expect(validateAuditPointCaseForm({ ...baseForm, category: "X1" as "M1" }).valid).toBe(false);
