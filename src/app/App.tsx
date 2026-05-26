@@ -1847,10 +1847,18 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 <small>Diff. {formatEuroCents(calculateTripDifferentialCents(trip))}</small>
               </div>
               <div className="trip-actions">
-                <button className="secondary-button" onClick={() => void toggleDone(trip)}>{trip.done ? "Offen" : "Erledigt"}</button>
-                <button className="secondary-button" onClick={() => editTrip(trip)}>Bearbeiten</button>
-                <button className="secondary-button" onClick={() => void duplicateTrip(trip)}>Duplizieren</button>
-                <button className="danger-button" onClick={() => void removeTrip(trip.id)}>Löschen</button>
+                <button className="icon-button trip-action-button" type="button" title={trip.done ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={trip.done ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleDone(trip)}>
+                  {trip.done ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
+                </button>
+                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editTrip(trip)}>
+                  <PencilSimple size={17} />
+                </button>
+                <button className="icon-button trip-action-button" type="button" title="Duplizieren" aria-label="Duplizieren" onClick={() => void duplicateTrip(trip)}>
+                  <Copy size={17} />
+                </button>
+                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeTrip(trip.id)}>
+                  <Trash size={17} />
+                </button>
               </div>
             </article>
           ))}

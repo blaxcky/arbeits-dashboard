@@ -552,7 +552,7 @@ button:disabled {
 
 .trip-form-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0 14px;
+  gap: 14px;
 }
 
 .trip-form-section {
@@ -560,10 +560,11 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 14px;
-}
-
-.trip-form-section + .trip-form-section {
-  margin-top: 60px;
+  padding: 16px;
+  border: 1px solid #dbe3ec;
+  border-radius: 8px;
+  background: #fbfcfe;
+  box-shadow: 0 14px 32px -30px rgba(31, 41, 55, 0.45);
 }
 
 .trip-form-section-title {
@@ -584,7 +585,7 @@ button:disabled {
   content: "";
   height: 2px;
   flex: 1;
-  background: #cbd5e1;
+  background: #d7dee8;
 }
 
 .trip-form-section > .field {
@@ -1486,6 +1487,18 @@ button:disabled {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.trip-action-button {
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+}
+
+.danger-icon-button {
+  border-color: #d9a9a5;
+  background: #fff4f2;
+  color: var(--danger);
 }
 
 .trip-save-actions {
