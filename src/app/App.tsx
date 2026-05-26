@@ -2407,7 +2407,7 @@ function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWe
           return (
             <div key={day.date} className="week-row">
               <span>{weekdayName(day.date)}</span>
-              <span>{formatDateKey(day.date)}</span>
+              <span>{formatDateOnly(day.date)}</span>
               <span>{day.entry?.startTime ?? "-"}</span>
               <span>{day.entry?.endTime ?? "offen"}</span>
               <span className={`week-status week-delta-${tone}`} aria-label={statusLabel}>
@@ -2933,8 +2933,14 @@ function formatEuroCents(cents: number): string {
   return `${(cents / 100).toLocaleString("de-AT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`;
 }
 
+export function formatDateOnly(dateKey: string): string {
+  if (!isValidDateKey(dateKey)) return "-";
+  const [year, month, day] = dateKey.split("-");
+  return `${day}.${month}.${year}`;
+}
+
 function formatLongDateKey(dateKey: string): string {
-  return `${weekdayName(dateKey)}, ${formatDateKey(dateKey).replace(/^[^,]+,\s*/, "")}`;
+  return `${weekdayName(dateKey)}, ${formatDateOnly(dateKey)}`;
 }
 
 function isTripIncomplete(trip: Pick<Trip, "startTime" | "endTime">): boolean {

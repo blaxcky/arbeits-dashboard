@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase } from "../db/schema";
 
@@ -208,6 +208,13 @@ describe("trip copy fields", () => {
       perDiemCents: 0,
       done: false
     });
+  });
+});
+
+describe("date display helpers", () => {
+  it("formats dashboard week dates without weekday prefixes", () => {
+    expect(formatDateOnly("2026-05-26")).toBe("26.05.2026");
+    expect(formatDateOnly("")).toBe("-");
   });
 });
 
