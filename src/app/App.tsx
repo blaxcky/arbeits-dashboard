@@ -2059,11 +2059,24 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
               </label>
             </div>
           </div>
-          <div className="trip-payment-form">
-            <Field label={`Steuerfreier Öffi-BEZU Jahresdeckel ${year} (EUR)`} error={yearLimitError}>
-              <input inputMode="decimal" value={yearLimitEuros} aria-invalid={Boolean(yearLimitError)} onChange={(event) => { setYearLimitEuros(event.target.value); setYearLimitError(undefined); }} placeholder="leer" />
-            </Field>
-            <button className="secondary-button" type="button" onClick={() => void saveYearLimit()}>Deckel speichern</button>
+          <div className="year-limit-control">
+            <div className="year-limit-copy">
+              <span className="year-limit-label">Steuerfreier Öffi-BEZU</span>
+              <strong>Jahresdeckel {year}</strong>
+            </div>
+            <div className="year-limit-editor">
+              <label className="year-limit-input">
+                <span>Betrag</span>
+                <span className="amount-input-wrap">
+                  <input inputMode="decimal" value={yearLimitEuros} aria-invalid={Boolean(yearLimitError)} onChange={(event) => { setYearLimitEuros(event.target.value); setYearLimitError(undefined); }} placeholder="leer" />
+                  <span>EUR</span>
+                </span>
+              </label>
+              <button className="secondary-button year-limit-save" type="button" onClick={() => void saveYearLimit()}>
+                <CheckCircle size={17} /> Speichern
+              </button>
+            </div>
+            {yearLimitError ? <small className="field-error year-limit-error">{yearLimitError}</small> : null}
           </div>
           <dl className="detail-list">
             <div><dt>Reisen</dt><dd>{summary.count}</dd></div>

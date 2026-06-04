@@ -382,6 +382,106 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.year-limit-control {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(280px, auto);
+  align-items: end;
+  gap: 14px 18px;
+  margin: 4px 0 16px;
+  padding: 12px 0 14px;
+  border-top: 1px solid #eef1f5;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.year-limit-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.year-limit-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.year-limit-copy strong {
+  color: #1f2937;
+  font-size: 1.02rem;
+  line-height: 1.25;
+}
+
+.year-limit-editor {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) auto;
+  align-items: end;
+  gap: 10px;
+  justify-content: end;
+}
+
+.year-limit-input {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.amount-input-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.amount-input-wrap:focus-within {
+  border-color: #9fb4cc;
+  background: #fff;
+}
+
+.amount-input-wrap:has(input[aria-invalid="true"]) {
+  border-color: var(--danger);
+  background: #fff6f4;
+}
+
+.amount-input-wrap input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: #1f2937;
+  padding: 9px 10px 9px 12px;
+  outline: none;
+}
+
+.amount-input-wrap input::placeholder {
+  color: #c8d0dc;
+  opacity: 1;
+}
+
+.amount-input-wrap span {
+  padding: 0 12px 0 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.year-limit-save {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.year-limit-error {
+  grid-column: 2;
+  justify-self: start;
+}
+
 .year-select {
   display: grid;
   gap: 5px;
@@ -2110,12 +2210,22 @@ button:disabled {
   .split-grid,
   .settings-grid,
   .trip-side-layout-map-open,
+  .year-limit-control,
   .trip-form-section-body,
   .trip-form-grid,
   .trip-payment-form,
   .points-year-summary,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .year-limit-editor {
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: stretch;
+  }
+
+  .year-limit-error {
+    grid-column: 1;
   }
 
   .toast-stack {
