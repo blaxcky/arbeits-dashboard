@@ -461,6 +461,22 @@ button:disabled {
   font-family: "Geist Mono", ui-monospace, monospace;
 }
 
+.week-row-missing-end {
+  margin: 0 -10px;
+  padding: 12px 10px;
+  border-bottom-color: #e4b2ab;
+  border-radius: 8px;
+  background: #fff2ed;
+  box-shadow: inset 4px 0 0 #c94a3f;
+}
+
+.week-open-end,
+.week-hours-missing-end,
+.week-status-missing-end {
+  color: #9a332c;
+  font-weight: 900;
+}
+
 .week-status {
   justify-self: end;
   display: inline-flex;
@@ -538,6 +554,22 @@ button:disabled {
 .panel.day-entry-panel {
   gap: 30px;
   padding: 28px;
+}
+
+.panel.day-entry-panel-missing-end {
+  border-color: #c94a3f;
+  background: #fff7f3;
+  box-shadow: 0 0 0 3px rgba(201, 74, 63, 0.16), 0 20px 42px -28px rgba(122, 45, 37, 0.45);
+}
+
+.day-entry-panel-missing-end .panel-heading strong {
+  color: #8f2f28;
+}
+
+.day-entry-panel-missing-end .field input[aria-invalid="true"] {
+  border-color: #c94a3f;
+  background: #fff1ed;
+  box-shadow: 0 0 0 3px rgba(201, 74, 63, 0.14);
 }
 
 .form-grid {

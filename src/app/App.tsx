@@ -29,7 +29,7 @@ import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, usePar
 import type { AuditPointCase, AuditPointCategory, AuditPointStatus, SavedDestination, Settings, TimeEntry, UsoCase, UsoCaseStatus, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
-import { addDays, currentYear, formatDateKey, isValidDateKey, isoWeekDays, todayKey, weekdayName } from "../lib/dates";
+import { addDays, currentYear, formatDateKey, isValidDateKey, isoWeekDays, parseDateKey, todayKey, weekdayName } from "../lib/dates";
 import { formatAbsoluteMinutes, formatDays, formatMinutes, formatSignedMinutes, formatWholeDays, minutesToHourInput, parseHoursToMinutes } from "../lib/format";
 import {
   calculateDay,
@@ -172,6 +172,7 @@ type AuditPointCaseForm = ReturnType<typeof auditPointCaseToForm>;
 function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const settings = data.settings;
   const [selectedDate, setSelectedDate] = useState(todayKey());
+  const userSelectedDate = useRef(false);
   const entry = data.entriesByDate.get(selectedDate);
   const [form, setForm] = useState(() => entryToForm(entry, selectedDate, settings));
   const [timeErrors, setTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
@@ -200,6 +201,8 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const dailyTargetMinutes = settings?.dailyTargetMinutes ?? 480;
   const nextFlexDayBalance = settings ? calculateNextFlexDayBalance(flex, settings.dailyTargetMinutes) : null;
   const canBookFlexDay = Boolean(settings && nextFlexDayBalance !== null);
+  const selectedEntryMissingEnd = isWeekdayMissingEnd(previewEntry);
+  const endTimeError = timeErrors.endTime ?? (selectedEntryMissingEnd ? "Dienstende fehlt. Bitte nachtragen." : undefined);
   const breakField = (
     <Field label="Pause in Minuten" className="break-field" error={breakError}>
       <input
@@ -222,6 +225,17 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
     setTimeErrors({});
     setBreakError(undefined);
   }, [entry, selectedDate, settings]);
+
+  useEffect(() => {
+    if (data.loading || userSelectedDate.current) return;
+    const preferredDate = preferredTimeEntryDate(data.timeEntries, todayKey(data.clock));
+    setSelectedDate(preferredDate);
+  }, [data.clock, data.loading, data.timeEntries]);
+
+  function selectDate(date: string) {
+    userSelectedDate.current = true;
+    setSelectedDate(date);
+  }
 
   async function autoSave(draft: ReturnType<typeof entryToForm>, createWhenEmpty = true) {
     const startTime = timeForSave(draft.startTime, entry?.startTime);
@@ -324,18 +338,18 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
         />
       ) : null}
       <div className="dashboard-workflow-grid">
-        <form className="panel form-panel day-entry-panel" onSubmit={(event) => event.preventDefault()}>
+        <form className={`panel form-panel day-entry-panel${selectedEntryMissingEnd ? " day-entry-panel-missing-end" : ""}`} onSubmit={(event) => event.preventDefault()}>
           <div className="panel-heading">
             <span className="section-label">Tageserfassung</span>
             <strong>{formatLongDateKey(selectedDate)}</strong>
           </div>
           <div className="date-row">
-            <button type="button" className="secondary-button" onClick={() => setSelectedDate(addDays(selectedDate, -1))}>Zurück</button>
+            <button type="button" className="secondary-button" onClick={() => selectDate(addDays(selectedDate, -1))}>Zurück</button>
             <label>
               Datum
-              <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+              <input type="date" value={selectedDate} onChange={(event) => selectDate(event.target.value)} />
             </label>
-            <button type="button" className="secondary-button" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>Weiter</button>
+            <button type="button" className="secondary-button" onClick={() => selectDate(addDays(selectedDate, 1))}>Weiter</button>
           </div>
           <div className="form-grid day-entry-grid">
             <Field label="Dienstbeginn" error={timeErrors.startTime}>
@@ -349,13 +363,13 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 onBlur={(event) => void handleTimeBlur("startTime", event.target.value)}
               />
             </Field>
-            <Field label="Dienstende" error={timeErrors.endTime}>
+            <Field label="Dienstende" error={endTimeError}>
               <input
                 type="text"
                 inputMode="numeric"
                 placeholder="15:30"
                 value={form.endTime}
-                aria-invalid={Boolean(timeErrors.endTime)}
+                aria-invalid={Boolean(endTimeError)}
                 onChange={(event) => setForm({ ...form, endTime: event.target.value })}
                 onBlur={(event) => void handleTimeBlur("endTime", event.target.value)}
               />
@@ -432,7 +446,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           <Metric title="Dieses Jahr verbrauchen" value={formatDays(requiredConsumption, dailyTargetMinutes)} detail="Resturlaub plus Gleitzeit über Grenze" />
         </div>
       </div>
-      <WeekTable week={week} onWeekChange={(offsetDays) => setSelectedDate(addDays(selectedDate, offsetDays))} />
+      <WeekTable week={week} onWeekChange={(offsetDays) => selectDate(addDays(selectedDate, offsetDays))} />
     </section>
   );
 }
@@ -2318,18 +2332,19 @@ function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWe
         </div>
         {week.days.map((day) => {
           const tone = deltaTone(day.calculation.deltaMinutes);
-          const statusLabel = tone === "plus" ? "Plusstunden" : tone === "minus" ? "Minusstunden" : "Ausgeglichen";
+          const missingEnd = isWeekdayMissingEnd(day.entry);
+          const statusLabel = missingEnd ? "Dienstende fehlt" : tone === "plus" ? "Plusstunden" : tone === "minus" ? "Minusstunden" : "Ausgeglichen";
           return (
-            <div key={day.date} className="week-row">
+            <div key={day.date} className={`week-row${missingEnd ? " week-row-missing-end" : ""}`}>
               <span>{weekdayName(day.date)}</span>
               <span>{formatDateOnly(day.date)}</span>
               <span>{day.entry?.startTime ?? "-"}</span>
-              <span>{day.entry?.endTime ?? "offen"}</span>
-              <span className={`week-status week-delta-${tone}`} aria-label={statusLabel}>
-                {day.calculation.deltaMinutes > 0 ? <ArrowCircleUp size={16} weight="duotone" /> : day.calculation.deltaMinutes < 0 ? <ArrowCircleDown size={16} weight="duotone" /> : <MinusCircle size={16} weight="duotone" />}
+              <span className={missingEnd ? "week-open-end" : undefined}>{day.entry?.endTime ?? "offen"}</span>
+              <span className={`week-status ${missingEnd ? "week-status-missing-end" : `week-delta-${tone}`}`} aria-label={statusLabel}>
+                {missingEnd ? <Warning size={16} weight="duotone" /> : day.calculation.deltaMinutes > 0 ? <ArrowCircleUp size={16} weight="duotone" /> : day.calculation.deltaMinutes < 0 ? <ArrowCircleDown size={16} weight="duotone" /> : <MinusCircle size={16} weight="duotone" />}
               </span>
-              <strong className={`week-hours week-delta-${tone}`}>
-                {formatAbsoluteMinutes(day.calculation.deltaMinutes)}
+              <strong className={`week-hours ${missingEnd ? "week-hours-missing-end" : `week-delta-${tone}`}`}>
+                {missingEnd ? "fehlt" : formatAbsoluteMinutes(day.calculation.deltaMinutes)}
               </strong>
             </div>
           );
@@ -2871,6 +2886,19 @@ export function formatDateOnly(dateKey: string): string {
 
 function formatLongDateKey(dateKey: string): string {
   return `${weekdayName(dateKey)}, ${formatDateOnly(dateKey)}`;
+}
+
+export function preferredTimeEntryDate(entries: Pick<TimeEntry, "date" | "startTime" | "endTime">[], currentDate = todayKey()): string {
+  const openEntry = entries
+    .filter((entry) => entry.date <= currentDate && isWeekdayMissingEnd(entry))
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  return openEntry?.date ?? currentDate;
+}
+
+function isWeekdayMissingEnd(entry: Pick<TimeEntry, "date" | "startTime" | "endTime"> | undefined): boolean {
+  if (!entry?.startTime || entry.endTime || !isValidDateKey(entry.date)) return false;
+  const weekday = parseDateKey(entry.date).getDay();
+  return weekday >= 1 && weekday <= 5;
 }
 
 function isTripIncomplete(trip: Pick<Trip, "startTime" | "endTime">): boolean {

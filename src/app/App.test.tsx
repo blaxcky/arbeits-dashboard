@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase } from "../db/schema";
 
@@ -219,6 +219,24 @@ describe("date display helpers", () => {
   it("formats dashboard week dates without weekday prefixes", () => {
     expect(formatDateOnly("2026-05-26")).toBe("26.05.2026");
     expect(formatDateOnly("")).toBe("-");
+  });
+});
+
+describe("preferred time entry date", () => {
+  it("keeps the newest open weekday selected instead of today", () => {
+    expect(preferredTimeEntryDate([
+      { date: "2026-05-25", startTime: "07:30" },
+      { date: "2026-05-26", startTime: "07:30", endTime: "15:30" },
+      { date: "2026-05-27", startTime: "08:00" }
+    ], "2026-05-28")).toBe("2026-05-27");
+  });
+
+  it("ignores weekends, future entries, and completed days", () => {
+    expect(preferredTimeEntryDate([
+      { date: "2026-05-23", startTime: "07:30" },
+      { date: "2026-05-28", startTime: "07:30", endTime: "15:30" },
+      { date: "2026-05-29", startTime: "08:00" }
+    ], "2026-05-28")).toBe("2026-05-28");
   });
 });
 
