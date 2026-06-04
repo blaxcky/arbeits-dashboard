@@ -201,7 +201,8 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const dailyTargetMinutes = settings?.dailyTargetMinutes ?? 480;
   const nextFlexDayBalance = settings ? calculateNextFlexDayBalance(flex, settings.dailyTargetMinutes) : null;
   const canBookFlexDay = Boolean(settings && nextFlexDayBalance !== null);
-  const selectedEntryMissingEnd = isWeekdayMissingEnd(previewEntry);
+  const currentDate = todayKey(data.clock);
+  const selectedEntryMissingEnd = isOverdueWeekdayMissingEnd(previewEntry, currentDate);
   const endTimeError = timeErrors.endTime ?? (selectedEntryMissingEnd ? "Dienstende fehlt. Bitte nachtragen." : undefined);
   const breakField = (
     <Field label="Pause in Minuten" className="break-field" error={breakError}>
@@ -228,9 +229,9 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
 
   useEffect(() => {
     if (data.loading || userSelectedDate.current) return;
-    const preferredDate = preferredTimeEntryDate(data.timeEntries, todayKey(data.clock));
+    const preferredDate = preferredTimeEntryDate(data.timeEntries, currentDate);
     setSelectedDate(preferredDate);
-  }, [data.clock, data.loading, data.timeEntries]);
+  }, [currentDate, data.loading, data.timeEntries]);
 
   function selectDate(date: string) {
     userSelectedDate.current = true;
@@ -446,7 +447,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           <Metric title="Dieses Jahr verbrauchen" value={formatDays(requiredConsumption, dailyTargetMinutes)} detail="Resturlaub plus Gleitzeit über Grenze" />
         </div>
       </div>
-      <WeekTable week={week} onWeekChange={(offsetDays) => selectDate(addDays(selectedDate, offsetDays))} />
+      <WeekTable week={week} currentDate={currentDate} onWeekChange={(offsetDays) => selectDate(addDays(selectedDate, offsetDays))} />
     </section>
   );
 }
@@ -2309,7 +2310,7 @@ export function automaticDestinationDraft(destination: string, reason: string, m
   return { name: `(${trimmedReason})`, address, municipalityCode: municipality };
 }
 
-function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWeek>; onWeekChange: (offsetDays: number) => void }) {
+function WeekTable({ week, currentDate, onWeekChange }: { week: ReturnType<typeof calculateWeek>; currentDate: string; onWeekChange: (offsetDays: number) => void }) {
   return (
     <div className="panel">
       <div className="panel-heading week-heading">
@@ -2332,7 +2333,7 @@ function WeekTable({ week, onWeekChange }: { week: ReturnType<typeof calculateWe
         </div>
         {week.days.map((day) => {
           const tone = deltaTone(day.calculation.deltaMinutes);
-          const missingEnd = isWeekdayMissingEnd(day.entry);
+          const missingEnd = isOverdueWeekdayMissingEnd(day.entry, currentDate);
           const statusLabel = missingEnd ? "Dienstende fehlt" : tone === "plus" ? "Plusstunden" : tone === "minus" ? "Minusstunden" : "Ausgeglichen";
           return (
             <div key={day.date} className={`week-row${missingEnd ? " week-row-missing-end" : ""}`}>
@@ -2890,13 +2891,13 @@ function formatLongDateKey(dateKey: string): string {
 
 export function preferredTimeEntryDate(entries: Pick<TimeEntry, "date" | "startTime" | "endTime">[], currentDate = todayKey()): string {
   const openEntry = entries
-    .filter((entry) => entry.date <= currentDate && isWeekdayMissingEnd(entry))
+    .filter((entry) => isOverdueWeekdayMissingEnd(entry, currentDate))
     .sort((a, b) => b.date.localeCompare(a.date))[0];
   return openEntry?.date ?? currentDate;
 }
 
-function isWeekdayMissingEnd(entry: Pick<TimeEntry, "date" | "startTime" | "endTime"> | undefined): boolean {
-  if (!entry?.startTime || entry.endTime || !isValidDateKey(entry.date)) return false;
+function isOverdueWeekdayMissingEnd(entry: Pick<TimeEntry, "date" | "startTime" | "endTime"> | undefined, currentDate = todayKey()): boolean {
+  if (!entry?.startTime || entry.endTime || !isValidDateKey(entry.date) || entry.date >= currentDate) return false;
   const weekday = parseDateKey(entry.date).getDay();
   return weekday >= 1 && weekday <= 5;
 }

@@ -231,10 +231,11 @@ describe("preferred time entry date", () => {
     ], "2026-05-28")).toBe("2026-05-27");
   });
 
-  it("ignores weekends, future entries, and completed days", () => {
+  it("ignores today, weekends, future entries, and completed days", () => {
     expect(preferredTimeEntryDate([
       { date: "2026-05-23", startTime: "07:30" },
-      { date: "2026-05-28", startTime: "07:30", endTime: "15:30" },
+      { date: "2026-05-27", startTime: "07:30", endTime: "15:30" },
+      { date: "2026-05-28", startTime: "07:30" },
       { date: "2026-05-29", startTime: "08:00" }
     ], "2026-05-28")).toBe("2026-05-28");
   });
