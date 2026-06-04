@@ -374,6 +374,14 @@ button:disabled {
   margin-bottom: 14px;
 }
 
+.year-overview-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .year-select {
   display: grid;
   gap: 5px;

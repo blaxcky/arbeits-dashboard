@@ -24,6 +24,7 @@ import {
   PencilSimple,
   Plus,
   Receipt,
+  Printer,
   Trash,
   X,
   UploadSimple,
@@ -65,6 +66,7 @@ import {
   TRANSPORT_LABELS,
   TRIP_RULES
 } from "../modules/expenses/calculations";
+import { buildTripAdvertisingCostsExportRows, buildTripAdvertisingCostsPrintHtml, summarizeTripAdvertisingCostsExport } from "../modules/expenses/advertisingCostsExport";
 import {
   AUDIT_POINT_CATEGORIES,
   AUDIT_POINT_CATEGORY_RULES,
@@ -1945,6 +1947,28 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
   const [paymentAmountError, setPaymentAmountError] = useState<string | undefined>();
   const yearPayments = data.tripPayments.filter((payment) => payment.year === year);
 
+  function printAdvertisingCostsExport() {
+    const rows = buildTripAdvertisingCostsExportRows(data.trips, year);
+    if (rows.length === 0) {
+      showToast("Keine Reisen für dieses Jahr vorhanden.");
+      return;
+    }
+
+    const exportSummary = summarizeTripAdvertisingCostsExport(rows, data.tripPayments, year);
+    const html = buildTripAdvertisingCostsPrintHtml({ year, rows, summary: exportSummary, payments: data.tripPayments });
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+      showToast("Druckansicht konnte nicht geöffnet werden.");
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => printWindow.print(), 100);
+  }
+
   async function savePayment() {
     const amountCents = parseEuroCentsInput(paymentForm.amountEuros);
     if (amountCents === null || amountCents <= 0) {
@@ -1976,14 +2000,19 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
         <div className="panel">
           <div className="panel-heading year-overview-heading">
             <span className="section-label">Jahreswerte {year}</span>
-            <label className="year-select">
-              <span>Jahr</span>
-              <select value={year} onChange={(event) => navigate(`/reisekosten/jahr/${event.target.value}`)}>
-                {yearOptions.map((optionYear) => (
-                  <option key={optionYear} value={optionYear}>{optionYear}</option>
-                ))}
-              </select>
-            </label>
+            <div className="year-overview-actions">
+              <button className="secondary-button" type="button" onClick={printAdvertisingCostsExport}>
+                <Printer size={17} /> Werbungskosten-PDF
+              </button>
+              <label className="year-select">
+                <span>Jahr</span>
+                <select value={year} onChange={(event) => navigate(`/reisekosten/jahr/${event.target.value}`)}>
+                  {yearOptions.map((optionYear) => (
+                    <option key={optionYear} value={optionYear}>{optionYear}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
           <dl className="detail-list">
             <div><dt>Reisen</dt><dd>{summary.count}</dd></div>
