@@ -3,8 +3,10 @@ import {
   ArrowCircleDown,
   ArrowCircleUp,
   Briefcase,
+  CalendarBlank,
   CalendarCheck,
   CalendarPlus,
+  Car,
   ChartBar,
   CheckCircle,
   ClipboardText,
@@ -15,14 +17,18 @@ import {
   House,
   ListChecks,
   MagnifyingGlass,
+  MapTrifold,
   MapPin,
   MinusCircle,
+  NotePencil,
   PencilSimple,
   Plus,
+  Receipt,
   Trash,
   X,
   UploadSimple,
-  Warning
+  Warning,
+  type Icon
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, type PointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
@@ -1511,9 +1517,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             <span className="section-label">{editingId ? "Reise bearbeiten" : "Neue Reise"}</span>
             <button className="secondary-button" onClick={() => void startNewTrip()}>Neu</button>
           </div>
-          <div className="form-grid trip-form-grid">
-            <section className="trip-form-section" aria-labelledby="trip-section-dates">
-              <h3 id="trip-section-dates" className="trip-form-section-title">Reisedaten</h3>
+          <div className="trip-form-grid">
+            <TripFormSection id="trip-section-dates" title="Reisedaten" icon={CalendarBlank}>
               <Field label="Grund" className="field-wide"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
               <Field label="Datum" error={tripDateError}>
                 <input type="date" value={form.date} aria-invalid={Boolean(tripDateError)} onChange={(event) => updateTripField("date", event.target.value)} />
@@ -1540,9 +1545,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                   onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
                 />
               </Field>
-            </section>
-            <section className="trip-form-section" aria-labelledby="trip-section-route">
-              <h3 id="trip-section-route" className="trip-form-section-title">Route</h3>
+            </TripFormSection>
+            <TripFormSection id="trip-section-route" title="Route" icon={MapTrifold}>
               <Field label="Startort" className="trip-field-half"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
               <Field label="Zieladresse" className="trip-field-half">
                 <div className="input-with-button">
@@ -1561,23 +1565,23 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 </div>
               </Field>
               <Field label="Einfache Strecke (km)" className="trip-field-half"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
-            </section>
-            <section className="trip-form-section" aria-labelledby="trip-section-costs">
-              <h3 id="trip-section-costs" className="trip-form-section-title">Fahrtkosten</h3>
+            </TripFormSection>
+            <TripFormSection id="trip-section-costs" title="Fahrtkosten" icon={Car} className="trip-form-section-split">
               <Field label="Fahrtkostenart" className="trip-field-half">
                 <select value={form.transportType} onChange={(event) => updateTripField("transportType", event.target.value as TripTransportType)}>
                   {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
                 </select>
               </Field>
               <Field label="Ticketpreis (EUR)" className="trip-field-half trip-cost-field"><input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} /></Field>
-            </section>
-            <section className="trip-form-section" aria-labelledby="trip-section-other">
-              <h3 id="trip-section-other" className="trip-form-section-title">Sonstiges</h3>
+            </TripFormSection>
+            <TripFormSection id="trip-section-other" title="Sonstiges" icon={Receipt} className="trip-form-section-split">
               <Field label="Sonstige Kosten (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
               <Field label="Beschreibung sonstige Kosten" className="trip-field-half"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
               <label className="check-row field-wide"><input type="checkbox" checked={form.employerDoesNotReimburseCosts} onChange={(event) => updateTripField("employerDoesNotReimburseCosts", event.target.checked)} /> Arbeitgeber ersetzt keine Kosten</label>
+            </TripFormSection>
+            <TripFormSection id="trip-section-notes" title="Zusätzliche Notizen" icon={NotePencil}>
               <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
-            </section>
+            </TripFormSection>
           </div>
           <section className="trip-preview trip-form-preview" aria-label="Kennzahlen-Vorschau">
             <div className="trip-preview-group trip-preview-group-primary">
@@ -2538,6 +2542,20 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
 function Field({ label, children, error, className = "" }: { label: string; children: React.ReactNode; error?: string; className?: string }) {
   return <label className={`field ${className}`.trim()}><span>{label}</span>{children}{error ? <small className="field-error">{error}</small> : null}</label>;
+}
+
+function TripFormSection({ id, title, icon: IconComponent, className = "", children }: { id: string; title: string; icon: Icon; className?: string; children: React.ReactNode }) {
+  return (
+    <section className={`trip-form-section ${className}`.trim()} aria-labelledby={id}>
+      <div className="trip-form-section-header">
+        <IconComponent size={20} weight="duotone" aria-hidden="true" />
+        <h3 id={id} className="trip-form-section-title">{title}</h3>
+      </div>
+      <div className="trip-form-section-body">
+        {children}
+      </div>
+    </section>
+  );
 }
 
 function AutoFitInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {

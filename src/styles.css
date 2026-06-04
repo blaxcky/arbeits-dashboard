@@ -597,29 +597,39 @@ button:disabled {
 }
 
 .trip-form-grid {
+  display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 14px;
 }
 
 .trip-form-section {
   grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 14px;
-  padding: 20px;
-  border: 1px solid var(--line);
+  overflow: hidden;
+  border: 1px solid #dce2ea;
   border-radius: 8px;
   background: var(--panel);
-  box-shadow: 0 18px 40px -28px rgba(31, 41, 55, 0.35);
+  box-shadow: 0 16px 34px -30px rgba(31, 41, 55, 0.42);
+}
+
+.trip-form-section-split {
+  grid-column: span 3;
+}
+
+.trip-form-section-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #dfe5ec;
+  background: #f5f7fa;
+  color: #526171;
 }
 
 .trip-form-section-title {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 14px;
   margin: 0;
-  color: #334155;
+  color: #2f3d4f;
   font-size: 0.9rem;
   font-weight: 900;
   letter-spacing: 0;
@@ -627,14 +637,14 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.trip-form-section-title::after {
-  content: "";
-  height: 2px;
-  flex: 1;
-  background: #d7dee8;
+.trip-form-section-body {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
 }
 
-.trip-form-section > .field {
+.trip-form-section-body > .field {
   grid-column: span 2;
 }
 
@@ -644,6 +654,42 @@ button:disabled {
 
 .trip-form-section .trip-field-half {
   grid-column: span 3;
+}
+
+.trip-form-section-split .trip-field-half {
+  grid-column: 1 / -1;
+}
+
+.trip-form-section .field {
+  gap: 6px;
+  color: #334155;
+  font-size: 0.9rem;
+}
+
+.trip-form-section .field input,
+.trip-form-section .field select,
+.trip-form-section .field textarea {
+  min-height: 46px;
+  border-color: #d9e0e8;
+  background: #fcfdff;
+  box-sizing: border-box;
+}
+
+.trip-form-section .field input::placeholder,
+.trip-form-section .field textarea::placeholder {
+  color: #cbd4df;
+}
+
+.trip-form-section .field input:focus,
+.trip-form-section .field select:focus,
+.trip-form-section .field textarea:focus {
+  border-color: #8aa4c4;
+  background: #fff;
+}
+
+.trip-form-section .check-row {
+  min-height: 46px;
+  padding-top: 8px;
 }
 
 .day-entry-grid {
@@ -2022,7 +2068,7 @@ button:disabled {
   .split-grid,
   .settings-grid,
   .trip-side-layout-map-open,
-  .trip-form-section,
+  .trip-form-section-body,
   .trip-form-grid,
   .trip-payment-form,
   .points-year-summary,
@@ -2037,7 +2083,8 @@ button:disabled {
     width: auto;
   }
 
-  .trip-form-section > .field,
+  .trip-form-section-split,
+  .trip-form-section-body > .field,
   .trip-form-section .trip-field-half {
     grid-column: auto;
   }
