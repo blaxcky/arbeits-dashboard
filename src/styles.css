@@ -633,7 +633,12 @@ button:disabled {
 }
 
 .day-entry-grid {
-  align-items: end;
+  align-items: start;
+}
+
+.day-entry-grid .field {
+  align-content: start;
+  min-height: 104px;
 }
 
 .field {
