@@ -1506,8 +1506,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         <span>{openTrips.length} offen</span>
       </div>
       <div className={`split-grid trips-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trips-layout-map-open" : ""}`}>
-        <div className="panel form-panel">
-          <div className="panel-heading">
+        <div className="trip-form-stack">
+          <div className="trip-form-toolbar">
             <span className="section-label">{editingId ? "Reise bearbeiten" : "Neue Reise"}</span>
             <button className="secondary-button" onClick={() => void startNewTrip()}>Neu</button>
           </div>
@@ -1579,7 +1579,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
             </section>
           </div>
-          <section className="trip-preview" aria-label="Kennzahlen-Vorschau">
+          <section className="trip-preview trip-form-preview" aria-label="Kennzahlen-Vorschau">
             <div className="trip-preview-group trip-preview-group-primary">
               <span className="trip-preview-title">Reise</span>
               <dl className="trip-preview-list">
