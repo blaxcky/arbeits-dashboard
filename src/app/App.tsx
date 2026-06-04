@@ -2909,8 +2909,8 @@ export function openTripFields(trip: Trip): OpenTripField[] {
   ];
   if (isPublicTransport) {
     fields.push(
-      { label: "Beschreibung", value: "Fahrt Oeffis", ready: true, layout: "short" },
-      { label: "Bemerkungen", value: `Fahrt wurde mit oeffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()), layout: "wide" },
+      { label: "Beschreibung", value: "Fahrt Öffis", ready: true, layout: "short" },
+      { label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()), layout: "wide" },
       { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }
     );
   }

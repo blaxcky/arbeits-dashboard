@@ -157,9 +157,9 @@ describe("trip copy fields", () => {
 
   it("uses the exact public transport copy text", () => {
     const fields = openTripFields(baseTrip);
-    expect(fields.find((field) => field.label === "Beschreibung")).toMatchObject({ value: "Fahrt Oeffis", ready: true });
+    expect(fields.find((field) => field.label === "Beschreibung")).toMatchObject({ value: "Fahrt Öffis", ready: true });
     expect(fields.find((field) => field.label === "Bemerkungen")).toMatchObject({
-      value: "Fahrt wurde mit oeffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien Kilometer lt. Google Maps",
+      value: "Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien Kilometer lt. Google Maps",
       ready: true,
       layout: "wide"
     });
