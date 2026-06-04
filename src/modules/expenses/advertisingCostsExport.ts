@@ -1,11 +1,11 @@
-import type { TravelExpensePayment, Trip, TripTransportType } from "../../db/schema";
+import type { TravelExpensePayment, Trip } from "../../db/schema";
 import {
+  calculateFictionalKilometerAllowanceCents,
   calculateOtherCostsDifferentialCents,
   calculatePerDiemDifferentialCents,
   calculatePublicTransportPayoutCents,
   calculateTaxablePublicTransportSubsidyCents,
-  calculateTransportDifferentialCents,
-  TRANSPORT_LABELS
+  calculateTransportDifferentialCents
 } from "./calculations";
 
 export interface TripAdvertisingCostsExportRow {
@@ -17,14 +17,12 @@ export interface TripAdvertisingCostsExportRow {
   origin: string;
   destination: string;
   municipalityCode: string;
-  transportType: TripTransportType;
-  transportLabel: string;
   oneWayKilometers: number;
   totalKilometers: number;
-  ticketPriceCents: number;
   employerPerDiemCents: number;
   perDiemAdvertisingCostsCents: number;
   employerTransportPayoutCents: number;
+  transportTaxAllowanceCents: number;
   transportAdvertisingCostsCents: number;
   employerOtherCostsCents: number;
   otherAdvertisingCostsCents: number;
@@ -40,6 +38,7 @@ export interface TripAdvertisingCostsExportSummary {
   employerPerDiemCents: number;
   perDiemAdvertisingCostsCents: number;
   employerTransportPayoutCents: number;
+  transportTaxAllowanceCents: number;
   transportAdvertisingCostsCents: number;
   employerOtherCostsCents: number;
   otherAdvertisingCostsCents: number;
@@ -59,6 +58,7 @@ export function buildTripAdvertisingCostsExportRows(trips: Trip[], year: number)
       const employerPerDiemCents = employerReimbursedCosts ? Math.max(trip.perDiemCents, 0) : 0;
       const perDiemAdvertisingCostsCents = calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursedCosts);
       const employerTransportPayoutCents = calculatePublicTransportPayoutCents(trip);
+      const transportTaxAllowanceCents = calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers);
       const transportAdvertisingCostsCents = calculateTransportDifferentialCents(trip);
       const employerOtherCostsCents = employerReimbursedCosts ? Math.max(trip.otherCostsCents, 0) : 0;
       const otherAdvertisingCostsCents = calculateOtherCostsDifferentialCents(trip);
@@ -74,14 +74,12 @@ export function buildTripAdvertisingCostsExportRows(trips: Trip[], year: number)
         origin: trip.origin,
         destination: trip.destination,
         municipalityCode: trip.municipalityCode ?? "",
-        transportType: trip.transportType,
-        transportLabel: TRANSPORT_LABELS[trip.transportType],
         oneWayKilometers: trip.oneWayKilometers,
         totalKilometers: trip.oneWayKilometers * 2,
-        ticketPriceCents: Math.max(trip.ticketPriceCents ?? 0, 0),
         employerPerDiemCents,
         perDiemAdvertisingCostsCents,
         employerTransportPayoutCents,
+        transportTaxAllowanceCents,
         transportAdvertisingCostsCents,
         employerOtherCostsCents,
         otherAdvertisingCostsCents,
@@ -105,6 +103,7 @@ export function summarizeTripAdvertisingCostsExport(rows: TripAdvertisingCostsEx
     employerPerDiemCents: sumRows(rows, (row) => row.employerPerDiemCents),
     perDiemAdvertisingCostsCents: sumRows(rows, (row) => row.perDiemAdvertisingCostsCents),
     employerTransportPayoutCents: sumRows(rows, (row) => row.employerTransportPayoutCents),
+    transportTaxAllowanceCents: sumRows(rows, (row) => row.transportTaxAllowanceCents),
     transportAdvertisingCostsCents: sumRows(rows, (row) => row.transportAdvertisingCostsCents),
     employerOtherCostsCents: sumRows(rows, (row) => row.employerOtherCostsCents),
     otherAdvertisingCostsCents: sumRows(rows, (row) => row.otherAdvertisingCostsCents),
@@ -172,6 +171,7 @@ export function buildTripAdvertisingCostsPrintHtml({
     ${summaryItem("Diäten Arbeitgeber", formatEuroCents(summary.employerPerDiemCents))}
     ${summaryItem("Diäten Werbungskosten", formatEuroCents(summary.perDiemAdvertisingCostsCents))}
     ${summaryItem("Fahrtkostenersatz Arbeitgeber", formatEuroCents(summary.employerTransportPayoutCents))}
+    ${summaryItem("Fahrtkosten steuerlich", formatEuroCents(summary.transportTaxAllowanceCents))}
     ${summaryItem("Kilometergeld offen", formatEuroCents(summary.transportAdvertisingCostsCents))}
     ${summaryItem("Sonstige Werbungskosten", formatEuroCents(summary.otherAdvertisingCostsCents))}
     ${summaryItem("Steuerpfl. Öffi-BEZU", formatEuroCents(summary.taxablePublicTransportSubsidyCents))}
@@ -190,7 +190,6 @@ export function buildTripAdvertisingCostsPrintHtml({
         <th>Startort</th>
         <th>Zieladresse</th>
         <th>GKZ</th>
-        <th>Fahrtkostenart</th>
         <th class="num">km einfach</th>
         <th class="num">km gesamt</th>
       </tr>
@@ -227,16 +226,15 @@ function renderTripRows(row: TripAdvertisingCostsExportRow): string {
     <td>${escapeHtml(row.origin || "-")}</td>
     <td>${escapeHtml(row.destination || "-")}</td>
     <td>${escapeHtml(row.municipalityCode || "-")}</td>
-    <td>${escapeHtml(row.transportLabel)}</td>
     <td class="num">${escapeHtml(formatKilometers(row.oneWayKilometers))}</td>
     <td class="num">${escapeHtml(formatKilometers(row.totalKilometers))}</td>
   </tr>
   <tr>
     <td class="label">Kosten</td>
-    <td colspan="2">Ticket: <strong>${escapeHtml(formatEuroCents(row.ticketPriceCents))}</strong></td>
     <td colspan="2">Diäten AG: <strong>${escapeHtml(formatEuroCents(row.employerPerDiemCents))}</strong></td>
     <td>Diäten WK: <strong>${escapeHtml(formatEuroCents(row.perDiemAdvertisingCostsCents))}</strong></td>
     <td>Fahrt AG: <strong>${escapeHtml(formatEuroCents(row.employerTransportPayoutCents))}</strong></td>
+    <td>Fahrt steuerlich: <strong>${escapeHtml(formatEuroCents(row.transportTaxAllowanceCents))}</strong></td>
     <td>KM offen: <strong>${escapeHtml(formatEuroCents(row.transportAdvertisingCostsCents))}</strong></td>
     <td>Sonst. AG: <strong>${escapeHtml(formatEuroCents(row.employerOtherCostsCents))}</strong></td>
     <td>Sonst. WK: <strong>${escapeHtml(formatEuroCents(row.otherAdvertisingCostsCents))}</strong></td>

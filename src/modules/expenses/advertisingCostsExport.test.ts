@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TravelExpensePayment, Trip } from "../../db/schema";
 import {
+  calculateFictionalKilometerAllowanceCents,
   calculatePerDiemDifferentialCents,
   calculatePublicTransportPayoutCents,
   calculateTaxablePublicTransportSubsidyCents,
@@ -67,9 +68,11 @@ describe("trip advertising costs export", () => {
     expect(JSON.stringify(rows)).not.toContain("PRIVATE_REASON_SENTINEL");
     expect(JSON.stringify(rows)).not.toContain("PRIVATE_NOTE_SENTINEL");
     expect(JSON.stringify(rows)).not.toContain("PRIVATE_OTHER_COSTS_SENTINEL");
+    expect(JSON.stringify(rows)).not.toContain("befoerderungszuschuss");
+    expect(JSON.stringify(rows)).not.toContain("Beförderungszuschuss");
   });
 
-  it("uses existing calculations for per diem, employer transport payout and open kilometer allowance", () => {
+  it("uses existing calculations for per diem, employer transport payout and tax kilometer allowance", () => {
     const trip = {
       ...baseTrip,
       transportType: "oeffi-zuschuss" as const,
@@ -78,10 +81,10 @@ describe("trip advertising costs export", () => {
     };
     const [row] = buildTripAdvertisingCostsExportRows([trip], 2026);
 
-    expect(row.ticketPriceCents).toBe(500);
     expect(row.employerPerDiemCents).toBe(trip.perDiemCents);
     expect(row.perDiemAdvertisingCostsCents).toBe(calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, trip.employerReimbursedCosts));
     expect(row.employerTransportPayoutCents).toBe(calculatePublicTransportPayoutCents(trip));
+    expect(row.transportTaxAllowanceCents).toBe(calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers));
     expect(row.transportAdvertisingCostsCents).toBe(calculateTransportDifferentialCents(trip));
     expect(row.taxablePublicTransportSubsidyCents).toBe(calculateTaxablePublicTransportSubsidyCents(trip));
   });
@@ -107,6 +110,7 @@ describe("trip advertising costs export", () => {
     expect(summary.count).toBe(2);
     expect(summary.paidCents).toBe(1500);
     expect(summary.employerTransportPayoutCents).toBe(rows[0].employerTransportPayoutCents);
+    expect(summary.transportTaxAllowanceCents).toBe(rows[0].transportTaxAllowanceCents + rows[1].transportTaxAllowanceCents);
     expect(summary.paidCents).not.toBe(summary.employerTransportPayoutCents);
     expect(summary.advertisingCostsTotalCents).toBe(rows[0].advertisingCostsTotalCents + rows[1].advertisingCostsTotalCents);
     expect(summary.remainingReconciliationCents).toBe(summary.employerReimbursementTotalCents - summary.paidCents);
@@ -120,6 +124,10 @@ describe("trip advertising costs export", () => {
     expect(html).toContain("Wien Hauptbahnhof");
     expect(html).toContain("Linz, Hauptplatz 1");
     expect(html).toContain("40101");
+    expect(html).toContain("Fahrt AG");
+    expect(html).toContain("Fahrt steuerlich");
+    expect(html).not.toContain("Fahrtkostenart");
+    expect(html).not.toContain("Beförderungszuschuss");
     expect(html).not.toContain("PRIVATE_REASON_SENTINEL");
     expect(html).not.toContain("PRIVATE_NOTE_SENTINEL");
     expect(html).not.toContain("PRIVATE_OTHER_COSTS_SENTINEL");
