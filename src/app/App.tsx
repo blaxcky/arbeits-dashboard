@@ -1572,7 +1572,10 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                   {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
                 </select>
               </Field>
-              <Field label="Ticketpreis (EUR)" className="trip-field-half trip-cost-field"><input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} /></Field>
+              <Field label="Ticketpreis pro Reise (EUR)" className="trip-field-half trip-cost-field">
+                <input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} />
+                {form.transportType === "oeffi-zuschuss" ? <span className="field-help">Einzelpreis erfassen; Hin- und Rückreise gelten jeweils mit diesem Preis.</span> : null}
+              </Field>
             </TripFormSection>
             <TripFormSection id="trip-section-other" title="Sonstiges" icon={Receipt} className="trip-form-section-split">
               <Field label="Sonstige Kosten (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
@@ -2089,10 +2092,16 @@ function OpenTripsDialog({ trips, showToast, onClose, onDone }: { trips: Trip[];
 function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showToast: ShowToast; onDone: (trip: Trip) => Promise<unknown> }) {
   const openTrips = sortedOpenTrips(trips);
   const activeTrip = openTrips[0];
+  const [copiedFieldKeys, setCopiedFieldKeys] = useState<Set<string>>(() => new Set());
 
-  async function copyValue(value: string) {
+  useEffect(() => {
+    setCopiedFieldKeys(new Set());
+  }, [activeTrip?.id]);
+
+  async function copyValue(value: string, fieldKey: string) {
     try {
       await navigator.clipboard.writeText(value);
+      setCopiedFieldKeys((previous) => new Set(previous).add(fieldKey));
       showToast("Wert kopiert.");
     } catch {
       showToast("Kopieren nicht möglich.");
@@ -2112,20 +2121,26 @@ function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showTo
             </div>
             <strong>{formatEuroCents(calculateTripTotalCents(activeTrip))}</strong>
           </div>
+          {activeTrip.transportType === "oeffi-zuschuss" ? (
+            <p className="open-trip-ticket-note">Ticketpreis ist der Einzelpreis pro Reise; Hin- und Rückreise jeweils mit diesem Preis erfassen.</p>
+          ) : null}
           <div className="copy-field-grid">
-            {openTripFields(activeTrip).map((field) => (
-              <div key={field.label} className={`${field.ready ? "" : "copy-field-missing"} copy-field-${field.layout}`}>
-                <span>{field.label}{field.unit ? ` · ${field.unit}` : ""}</span>
-                {field.layout === "wide" ? (
-                  <textarea value={field.value || "Nicht kopierfertig"} readOnly rows={3} aria-label={field.label} />
-                ) : (
-                  <strong>{field.value || "Nicht kopierfertig"}</strong>
-                )}
-                <button className="icon-button" type="button" title={`${field.label} kopieren`} aria-label={`${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value)}>
-                  <Copy size={16} />
-                </button>
-              </div>
-            ))}
+            {openTripFields(activeTrip).map((field) => {
+              const fieldKey = `${activeTrip.id}:${field.label}`;
+              return (
+                <div key={field.label} className={`${field.ready ? "" : "copy-field-missing"} ${copiedFieldKeys.has(fieldKey) ? "copy-field-copied" : ""} copy-field-${field.layout}`}>
+                  <span>{field.label}{field.unit ? ` · ${field.unit}` : ""}</span>
+                  {field.layout === "wide" ? (
+                    <textarea value={field.value || "Nicht kopierfertig"} readOnly rows={3} aria-label={field.label} />
+                  ) : (
+                    <strong>{field.value || "Nicht kopierfertig"}</strong>
+                  )}
+                  <button className="icon-button" type="button" title={`${field.label} kopieren`} aria-label={`${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value, fieldKey)}>
+                    <Copy size={16} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
           <button className="secondary-button" type="button" onClick={() => void onDone(activeTrip)}>
             <CheckCircle size={17} /> Als erledigt markieren
@@ -2956,6 +2971,7 @@ export function openTripFields(trip: Trip): OpenTripField[] {
   ];
   if (isPublicTransport) {
     fields.push(
+      { label: "Ticketpreis pro Reise", value: centsToEuroInput(trip.ticketPriceCents ?? 0), ready: (trip.ticketPriceCents ?? 0) > 0, layout: "short", unit: "EUR" },
       { label: "Beschreibung", value: "Fahrt Öffis", ready: true, layout: "short" },
       { label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()), layout: "wide" },
       { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }

@@ -156,7 +156,8 @@ describe("trip copy fields", () => {
   });
 
   it("uses the exact public transport copy text", () => {
-    const fields = openTripFields(baseTrip);
+    const fields = openTripFields({ ...baseTrip, ticketPriceCents: 550 });
+    expect(fields.find((field) => field.label === "Ticketpreis pro Reise")).toMatchObject({ value: "5,5", ready: true, layout: "short", unit: "EUR" });
     expect(fields.find((field) => field.label === "Beschreibung")).toMatchObject({ value: "Fahrt Öffis", ready: true });
     expect(fields.find((field) => field.label === "Bemerkungen")).toMatchObject({
       value: "Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien Kilometer lt. Google Maps",
@@ -164,6 +165,11 @@ describe("trip copy fields", () => {
       layout: "wide"
     });
     expect(fields.find((field) => field.label === "Anzahl")).toMatchObject({ value: "60", ready: true });
+  });
+
+  it("keeps missing public transport ticket prices unavailable for copying", () => {
+    expect(openTripFields(baseTrip).find((field) => field.label === "Ticketpreis pro Reise")).toMatchObject({ value: "0", ready: false, unit: "EUR" });
+    expect(openTripFields({ ...baseTrip, ticketPriceCents: undefined }).find((field) => field.label === "Ticketpreis pro Reise")).toMatchObject({ value: "0", ready: false, unit: "EUR" });
   });
 
   it("adds kilometer allowance copy fields with the exact remark", () => {

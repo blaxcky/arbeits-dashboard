@@ -728,6 +728,13 @@ button:disabled {
   background: #eef2f5;
 }
 
+.field-help {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .field input::placeholder,
 .field textarea::placeholder,
 .date-row input::placeholder {
@@ -1666,6 +1673,17 @@ button:disabled {
   gap: 8px;
 }
 
+.open-trip-ticket-note {
+  margin: 0;
+  border: 1px solid #d8e4ef;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f5f9fc;
+  color: #334155;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .copy-field-grid > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1718,6 +1736,22 @@ button:disabled {
 
 .copy-field-missing {
   opacity: 0.68;
+}
+
+.copy-field-copied {
+  border-color: #cbd5df;
+  background: #eef1f4;
+}
+
+.copy-field-copied span,
+.copy-field-copied strong,
+.copy-field-copied textarea {
+  color: #7a8492;
+  opacity: 0.48;
+}
+
+.copy-field-copied .icon-button {
+  opacity: 1;
 }
 
 @media (max-width: 720px) {
