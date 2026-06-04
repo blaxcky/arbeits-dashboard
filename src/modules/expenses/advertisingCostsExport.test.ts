@@ -62,9 +62,9 @@ describe("trip advertising costs export", () => {
     expect(rows[0]).toMatchObject({
       origin: "Wien Hauptbahnhof",
       destination: "Linz, Hauptplatz 1",
-      municipalityCode: "40101",
       employerPerDiemCents: 0
     });
+    expect(JSON.stringify(rows)).not.toContain("40101");
     expect(JSON.stringify(rows)).not.toContain("PRIVATE_REASON_SENTINEL");
     expect(JSON.stringify(rows)).not.toContain("PRIVATE_NOTE_SENTINEL");
     expect(JSON.stringify(rows)).not.toContain("PRIVATE_OTHER_COSTS_SENTINEL");
@@ -123,9 +123,12 @@ describe("trip advertising costs export", () => {
 
     expect(html).toContain("Wien Hauptbahnhof");
     expect(html).toContain("Linz, Hauptplatz 1");
-    expect(html).toContain("40101");
     expect(html).toContain("Fahrt AG");
     expect(html).toContain("Fahrt steuerlich");
+    expect(html).not.toContain("40101");
+    expect(html).not.toContain("GKZ");
+    expect(html).not.toContain("Jahressummen");
+    expect(html).not.toContain("Werbungskosten gesamt");
     expect(html).not.toContain("Fahrtkostenart");
     expect(html).not.toContain("Beförderungszuschuss");
     expect(html).not.toContain("PRIVATE_REASON_SENTINEL");

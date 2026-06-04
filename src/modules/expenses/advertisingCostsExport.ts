@@ -16,7 +16,6 @@ export interface TripAdvertisingCostsExportRow {
   durationMinutes: number;
   origin: string;
   destination: string;
-  municipalityCode: string;
   oneWayKilometers: number;
   totalKilometers: number;
   employerPerDiemCents: number;
@@ -73,7 +72,6 @@ export function buildTripAdvertisingCostsExportRows(trips: Trip[], year: number)
         durationMinutes: trip.durationMinutes,
         origin: trip.origin,
         destination: trip.destination,
-        municipalityCode: trip.municipalityCode ?? "",
         oneWayKilometers: trip.oneWayKilometers,
         totalKilometers: trip.oneWayKilometers * 2,
         employerPerDiemCents,
@@ -118,7 +116,6 @@ export function summarizeTripAdvertisingCostsExport(rows: TripAdvertisingCostsEx
 export function buildTripAdvertisingCostsPrintHtml({
   year,
   rows,
-  summary,
   payments
 }: {
   year: number;
@@ -140,10 +137,6 @@ export function buildTripAdvertisingCostsPrintHtml({
     h1 { margin: 0 0 4px; font-size: 15px; }
     h2 { margin: 8px 0 4px; font-size: 10px; }
     .meta { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; color: #374151; }
-    .summary { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-bottom: 6px; }
-    .summary div { border: 1px solid #d1d5db; padding: 2px 3px; }
-    .summary span { display: block; color: #4b5563; font-size: 7.5px; }
-    .summary strong { display: block; font-size: 9px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td { border: 1px solid #d1d5db; padding: 2px 3px; vertical-align: top; overflow-wrap: anywhere; }
     th { background: #f3f4f6; font-weight: 700; }
@@ -164,21 +157,6 @@ export function buildTripAdvertisingCostsPrintHtml({
       <span>Private Freitexte wie Reisegrund, Notizen und Beschreibungen sonstiger Kosten sind nicht enthalten.</span>
     </div>
   </header>
-  <section class="summary" aria-label="Jahressummen">
-    ${summaryItem("Reisen", String(summary.count))}
-    ${summaryItem("Dauer", formatDuration(summary.durationMinutes))}
-    ${summaryItem("Kilometer", formatKilometers(summary.kilometers))}
-    ${summaryItem("Diäten Arbeitgeber", formatEuroCents(summary.employerPerDiemCents))}
-    ${summaryItem("Diäten Werbungskosten", formatEuroCents(summary.perDiemAdvertisingCostsCents))}
-    ${summaryItem("Fahrtkostenersatz Arbeitgeber", formatEuroCents(summary.employerTransportPayoutCents))}
-    ${summaryItem("Fahrtkosten steuerlich", formatEuroCents(summary.transportTaxAllowanceCents))}
-    ${summaryItem("Kilometergeld offen", formatEuroCents(summary.transportAdvertisingCostsCents))}
-    ${summaryItem("Sonstige Werbungskosten", formatEuroCents(summary.otherAdvertisingCostsCents))}
-    ${summaryItem("Steuerpfl. Öffi-BEZU", formatEuroCents(summary.taxablePublicTransportSubsidyCents))}
-    ${summaryItem("Werbungskosten gesamt", formatEuroCents(summary.advertisingCostsTotalCents))}
-    ${summaryItem("AG-Überweisungen erfasst", formatEuroCents(summary.paidCents))}
-    ${summaryItem("Abgleich offen", formatEuroCents(summary.remainingReconciliationCents))}
-  </section>
   <table aria-label="Reisekosten Rohdaten">
     <thead>
       <tr>
@@ -189,7 +167,6 @@ export function buildTripAdvertisingCostsPrintHtml({
         <th>Dauer</th>
         <th>Startort</th>
         <th>Zieladresse</th>
-        <th>GKZ</th>
         <th class="num">km einfach</th>
         <th class="num">km gesamt</th>
       </tr>
@@ -225,13 +202,12 @@ function renderTripRows(row: TripAdvertisingCostsExportRow): string {
     <td>${escapeHtml(formatDuration(row.durationMinutes))}</td>
     <td>${escapeHtml(row.origin || "-")}</td>
     <td>${escapeHtml(row.destination || "-")}</td>
-    <td>${escapeHtml(row.municipalityCode || "-")}</td>
     <td class="num">${escapeHtml(formatKilometers(row.oneWayKilometers))}</td>
     <td class="num">${escapeHtml(formatKilometers(row.totalKilometers))}</td>
   </tr>
   <tr>
     <td class="label">Kosten</td>
-    <td colspan="2">Diäten AG: <strong>${escapeHtml(formatEuroCents(row.employerPerDiemCents))}</strong></td>
+    <td>Diäten AG: <strong>${escapeHtml(formatEuroCents(row.employerPerDiemCents))}</strong></td>
     <td>Diäten WK: <strong>${escapeHtml(formatEuroCents(row.perDiemAdvertisingCostsCents))}</strong></td>
     <td>Fahrt AG: <strong>${escapeHtml(formatEuroCents(row.employerTransportPayoutCents))}</strong></td>
     <td>Fahrt steuerlich: <strong>${escapeHtml(formatEuroCents(row.transportTaxAllowanceCents))}</strong></td>
@@ -240,10 +216,6 @@ function renderTripRows(row: TripAdvertisingCostsExportRow): string {
     <td>Sonst. WK: <strong>${escapeHtml(formatEuroCents(row.otherAdvertisingCostsCents))}</strong></td>
     <td>Öffi steuerpfl. / WK ges.: <strong>${escapeHtml(formatEuroCents(row.taxablePublicTransportSubsidyCents))} / ${escapeHtml(formatEuroCents(row.advertisingCostsTotalCents))}</strong></td>
   </tr>`;
-}
-
-function summaryItem(label: string, value: string): string {
-  return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 
 function sumRows(rows: TripAdvertisingCostsExportRow[], value: (row: TripAdvertisingCostsExportRow) => number): number {
