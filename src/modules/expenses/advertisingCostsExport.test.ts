@@ -4,7 +4,6 @@ import {
   calculateFictionalKilometerAllowanceCents,
   calculatePerDiemDifferentialCents,
   calculatePublicTransportPayoutCents,
-  calculateTaxablePublicTransportSubsidyCents,
   calculateTransportDifferentialCents
 } from "./calculations";
 import { buildTripAdvertisingCostsExportRows, buildTripAdvertisingCostsPrintHtml, summarizeTripAdvertisingCostsExport } from "./advertisingCostsExport";
@@ -72,21 +71,21 @@ describe("trip advertising costs export", () => {
     expect(JSON.stringify(rows)).not.toContain("Beförderungszuschuss");
   });
 
-  it("uses existing calculations for per diem, employer transport payout and tax kilometer allowance", () => {
+  it("uses the tax-free part of employer transport payout for public transport rows", () => {
     const trip = {
       ...baseTrip,
       transportType: "oeffi-zuschuss" as const,
-      oneWayKilometers: 60,
-      ticketPriceCents: 500
+      oneWayKilometers: 50,
+      ticketPriceCents: 1500
     };
     const [row] = buildTripAdvertisingCostsExportRows([trip], 2026);
 
     expect(row.employerPerDiemCents).toBe(trip.perDiemCents);
     expect(row.perDiemAdvertisingCostsCents).toBe(calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, trip.employerReimbursedCosts));
-    expect(row.employerTransportPayoutCents).toBe(calculatePublicTransportPayoutCents(trip));
+    expect(calculatePublicTransportPayoutCents(trip)).toBe(5000);
+    expect(row.employerTaxFreeTransportPayoutCents).toBe(3000);
     expect(row.transportTaxAllowanceCents).toBe(calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers));
     expect(row.transportAdvertisingCostsCents).toBe(calculateTransportDifferentialCents(trip));
-    expect(row.taxablePublicTransportSubsidyCents).toBe(calculateTaxablePublicTransportSubsidyCents(trip));
   });
 
   it("summarizes advertising costs and keeps employer payments separate", () => {
@@ -109,9 +108,9 @@ describe("trip advertising costs export", () => {
 
     expect(summary.count).toBe(2);
     expect(summary.paidCents).toBe(1500);
-    expect(summary.employerTransportPayoutCents).toBe(rows[0].employerTransportPayoutCents);
+    expect(summary.employerTaxFreeTransportPayoutCents).toBe(rows[0].employerTaxFreeTransportPayoutCents);
     expect(summary.transportTaxAllowanceCents).toBe(rows[0].transportTaxAllowanceCents + rows[1].transportTaxAllowanceCents);
-    expect(summary.paidCents).not.toBe(summary.employerTransportPayoutCents);
+    expect(summary.paidCents).not.toBe(summary.employerTaxFreeTransportPayoutCents);
     expect(summary.advertisingCostsTotalCents).toBe(rows[0].advertisingCostsTotalCents + rows[1].advertisingCostsTotalCents);
     expect(summary.remainingReconciliationCents).toBe(summary.employerReimbursementTotalCents - summary.paidCents);
   });
@@ -123,8 +122,9 @@ describe("trip advertising costs export", () => {
 
     expect(html).toContain("Wien Hauptbahnhof");
     expect(html).toContain("Linz, Hauptplatz 1");
-    expect(html).toContain("Fahrt AG");
+    expect(html).toContain("Fahrt AG steuerfrei");
     expect(html).toContain("Fahrt steuerlich");
+    expect(html).not.toContain("Öffi steuerpfl.");
     expect(html).not.toContain("40101");
     expect(html).not.toContain("GKZ");
     expect(html).not.toContain("Jahressummen");

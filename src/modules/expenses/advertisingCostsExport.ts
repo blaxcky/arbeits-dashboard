@@ -4,7 +4,8 @@ import {
   calculateOtherCostsDifferentialCents,
   calculatePerDiemDifferentialCents,
   calculatePublicTransportPayoutCents,
-  calculateTaxablePublicTransportSubsidyCents,
+  calculatePublicTransportTicketRoundTripCents,
+  calculateTripTravelCostCents,
   calculateTransportDifferentialCents
 } from "./calculations";
 
@@ -20,12 +21,11 @@ export interface TripAdvertisingCostsExportRow {
   totalKilometers: number;
   employerPerDiemCents: number;
   perDiemAdvertisingCostsCents: number;
-  employerTransportPayoutCents: number;
+  employerTaxFreeTransportPayoutCents: number;
   transportTaxAllowanceCents: number;
   transportAdvertisingCostsCents: number;
   employerOtherCostsCents: number;
   otherAdvertisingCostsCents: number;
-  taxablePublicTransportSubsidyCents: number;
   advertisingCostsTotalCents: number;
 }
 
@@ -36,12 +36,11 @@ export interface TripAdvertisingCostsExportSummary {
   kilometers: number;
   employerPerDiemCents: number;
   perDiemAdvertisingCostsCents: number;
-  employerTransportPayoutCents: number;
+  employerTaxFreeTransportPayoutCents: number;
   transportTaxAllowanceCents: number;
   transportAdvertisingCostsCents: number;
   employerOtherCostsCents: number;
   otherAdvertisingCostsCents: number;
-  taxablePublicTransportSubsidyCents: number;
   advertisingCostsTotalCents: number;
   employerReimbursementTotalCents: number;
   paidCents: number;
@@ -57,11 +56,11 @@ export function buildTripAdvertisingCostsExportRows(trips: Trip[], year: number)
       const employerPerDiemCents = employerReimbursedCosts ? Math.max(trip.perDiemCents, 0) : 0;
       const perDiemAdvertisingCostsCents = calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursedCosts);
       const employerTransportPayoutCents = calculatePublicTransportPayoutCents(trip);
+      const employerTaxFreeTransportPayoutCents = calculateEmployerTaxFreeTransportPayoutCents(trip, employerTransportPayoutCents);
       const transportTaxAllowanceCents = calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers);
       const transportAdvertisingCostsCents = calculateTransportDifferentialCents(trip);
       const employerOtherCostsCents = employerReimbursedCosts ? Math.max(trip.otherCostsCents, 0) : 0;
       const otherAdvertisingCostsCents = calculateOtherCostsDifferentialCents(trip);
-      const taxablePublicTransportSubsidyCents = calculateTaxablePublicTransportSubsidyCents(trip);
       const advertisingCostsTotalCents = perDiemAdvertisingCostsCents + transportAdvertisingCostsCents + otherAdvertisingCostsCents;
 
       return {
@@ -76,12 +75,11 @@ export function buildTripAdvertisingCostsExportRows(trips: Trip[], year: number)
         totalKilometers: trip.oneWayKilometers * 2,
         employerPerDiemCents,
         perDiemAdvertisingCostsCents,
-        employerTransportPayoutCents,
+        employerTaxFreeTransportPayoutCents,
         transportTaxAllowanceCents,
         transportAdvertisingCostsCents,
         employerOtherCostsCents,
         otherAdvertisingCostsCents,
-        taxablePublicTransportSubsidyCents,
         advertisingCostsTotalCents
       };
     });
@@ -91,7 +89,7 @@ export function summarizeTripAdvertisingCostsExport(rows: TripAdvertisingCostsEx
   const paidCents = payments
     .filter((payment) => payment.year === year)
     .reduce((sum, payment) => sum + Math.max(payment.amountCents, 0), 0);
-  const employerReimbursementTotalCents = sumRows(rows, (row) => row.employerPerDiemCents + row.employerTransportPayoutCents + row.employerOtherCostsCents);
+  const employerReimbursementTotalCents = sumRows(rows, (row) => row.employerPerDiemCents + row.employerTaxFreeTransportPayoutCents + row.employerOtherCostsCents);
 
   return {
     year,
@@ -100,12 +98,11 @@ export function summarizeTripAdvertisingCostsExport(rows: TripAdvertisingCostsEx
     kilometers: sumRows(rows, (row) => row.totalKilometers),
     employerPerDiemCents: sumRows(rows, (row) => row.employerPerDiemCents),
     perDiemAdvertisingCostsCents: sumRows(rows, (row) => row.perDiemAdvertisingCostsCents),
-    employerTransportPayoutCents: sumRows(rows, (row) => row.employerTransportPayoutCents),
+    employerTaxFreeTransportPayoutCents: sumRows(rows, (row) => row.employerTaxFreeTransportPayoutCents),
     transportTaxAllowanceCents: sumRows(rows, (row) => row.transportTaxAllowanceCents),
     transportAdvertisingCostsCents: sumRows(rows, (row) => row.transportAdvertisingCostsCents),
     employerOtherCostsCents: sumRows(rows, (row) => row.employerOtherCostsCents),
     otherAdvertisingCostsCents: sumRows(rows, (row) => row.otherAdvertisingCostsCents),
-    taxablePublicTransportSubsidyCents: sumRows(rows, (row) => row.taxablePublicTransportSubsidyCents),
     advertisingCostsTotalCents: sumRows(rows, (row) => row.advertisingCostsTotalCents),
     employerReimbursementTotalCents,
     paidCents,
@@ -209,13 +206,18 @@ function renderTripRows(row: TripAdvertisingCostsExportRow): string {
     <td class="label">Kosten</td>
     <td>Diäten AG: <strong>${escapeHtml(formatEuroCents(row.employerPerDiemCents))}</strong></td>
     <td>Diäten WK: <strong>${escapeHtml(formatEuroCents(row.perDiemAdvertisingCostsCents))}</strong></td>
-    <td>Fahrt AG: <strong>${escapeHtml(formatEuroCents(row.employerTransportPayoutCents))}</strong></td>
+    <td>Fahrt AG steuerfrei: <strong>${escapeHtml(formatEuroCents(row.employerTaxFreeTransportPayoutCents))}</strong></td>
     <td>Fahrt steuerlich: <strong>${escapeHtml(formatEuroCents(row.transportTaxAllowanceCents))}</strong></td>
     <td>KM offen: <strong>${escapeHtml(formatEuroCents(row.transportAdvertisingCostsCents))}</strong></td>
     <td>Sonst. AG: <strong>${escapeHtml(formatEuroCents(row.employerOtherCostsCents))}</strong></td>
     <td>Sonst. WK: <strong>${escapeHtml(formatEuroCents(row.otherAdvertisingCostsCents))}</strong></td>
-    <td>Öffi steuerpfl. / WK ges.: <strong>${escapeHtml(formatEuroCents(row.taxablePublicTransportSubsidyCents))} / ${escapeHtml(formatEuroCents(row.advertisingCostsTotalCents))}</strong></td>
+    <td>WK ges.: <strong>${escapeHtml(formatEuroCents(row.advertisingCostsTotalCents))}</strong></td>
   </tr>`;
+}
+
+function calculateEmployerTaxFreeTransportPayoutCents(trip: Trip, employerTransportPayoutCents: number): number {
+  if (trip.transportType === "oeffi-zuschuss") return Math.min(employerTransportPayoutCents, calculatePublicTransportTicketRoundTripCents(trip));
+  return Math.min(employerTransportPayoutCents, calculateTripTravelCostCents(trip));
 }
 
 function sumRows(rows: TripAdvertisingCostsExportRow[], value: (row: TripAdvertisingCostsExportRow) => number): number {
