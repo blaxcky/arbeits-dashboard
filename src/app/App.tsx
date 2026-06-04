@@ -1956,12 +1956,13 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
 
     const exportSummary = summarizeTripAdvertisingCostsExport(rows, data.tripPayments, year);
     const html = buildTripAdvertisingCostsPrintHtml({ year, rows, summary: exportSummary, payments: data.tripPayments });
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    const printWindow = window.open("", "_blank");
     if (!printWindow) {
       showToast("Druckansicht konnte nicht geöffnet werden.");
       return;
     }
 
+    printWindow.opener = null;
     printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
