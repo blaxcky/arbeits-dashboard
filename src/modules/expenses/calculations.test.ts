@@ -95,25 +95,33 @@ describe("expense calculations", () => {
     const normal = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 60, ticketPriceCents: 500 };
     expect(calculateTripTravelCostCents(normal)).toBe(5400);
     expect(calculatePublicTransportPayoutCents(normal)).toBe(5400);
-    expect(calculateTaxablePublicTransportSubsidyCents(normal)).toBe(4900);
-    expect(calculateTransportDifferentialCents(normal)).toBe(5500);
+    expect(calculateTaxablePublicTransportSubsidyCents(normal)).toBe(4400);
+    expect(calculateTransportDifferentialCents(normal)).toBe(5000);
 
     const ticketAboveSubsidy = { ...normal, ticketPriceCents: 5500 };
-    expect(calculatePublicTransportPayoutCents(ticketAboveSubsidy)).toBe(5500);
+    expect(calculatePublicTransportPayoutCents(ticketAboveSubsidy)).toBe(11000);
     expect(calculateTaxablePublicTransportSubsidyCents(ticketAboveSubsidy)).toBe(0);
-    expect(calculateTransportDifferentialCents(ticketAboveSubsidy)).toBe(500);
+    expect(calculateTransportDifferentialCents(ticketAboveSubsidy)).toBe(0);
   });
 
   it("does not add taxable public transport subsidy to the differential", () => {
     const trip = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 60, durationMinutes: 301, perDiemCents: 1000, ticketPriceCents: 500 };
-    expect(calculateTaxablePublicTransportSubsidyCents(trip)).toBe(4900);
-    expect(calculateTripDifferentialCents(trip)).toBe(6000);
+    expect(calculateTaxablePublicTransportSubsidyCents(trip)).toBe(4400);
+    expect(calculateTripDifferentialCents(trip)).toBe(5500);
   });
 
   it("calculates taxable public transport subsidy from ticket price without going below zero", () => {
-    expect(calculateTaxablePublicTransportSubsidyCents({ ...baseTrip, transportType: "oeffi-zuschuss", oneWayKilometers: 100, ticketPriceCents: 3000 })).toBe(4000);
+    expect(calculateTaxablePublicTransportSubsidyCents({ ...baseTrip, transportType: "oeffi-zuschuss", oneWayKilometers: 100, ticketPriceCents: 3000 })).toBe(1000);
     expect(calculateTaxablePublicTransportSubsidyCents({ ...baseTrip, transportType: "oeffi-zuschuss", oneWayKilometers: 100, ticketPriceCents: 8000 })).toBe(0);
     expect(calculateTaxablePublicTransportSubsidyCents({ ...baseTrip, transportType: "befoerderungszuschuss", oneWayKilometers: 100, ticketPriceCents: 3000 })).toBe(0);
+  });
+
+  it("treats public transport ticket price as one direction for tax-free round trip costs", () => {
+    const trip = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 50, ticketPriceCents: 1500 };
+
+    expect(calculateTripTravelCostCents(trip)).toBe(5000);
+    expect(calculatePublicTransportPayoutCents(trip)).toBe(5000);
+    expect(calculateTaxablePublicTransportSubsidyCents(trip)).toBe(2000);
   });
 
   it("keeps old trip objects without ticket price calculable", () => {

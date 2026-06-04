@@ -58,7 +58,7 @@ export function calculateTripTravelCostCents(trip: Pick<Trip, "transportType" | 
 export function calculatePublicTransportPayoutCents(trip: Pick<Trip, "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "ticketPriceCents">> & TripReimbursementInput): number {
   if (!employerReimbursesCosts(trip)) return 0;
   if (trip.transportType !== "oeffi-zuschuss") return calculateTripTravelCostCents(trip);
-  return Math.max(calculateTripTravelCostCents(trip), Math.max(trip.ticketPriceCents ?? 0, 0));
+  return Math.max(calculateTripTravelCostCents(trip), calculatePublicTransportTicketRoundTripCents(trip));
 }
 
 export function calculateTripTotalCents(trip: Pick<Trip, "transportType" | "oneWayKilometers" | "perDiemCents" | "otherCostsCents"> & Partial<Pick<Trip, "ticketPriceCents">> & TripReimbursementInput): number {
@@ -91,14 +91,18 @@ export function calculateTransportDifferentialCents(trip: Pick<Trip, "transportT
   if (!employerReimbursesCosts(trip)) return calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers);
   if (trip.transportType !== "befoerderungszuschuss" && trip.transportType !== "oeffi-zuschuss") return 0;
   const fictionalKilometerAllowanceCents = calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers);
-  const taxFreeAmountCents = trip.transportType === "oeffi-zuschuss" ? Math.max(trip.ticketPriceCents ?? 0, 0) : calculateTripTravelCostCents(trip);
+  const taxFreeAmountCents = trip.transportType === "oeffi-zuschuss" ? calculatePublicTransportTicketRoundTripCents(trip) : calculateTripTravelCostCents(trip);
   return Math.max(fictionalKilometerAllowanceCents - taxFreeAmountCents, 0);
 }
 
 export function calculateTaxablePublicTransportSubsidyCents(trip: Pick<Trip, "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "ticketPriceCents">> & TripReimbursementInput): number {
   if (!employerReimbursesCosts(trip)) return 0;
   if (trip.transportType !== "oeffi-zuschuss") return 0;
-  return Math.max(calculatePublicTransportPayoutCents(trip) - Math.max(trip.ticketPriceCents ?? 0, 0), 0);
+  return Math.max(calculatePublicTransportPayoutCents(trip) - calculatePublicTransportTicketRoundTripCents(trip), 0);
+}
+
+export function calculatePublicTransportTicketRoundTripCents(trip: Partial<Pick<Trip, "ticketPriceCents">>): number {
+  return Math.max(trip.ticketPriceCents ?? 0, 0) * 2;
 }
 
 export function calculateOtherCostsDifferentialCents(trip: Pick<Trip, "otherCostsCents"> & TripReimbursementInput): number {

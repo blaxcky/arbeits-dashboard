@@ -53,6 +53,7 @@ import {
   calculateOtherCostsDifferentialCents,
   calculatePerDiemDifferentialCents,
   calculatePublicTransportPayoutCents,
+  calculatePublicTransportTicketRoundTripCents,
   calculateTaxablePublicTransportSubsidyCents,
   calculateTaxPerDiemCents,
   calculateTransportDifferentialCents,
@@ -1181,7 +1182,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const previewOtherCostsDifferentialCents = calculateOtherCostsDifferentialCents(previewTripCosts);
   const previewTaxableTransportSubsidyCents = calculateTaxablePublicTransportSubsidyCents(previewTripCosts);
   const previewDifferentialCents = calculateTripDifferentialCents({ ...previewTripCosts, durationMinutes: previewDurationMinutes });
-  const publicTicketAboveSubsidy = previewTripCosts.employerReimbursedCosts && form.transportType === "oeffi-zuschuss" && previewTripCosts.ticketPriceCents > previewTravelCostCents;
+  const publicTicketAboveSubsidy = previewTripCosts.employerReimbursedCosts && form.transportType === "oeffi-zuschuss" && calculatePublicTransportTicketRoundTripCents(previewTripCosts) > previewTravelCostCents;
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
   const mapsUrl = buildGoogleMapsUrl(form.origin, form.destination);
   const mapsEmbedUrl = buildGoogleMapsEmbedUrl(form.origin, form.destination);
@@ -1574,7 +1575,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                   {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
                 </select>
               </Field>
-              <Field label="Ticketpreis pro Reise (EUR)" className="trip-field-half trip-cost-field">
+              <Field label="Ticketpreis je Richtung (EUR)" className="trip-field-half trip-cost-field">
                 <input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} />
                 {form.transportType === "oeffi-zuschuss" ? <span className="field-help">Einzelpreis erfassen; Hin- und Rückreise gelten jeweils mit diesem Preis.</span> : null}
               </Field>
@@ -1620,7 +1621,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               </dl>
             </div>
           </section>
-          {publicTicketAboveSubsidy ? <Notice tone="warning" title="Ticketpreis liegt über dem Öffi-BEZU" text="Es wird der Ticketpreis ersetzt; dadurch entsteht kein steuerpflichtiger Öffi-BEZU." /> : null}
+          {publicTicketAboveSubsidy ? <Notice tone="warning" title="Ticketpreise liegen über dem Öffi-BEZU" text="Es wird der Ticketpreis für Hin- und Rückreise ersetzt; dadurch entsteht kein steuerpflichtiger Öffi-BEZU." /> : null}
           <div className="trip-helper-grid">
             {mapsUrl ? (
               <div className="button-row trip-map-actions">
@@ -2152,7 +2153,7 @@ function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showTo
             <strong>{formatEuroCents(calculateTripTotalCents(activeTrip))}</strong>
           </div>
           {activeTrip.transportType === "oeffi-zuschuss" ? (
-            <p className="open-trip-ticket-note">Ticketpreis ist der Einzelpreis pro Reise; Hin- und Rückreise jeweils mit diesem Preis erfassen.</p>
+            <p className="open-trip-ticket-note">Ticketpreis ist der Einzelpreis je Richtung; Hin- und Rückreise werden mit diesem Preis gerechnet.</p>
           ) : null}
           <div className="copy-field-grid">
             {openTripFields(activeTrip).map((field) => {
@@ -3001,7 +3002,7 @@ export function openTripFields(trip: Trip): OpenTripField[] {
   ];
   if (isPublicTransport) {
     fields.push(
-      { label: "Ticketpreis pro Reise", value: centsToEuroInput(trip.ticketPriceCents ?? 0), ready: (trip.ticketPriceCents ?? 0) > 0, layout: "short", unit: "EUR" },
+      { label: "Ticketpreis je Richtung", value: centsToEuroInput(trip.ticketPriceCents ?? 0), ready: (trip.ticketPriceCents ?? 0) > 0, layout: "short", unit: "EUR" },
       { label: "Beschreibung", value: "Fahrt Öffis", ready: true, layout: "short" },
       { label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()), layout: "wide" },
       { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }
