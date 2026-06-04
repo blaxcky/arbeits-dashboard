@@ -95,6 +95,79 @@ export function calculateTransportDifferentialCents(trip: Pick<Trip, "transportT
   return Math.max(fictionalKilometerAllowanceCents - taxFreeAmountCents, 0);
 }
 
+export interface PublicTransportTripTaxBreakdown {
+  tripId: string;
+  employerTransportPayoutCents: number;
+  publicTransportTicketRoundTripCents: number;
+  publicTransportTaxFreeCents: number;
+  taxablePublicTransportSubsidyCents: number;
+  transportDifferentialCents: number;
+}
+
+export function calculateTripTaxBreakdown(
+  trip: Pick<Trip, "id" | "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "ticketPriceCents">> & TripReimbursementInput,
+  publicTransportTaxFreeCents?: number
+): PublicTransportTripTaxBreakdown {
+  const employerTransportPayoutCents = calculatePublicTransportPayoutCents(trip);
+  const fictionalKilometerAllowanceCents = calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers);
+  if (!employerReimbursesCosts(trip)) {
+    return {
+      tripId: trip.id,
+      employerTransportPayoutCents,
+      publicTransportTicketRoundTripCents: 0,
+      publicTransportTaxFreeCents: 0,
+      taxablePublicTransportSubsidyCents: 0,
+      transportDifferentialCents: fictionalKilometerAllowanceCents
+    };
+  }
+
+  if (trip.transportType !== "oeffi-zuschuss") {
+    return {
+      tripId: trip.id,
+      employerTransportPayoutCents,
+      publicTransportTicketRoundTripCents: 0,
+      publicTransportTaxFreeCents: 0,
+      taxablePublicTransportSubsidyCents: 0,
+      transportDifferentialCents: calculateTransportDifferentialCents(trip)
+    };
+  }
+
+  const publicTransportTicketRoundTripCents = calculatePublicTransportTicketRoundTripCents(trip);
+  const taxFreeCents = Math.min(Math.max(publicTransportTaxFreeCents ?? publicTransportTicketRoundTripCents, 0), publicTransportTicketRoundTripCents);
+  return {
+    tripId: trip.id,
+    employerTransportPayoutCents,
+    publicTransportTicketRoundTripCents,
+    publicTransportTaxFreeCents: taxFreeCents,
+    taxablePublicTransportSubsidyCents: Math.max(employerTransportPayoutCents - taxFreeCents, 0),
+    transportDifferentialCents: Math.max(fictionalKilometerAllowanceCents - taxFreeCents, 0)
+  };
+}
+
+export function calculatePublicTransportYearBreakdown<T extends Pick<Trip, "id" | "date" | "createdAt" | "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "startTime" | "ticketPriceCents">> & TripReimbursementInput>(
+  trips: T[],
+  year: number,
+  publicTransportTaxFreeYearLimitCents: number | null = null
+): Map<string, PublicTransportTripTaxBreakdown> {
+  const remainingByYear = Math.max(publicTransportTaxFreeYearLimitCents ?? 0, 0);
+  let remainingCents = remainingByYear;
+  const breakdowns = new Map<string, PublicTransportTripTaxBreakdown>();
+
+  trips
+    .filter((trip) => trip.date.startsWith(`${year}-`))
+    .sort(compareTripsChronologically)
+    .forEach((trip) => {
+      const ticketRoundTripCents = trip.transportType === "oeffi-zuschuss" && employerReimbursesCosts(trip)
+        ? calculatePublicTransportTicketRoundTripCents(trip)
+        : 0;
+      const taxFreeCents = Math.min(ticketRoundTripCents, remainingCents);
+      remainingCents -= taxFreeCents;
+      breakdowns.set(trip.id, calculateTripTaxBreakdown(trip, taxFreeCents));
+    });
+
+  return breakdowns;
+}
+
 export function calculateTaxablePublicTransportSubsidyCents(trip: Pick<Trip, "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "ticketPriceCents">> & TripReimbursementInput): number {
   if (!employerReimbursesCosts(trip)) return 0;
   if (trip.transportType !== "oeffi-zuschuss") return 0;
@@ -110,12 +183,13 @@ export function calculateOtherCostsDifferentialCents(trip: Pick<Trip, "otherCost
   return Math.max(trip.otherCostsCents, 0);
 }
 
-export function calculateTripDifferentialCents(trip: Pick<Trip, "durationMinutes" | "perDiemCents" | "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "ticketPriceCents" | "otherCostsCents">> & TripReimbursementInput): number {
-  return calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursesCosts(trip)) + calculateTransportDifferentialCents(trip) + calculateOtherCostsDifferentialCents({ otherCostsCents: trip.otherCostsCents ?? 0, employerReimbursedCosts: trip.employerReimbursedCosts });
+export function calculateTripDifferentialCents(trip: Pick<Trip, "durationMinutes" | "perDiemCents" | "transportType" | "oneWayKilometers"> & Partial<Pick<Trip, "ticketPriceCents" | "otherCostsCents">> & TripReimbursementInput, transportDifferentialCents = calculateTransportDifferentialCents(trip)): number {
+  return calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursesCosts(trip)) + transportDifferentialCents + calculateOtherCostsDifferentialCents({ otherCostsCents: trip.otherCostsCents ?? 0, employerReimbursedCosts: trip.employerReimbursedCosts });
 }
 
-export function summarizeTripsByYear(trips: Trip[], year: number, payments: TravelExpensePayment[] = []) {
+export function summarizeTripsByYear(trips: Trip[], year: number, payments: TravelExpensePayment[] = [], publicTransportTaxFreeYearLimitCents: number | null = null) {
   const yearTrips = trips.filter((trip) => trip.date.startsWith(`${year}-`));
+  const yearBreakdowns = calculatePublicTransportYearBreakdown(yearTrips, year, publicTransportTaxFreeYearLimitCents);
   const paidCents = payments.filter((payment) => payment.year === year).reduce((sum, payment) => sum + Math.max(payment.amountCents, 0), 0);
   const totalCents = yearTrips.reduce((sum, trip) => sum + calculateTripTotalCents(trip), 0);
   return {
@@ -127,21 +201,21 @@ export function summarizeTripsByYear(trips: Trip[], year: number, payments: Trav
     totalCents,
     paidCents,
     remainingPayoutCents: totalCents - paidCents,
-    transportSubsidyCents: yearTrips.reduce((sum, trip) => sum + (isTransportSubsidy(trip.transportType) ? calculateTripTravelCostCents(trip) : 0), 0),
+    transportSubsidyCents: yearTrips.reduce((sum, trip) => sum + (yearBreakdowns.get(trip.id)?.publicTransportTaxFreeCents ?? 0), 0),
     perDiemDifferentialCents: yearTrips.reduce((sum, trip) => sum + calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursesCosts(trip)), 0),
-    transportDifferentialCents: yearTrips.reduce((sum, trip) => sum + calculateTransportDifferentialCents(trip), 0),
+    transportDifferentialCents: yearTrips.reduce((sum, trip) => sum + (yearBreakdowns.get(trip.id)?.transportDifferentialCents ?? calculateTransportDifferentialCents(trip)), 0),
     otherCostsDifferentialCents: yearTrips.reduce((sum, trip) => sum + calculateOtherCostsDifferentialCents(trip), 0),
-    differentialCents: yearTrips.reduce((sum, trip) => sum + calculateTripDifferentialCents(trip), 0),
+    differentialCents: yearTrips.reduce((sum, trip) => sum + calculateTripDifferentialCents(trip, yearBreakdowns.get(trip.id)?.transportDifferentialCents), 0),
     openCount: yearTrips.filter((trip) => !trip.done).length,
     openTotalCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + calculateTripTotalCents(trip), 0),
-    openTransportDifferentialCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + calculateTransportDifferentialCents(trip), 0),
+    openTransportDifferentialCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + (yearBreakdowns.get(trip.id)?.transportDifferentialCents ?? calculateTransportDifferentialCents(trip)), 0),
     openOtherCostsDifferentialCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + calculateOtherCostsDifferentialCents(trip), 0),
     oldestOpenTrip: yearTrips.filter((trip) => !trip.done).sort((a, b) => a.date.localeCompare(b.date))[0]
   };
 }
 
-export function remainingTransportSubsidyYearLimitCents(transportSubsidyCents: number): number {
-  return TRIP_RULES.transportSubsidyYearLimitCents - Math.max(transportSubsidyCents, 0);
+export function remainingTransportSubsidyYearLimitCents(transportSubsidyCents: number, publicTransportTaxFreeYearLimitCents: number | null = null): number {
+  return Math.max(publicTransportTaxFreeYearLimitCents ?? 0, 0) - Math.max(transportSubsidyCents, 0);
 }
 
 export function isTransportSubsidy(transportType: TripTransportType): boolean {
@@ -165,6 +239,13 @@ function calculateTieredAmountCents(oneWayKilometers: number, first50Cents: numb
   const second = Math.min(Math.max(oneWayKilometers - 50, 0), 250) * next250Cents;
   const beyond = Math.max(oneWayKilometers - 300, 0) * beyond300Cents;
   return Math.round(first + second + beyond);
+}
+
+function compareTripsChronologically(a: Pick<Trip, "id" | "date" | "createdAt"> & Partial<Pick<Trip, "startTime">>, b: Pick<Trip, "id" | "date" | "createdAt"> & Partial<Pick<Trip, "startTime">>): number {
+  return a.date.localeCompare(b.date)
+    || (a.startTime ?? "").localeCompare(b.startTime ?? "")
+    || a.createdAt.localeCompare(b.createdAt)
+    || a.id.localeCompare(b.id);
 }
 
 function parseClockMinutes(value: string): number | null {

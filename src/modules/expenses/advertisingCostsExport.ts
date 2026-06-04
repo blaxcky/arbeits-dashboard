@@ -1,10 +1,10 @@
 import type { TravelExpensePayment, Trip } from "../../db/schema";
 import {
+  calculatePublicTransportYearBreakdown,
   calculateFictionalKilometerAllowanceCents,
   calculateOtherCostsDifferentialCents,
   calculatePerDiemDifferentialCents,
   calculatePublicTransportPayoutCents,
-  calculatePublicTransportTicketRoundTripCents,
   calculateTripTravelCostCents,
   calculateTransportDifferentialCents
 } from "./calculations";
@@ -47,7 +47,8 @@ export interface TripAdvertisingCostsExportSummary {
   remainingReconciliationCents: number;
 }
 
-export function buildTripAdvertisingCostsExportRows(trips: Trip[], year: number): TripAdvertisingCostsExportRow[] {
+export function buildTripAdvertisingCostsExportRows(trips: Trip[], year: number, publicTransportTaxFreeYearLimitCents: number | null = null): TripAdvertisingCostsExportRow[] {
+  const publicTransportBreakdowns = calculatePublicTransportYearBreakdown(trips, year, publicTransportTaxFreeYearLimitCents);
   return trips
     .filter((trip) => trip.date.startsWith(`${year}-`))
     .sort(compareTripsForExport)
@@ -56,9 +57,9 @@ export function buildTripAdvertisingCostsExportRows(trips: Trip[], year: number)
       const employerPerDiemCents = employerReimbursedCosts ? Math.max(trip.perDiemCents, 0) : 0;
       const perDiemAdvertisingCostsCents = calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursedCosts);
       const employerTransportPayoutCents = calculatePublicTransportPayoutCents(trip);
-      const employerTaxFreeTransportPayoutCents = calculateEmployerTaxFreeTransportPayoutCents(trip, employerTransportPayoutCents);
+      const employerTaxFreeTransportPayoutCents = calculateEmployerTaxFreeTransportPayoutCents(trip, employerTransportPayoutCents, publicTransportBreakdowns.get(trip.id)?.publicTransportTaxFreeCents);
       const transportTaxAllowanceCents = calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers);
-      const transportAdvertisingCostsCents = calculateTransportDifferentialCents(trip);
+      const transportAdvertisingCostsCents = publicTransportBreakdowns.get(trip.id)?.transportDifferentialCents ?? calculateTransportDifferentialCents(trip);
       const employerOtherCostsCents = employerReimbursedCosts ? Math.max(trip.otherCostsCents, 0) : 0;
       const otherAdvertisingCostsCents = calculateOtherCostsDifferentialCents(trip);
       const advertisingCostsTotalCents = perDiemAdvertisingCostsCents + transportAdvertisingCostsCents + otherAdvertisingCostsCents;
@@ -215,8 +216,8 @@ function renderTripRows(row: TripAdvertisingCostsExportRow): string {
   </tr>`;
 }
 
-function calculateEmployerTaxFreeTransportPayoutCents(trip: Trip, employerTransportPayoutCents: number): number {
-  if (trip.transportType === "oeffi-zuschuss") return Math.min(employerTransportPayoutCents, calculatePublicTransportTicketRoundTripCents(trip));
+function calculateEmployerTaxFreeTransportPayoutCents(trip: Trip, employerTransportPayoutCents: number, publicTransportTaxFreeCents?: number): number {
+  if (trip.transportType === "oeffi-zuschuss") return Math.min(employerTransportPayoutCents, publicTransportTaxFreeCents ?? 0);
   return Math.min(employerTransportPayoutCents, calculateTripTravelCostCents(trip));
 }
 

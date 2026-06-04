@@ -143,6 +143,9 @@ export async function ensureDefaults(): Promise<Settings> {
   if (!settings) {
     settings = defaultSettings();
     await db.settings.put(settings);
+  } else if (settings.publicTransportTaxFreeYearLimitCents === undefined) {
+    settings = normalizeSettings(settings);
+    await db.settings.put(settings);
   }
 
   const meta = await db.appMeta.get("main");
@@ -439,7 +442,7 @@ export async function readAllData(): Promise<BackupData> {
 export async function replaceAllData(data: BackupData): Promise<void> {
   await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals], async () => {
     await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear()]);
-    if (data.settings) await db.settings.put(data.settings);
+    if (data.settings) await db.settings.put(normalizeSettings(data.settings));
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
     if (data.vacationSummary) await db.vacationSummary.put(data.vacationSummary);
@@ -472,6 +475,13 @@ function normalizeTrip(trip: Trip): Trip {
     transportSubsidyTaxCents: 0,
     ticketPriceCents: trip.ticketPriceCents ?? 0,
     note: trip.note ?? ""
+  };
+}
+
+function normalizeSettings(settings: Settings): Settings {
+  return {
+    ...settings,
+    publicTransportTaxFreeYearLimitCents: settings.publicTransportTaxFreeYearLimitCents ?? null
   };
 }
 

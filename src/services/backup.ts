@@ -136,6 +136,7 @@ function validateSettings(value: unknown): void {
   requireNullableNumber(value, "flexStartMinutes", "Gleitzeitstartwert ist ungültig.");
   requireNullableNumber(value, "vacationEntitlementMinutes", "Urlaubsanspruch ist ungültig.");
   requireNumber(value, "vacationUsedMinutes", "Verbrauchter Urlaub fehlt.");
+  requireOptionalNullableNumber(value, "publicTransportTaxFreeYearLimitCents", "Öffi-BEZU-Jahresdeckel ist ungültig.");
   requireString(value, "updatedAt", "Einstellungs-Zeitstempel fehlt.");
 }
 
@@ -363,6 +364,10 @@ function requireNumber(value: Record<string, unknown>, key: string, message: str
 
 function requireOptionalNumber(value: Record<string, unknown>, key: string, message: string): void {
   if (value[key] !== undefined && (typeof value[key] !== "number" || !Number.isFinite(value[key]))) throw new Error(message);
+}
+
+function requireOptionalNullableNumber(value: Record<string, unknown>, key: string, message: string): void {
+  if (value[key] !== undefined && value[key] !== null && (typeof value[key] !== "number" || !Number.isFinite(value[key]))) throw new Error(message);
 }
 
 function requireOptionalBoolean(value: Record<string, unknown>, key: string, message: string): void {

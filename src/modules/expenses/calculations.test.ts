@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDomesticPerDiemCents,
   calculatePublicTransportPayoutCents,
+  calculatePublicTransportYearBreakdown,
   calculatePerDiemDifferentialCents,
   calculateTaxablePublicTransportSubsidyCents,
   calculateTaxPerDiemCents,
@@ -184,7 +185,7 @@ describe("expense calculations", () => {
     expect(summary.durationMinutes).toBe(301);
     expect(summary.kilometers).toBe(20);
     expect(summary.totalCents).toBe(2020);
-    expect(summary.transportSubsidyCents).toBe(520);
+    expect(summary.transportSubsidyCents).toBe(0);
     expect(summary.perDiemDifferentialCents).toBe(500);
     expect(summary.transportDifferentialCents).toBe(480);
     expect(summary.otherCostsDifferentialCents).toBe(0);
@@ -193,7 +194,61 @@ describe("expense calculations", () => {
     expect(summary.openTotalCents).toBe(0);
     expect(summary.openTransportDifferentialCents).toBe(0);
     expect(summary.openOtherCostsDifferentialCents).toBe(0);
-    expect(remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents)).toBe(244480);
+    expect(remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents)).toBe(0);
+  });
+
+  it("treats an empty public transport tax-free yearly limit as zero", () => {
+    const trip = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 60, ticketPriceCents: 500 };
+    const breakdown = calculatePublicTransportYearBreakdown([trip], 2026).get(trip.id);
+
+    expect(breakdown?.publicTransportTaxFreeCents).toBe(0);
+    expect(breakdown?.taxablePublicTransportSubsidyCents).toBe(5400);
+    expect(breakdown?.transportDifferentialCents).toBe(6000);
+  });
+
+  it("caps the tax-free public transport ticket share by the yearly limit", () => {
+    const trip = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 50, ticketPriceCents: 1500 };
+    const breakdown = calculatePublicTransportYearBreakdown([trip], 2026, 3000).get(trip.id);
+
+    expect(calculatePublicTransportPayoutCents(trip)).toBe(5000);
+    expect(breakdown?.publicTransportTaxFreeCents).toBe(3000);
+    expect(breakdown?.taxablePublicTransportSubsidyCents).toBe(2000);
+    expect(breakdown?.transportDifferentialCents).toBe(2000);
+  });
+
+  it("uses only the remaining public transport tax-free yearly limit", () => {
+    const first = { ...baseTrip, id: "first", transportType: "oeffi-zuschuss" as const, oneWayKilometers: 50, ticketPriceCents: 500 };
+    const second = { ...baseTrip, id: "second", date: "2026-05-07", transportType: "oeffi-zuschuss" as const, oneWayKilometers: 50, ticketPriceCents: 1500 };
+    const breakdown = calculatePublicTransportYearBreakdown([second, first], 2026, 2000);
+
+    expect(breakdown.get(first.id)?.publicTransportTaxFreeCents).toBe(1000);
+    expect(breakdown.get(second.id)?.publicTransportTaxFreeCents).toBe(1000);
+    expect(breakdown.get(second.id)?.taxablePublicTransportSubsidyCents).toBe(4000);
+    expect(breakdown.get(second.id)?.transportDifferentialCents).toBe(4000);
+  });
+
+  it("distributes the public transport tax-free limit chronologically and deterministically", () => {
+    const trips: Trip[] = [
+      { ...baseTrip, id: "fourth", date: "2026-05-08", startTime: "07:00", createdAt: "2026-05-01T08:00:00.000Z", transportType: "oeffi-zuschuss", oneWayKilometers: 50, ticketPriceCents: 1000 },
+      { ...baseTrip, id: "first", date: "2026-05-07", startTime: "09:00", createdAt: "2026-05-01T09:00:00.000Z", transportType: "oeffi-zuschuss", oneWayKilometers: 50, ticketPriceCents: 1000 },
+      { ...baseTrip, id: "second", date: "2026-05-07", startTime: "10:00", createdAt: "2026-05-01T07:00:00.000Z", transportType: "oeffi-zuschuss", oneWayKilometers: 50, ticketPriceCents: 1000 },
+      { ...baseTrip, id: "third", date: "2026-05-08", startTime: "07:00", createdAt: "2026-05-01T08:00:00.000Z", transportType: "oeffi-zuschuss", oneWayKilometers: 50, ticketPriceCents: 1000 }
+    ];
+    const breakdown = calculatePublicTransportYearBreakdown(trips, 2026, 3000);
+
+    expect(breakdown.get("first")?.publicTransportTaxFreeCents).toBe(2000);
+    expect(breakdown.get("second")?.publicTransportTaxFreeCents).toBe(1000);
+    expect(breakdown.get("third")?.publicTransportTaxFreeCents).toBe(0);
+    expect(breakdown.get("fourth")?.publicTransportTaxFreeCents).toBe(0);
+  });
+
+  it("does not consume the public transport tax-free limit for standard transport subsidy", () => {
+    const standard = { ...baseTrip, id: "standard", date: "2026-05-06", transportType: "befoerderungszuschuss" as const, oneWayKilometers: 50, ticketPriceCents: 2000 };
+    const publicTransport = { ...baseTrip, id: "public", date: "2026-05-07", transportType: "oeffi-zuschuss" as const, oneWayKilometers: 50, ticketPriceCents: 1500 };
+    const breakdown = calculatePublicTransportYearBreakdown([standard, publicTransport], 2026, 3000);
+
+    expect(breakdown.get(standard.id)?.publicTransportTaxFreeCents).toBe(0);
+    expect(breakdown.get(publicTransport.id)?.publicTransportTaxFreeCents).toBe(3000);
   });
 
   it("summarizes additional advertising costs for non-reimbursed trips", () => {

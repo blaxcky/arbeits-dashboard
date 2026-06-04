@@ -3,8 +3,7 @@ import type { TravelExpensePayment, Trip } from "../../db/schema";
 import {
   calculateFictionalKilometerAllowanceCents,
   calculatePerDiemDifferentialCents,
-  calculatePublicTransportPayoutCents,
-  calculateTransportDifferentialCents
+  calculatePublicTransportPayoutCents
 } from "./calculations";
 import { buildTripAdvertisingCostsExportRows, buildTripAdvertisingCostsPrintHtml, summarizeTripAdvertisingCostsExport } from "./advertisingCostsExport";
 
@@ -78,14 +77,27 @@ describe("trip advertising costs export", () => {
       oneWayKilometers: 50,
       ticketPriceCents: 1500
     };
-    const [row] = buildTripAdvertisingCostsExportRows([trip], 2026);
+    const [row] = buildTripAdvertisingCostsExportRows([trip], 2026, 3000);
 
     expect(row.employerPerDiemCents).toBe(trip.perDiemCents);
     expect(row.perDiemAdvertisingCostsCents).toBe(calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, trip.employerReimbursedCosts));
     expect(calculatePublicTransportPayoutCents(trip)).toBe(5000);
     expect(row.employerTaxFreeTransportPayoutCents).toBe(3000);
     expect(row.transportTaxAllowanceCents).toBe(calculateFictionalKilometerAllowanceCents(trip.oneWayKilometers));
-    expect(row.transportAdvertisingCostsCents).toBe(calculateTransportDifferentialCents(trip));
+    expect(row.transportAdvertisingCostsCents).toBe(2000);
+  });
+
+  it("uses zero tax-free public transport payout in exports when the limit is empty", () => {
+    const trip = {
+      ...baseTrip,
+      transportType: "oeffi-zuschuss" as const,
+      oneWayKilometers: 50,
+      ticketPriceCents: 1500
+    };
+    const [row] = buildTripAdvertisingCostsExportRows([trip], 2026);
+
+    expect(row.employerTaxFreeTransportPayoutCents).toBe(0);
+    expect(row.transportAdvertisingCostsCents).toBe(5000);
   });
 
   it("summarizes advertising costs and keeps employer payments separate", () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
-import type { AuditPointCase } from "../db/schema";
+import type { AuditPointCase, Settings } from "../db/schema";
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -34,6 +34,36 @@ describe("parseEuroCentsInput", () => {
     expect(parseEuroCentsInput("")).toBeNull();
     expect(parseEuroCentsInput("abc")).toBeNull();
     expect(parseEuroCentsInput("12,345")).toBeNull();
+  });
+});
+
+describe("settings helpers", () => {
+  const settings: Settings = {
+    id: "main",
+    dailyTargetMinutes: 480,
+    weeklyTargetMinutes: 2400,
+    flexLimitMinutes: 6000,
+    flexStartMinutes: null,
+    vacationEntitlementMinutes: null,
+    vacationUsedMinutes: 0,
+    publicTransportTaxFreeYearLimitCents: null,
+    updatedAt: "2026-05-01T08:00:00.000Z"
+  };
+
+  it("keeps an empty public transport tax-free yearly limit editable", () => {
+    const form = settingsToForm(settings);
+
+    expect(form.publicTransportTaxFreeYearLimitEuros).toBe("");
+    expect(validateSettingsForm(form)).toEqual({});
+  });
+
+  it("formats and validates the public transport tax-free yearly limit as euros", () => {
+    const form = settingsToForm({ ...settings, publicTransportTaxFreeYearLimitCents: 245000 });
+
+    expect(form.publicTransportTaxFreeYearLimitEuros).toBe("2\u00a0450");
+    expect(validateSettingsForm({ ...form, publicTransportTaxFreeYearLimitEuros: "12,345" })).toMatchObject({
+      publicTransportTaxFreeYearLimitEuros: "Bitte einen EUR-Betrag mit maximal zwei Dezimalstellen eingeben."
+    });
   });
 });
 

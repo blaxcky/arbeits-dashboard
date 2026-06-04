@@ -54,6 +54,7 @@ import {
   calculatePerDiemDifferentialCents,
   calculatePublicTransportPayoutCents,
   calculatePublicTransportTicketRoundTripCents,
+  calculatePublicTransportYearBreakdown,
   calculateTaxablePublicTransportSubsidyCents,
   calculateTaxPerDiemCents,
   calculateTransportDifferentialCents,
@@ -61,11 +62,9 @@ import {
   calculateTripDurationMinutes,
   calculateTripTotalCents,
   calculateTripTravelCostCents,
-  isTransportSubsidy,
   remainingTransportSubsidyYearLimitCents,
   summarizeTripsByYear,
-  TRANSPORT_LABELS,
-  TRIP_RULES
+  TRANSPORT_LABELS
 } from "../modules/expenses/calculations";
 import { buildTripAdvertisingCostsExportRows, buildTripAdvertisingCostsPrintHtml, summarizeTripAdvertisingCostsExport } from "../modules/expenses/advertisingCostsExport";
 import {
@@ -494,7 +493,8 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
       flexLimitMinutes: clampHoursToMinutes(form.flexLimitMinutes, 0, 20000),
       flexStartMinutes: form.flexStartMinutes === "" ? null : hoursToMinutes(form.flexStartMinutes),
       vacationEntitlementMinutes: form.vacationEntitlementMinutes === "" ? null : hoursToMinutes(form.vacationEntitlementMinutes),
-      vacationUsedMinutes: clampHoursToMinutes(form.vacationUsedMinutes, 0, 20000)
+      vacationUsedMinutes: clampHoursToMinutes(form.vacationUsedMinutes, 0, 20000),
+      publicTransportTaxFreeYearLimitCents: form.publicTransportTaxFreeYearLimitEuros.trim() === "" ? null : parseEuroCentsInput(form.publicTransportTaxFreeYearLimitEuros)
     });
     showToast("Einstellungen gespeichert.");
   }
@@ -529,6 +529,14 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
             <Field label="Verbrauchter Urlaub (Stunden)" error={settingsErrors.vacationUsedMinutes}><input type="number" step="0.25" value={form.vacationUsedMinutes} aria-invalid={Boolean(settingsErrors.vacationUsedMinutes)} onChange={(event) => updateSettingsField("vacationUsedMinutes", event.target.value)} /></Field>
           </div>
           <button className="primary-button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
+        </div>
+        <div className="panel form-panel">
+          <span className="section-label">Reisekosten</span>
+          <div className="form-grid">
+            <Field label="Steuerfreier Öffi-BEZU Jahresdeckel (EUR)" error={settingsErrors.publicTransportTaxFreeYearLimitEuros}>
+              <input inputMode="decimal" value={form.publicTransportTaxFreeYearLimitEuros} aria-invalid={Boolean(settingsErrors.publicTransportTaxFreeYearLimitEuros)} onChange={(event) => updateSettingsField("publicTransportTaxFreeYearLimitEuros", event.target.value)} placeholder="leer" />
+            </Field>
+          </div>
         </div>
         <BackupPanel importRef={importRef} importPreview={importPreview} onPreview={(file) => handleImport(file, false)} onReplace={(file) => handleImport(file, true)} onDone={showToast} refresh={data.refresh} />
         <SystemStatusPanel data={data} storageEstimate={storageEstimate} />
@@ -1162,9 +1170,13 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const saveDestinationRef = useRef(data.saveDestination);
   const savedDestinationsRef = useRef(data.savedDestinations);
   const municipalitiesRef = useRef(municipalities);
+  const editingTrip = editingId ? data.trips.find((trip) => trip.id === editingId) : undefined;
   const previewStartTime = previewTime(form.startTime) ?? "";
   const previewEndTime = previewTime(form.endTime) ?? "";
   const previewDurationMinutes = calculateTripDurationMinutes(previewStartTime, previewEndTime);
+  const previewDate = isValidDateKey(form.date) ? form.date : todayKey();
+  const previewYear = Number(previewDate.slice(0, 4));
+  const publicTransportTaxFreeYearLimitCents = data.settings?.publicTransportTaxFreeYearLimitCents ?? null;
   const previewTripCosts = {
     transportType: form.transportType,
     oneWayKilometers: parseDecimalNumber(form.oneWayKilometers),
@@ -1173,22 +1185,37 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     employerReimbursedCosts: !form.employerDoesNotReimburseCosts,
     ticketPriceCents: form.transportType === "oeffi-zuschuss" ? eurosToCents(form.ticketPriceEuros) : 0
   };
-  const summary = summarizeTripsByYear(data.trips, currentYear());
+  const previewTripTaxInput = {
+    ...previewTripCosts,
+    id: editingId ?? "__preview-trip",
+    date: previewDate,
+    startTime: previewStartTime || undefined,
+    createdAt: editingTrip?.createdAt ?? new Date().toISOString()
+  };
+  const previewYearBreakdowns = calculatePublicTransportYearBreakdown(
+    [...data.trips.filter((trip) => trip.id !== editingId), previewTripTaxInput],
+    previewYear,
+    publicTransportTaxFreeYearLimitCents
+  );
+  const previewTaxBreakdown = previewYearBreakdowns.get(previewTripTaxInput.id);
+  const summary = summarizeTripsByYear(data.trips, currentYear(), [], publicTransportTaxFreeYearLimitCents);
   const previewTravelCostCents = calculateTripTravelCostCents(previewTripCosts);
   const previewPayoutCents = calculatePublicTransportPayoutCents(previewTripCosts);
   const previewTaxPerDiemCents = calculateTaxPerDiemCents(previewDurationMinutes);
   const previewPerDiemDifferentialCents = calculatePerDiemDifferentialCents(previewDurationMinutes, previewTripCosts.perDiemCents, previewTripCosts.employerReimbursedCosts);
-  const previewTransportDifferentialCents = calculateTransportDifferentialCents(previewTripCosts);
+  const previewTransportDifferentialCents = previewTaxBreakdown?.transportDifferentialCents ?? calculateTransportDifferentialCents(previewTripCosts);
   const previewOtherCostsDifferentialCents = calculateOtherCostsDifferentialCents(previewTripCosts);
-  const previewTaxableTransportSubsidyCents = calculateTaxablePublicTransportSubsidyCents(previewTripCosts);
-  const previewDifferentialCents = calculateTripDifferentialCents({ ...previewTripCosts, durationMinutes: previewDurationMinutes });
-  const publicTicketAboveSubsidy = previewTripCosts.employerReimbursedCosts && form.transportType === "oeffi-zuschuss" && calculatePublicTransportTicketRoundTripCents(previewTripCosts) > previewTravelCostCents;
-  const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
+  const previewTaxableTransportSubsidyCents = previewTaxBreakdown?.taxablePublicTransportSubsidyCents ?? calculateTaxablePublicTransportSubsidyCents(previewTripCosts);
+  const previewDifferentialCents = calculateTripDifferentialCents({ ...previewTripCosts, durationMinutes: previewDurationMinutes }, previewTransportDifferentialCents);
+  const publicTicketAboveSubsidy = previewTripCosts.employerReimbursedCosts
+    && form.transportType === "oeffi-zuschuss"
+    && calculatePublicTransportTicketRoundTripCents(previewTripCosts) > previewTravelCostCents
+    && (previewTaxBreakdown?.publicTransportTaxFreeCents ?? 0) >= previewPayoutCents;
+  const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents, publicTransportTaxFreeYearLimitCents);
   const mapsUrl = buildGoogleMapsUrl(form.origin, form.destination);
   const mapsEmbedUrl = buildGoogleMapsEmbedUrl(form.origin, form.destination);
   const needsKilometerEvidence = form.transportType === "kilometergeld";
   const needsPublicTransportEvidence = form.transportType === "oeffi-zuschuss";
-  const editingTrip = editingId ? data.trips.find((trip) => trip.id === editingId) : undefined;
   const openTrips = data.trips.filter((trip) => !trip.done);
   const filesByTripId = useMemo(() => {
     const grouped = new Map<string, TripFile[]>();
@@ -1942,14 +1969,16 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
   const params = useParams();
   const year = yearFromUrlParam(params.year);
   const yearOptions = tripYearOptions(data.trips, currentYear(), year);
-  const summary = summarizeTripsByYear(data.trips, year, data.tripPayments);
-  const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents);
+  const publicTransportTaxFreeYearLimitCents = data.settings?.publicTransportTaxFreeYearLimitCents ?? null;
+  const summary = summarizeTripsByYear(data.trips, year, data.tripPayments, publicTransportTaxFreeYearLimitCents);
+  const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents, publicTransportTaxFreeYearLimitCents);
+  const transportSubsidyYearLimitCents = Math.max(publicTransportTaxFreeYearLimitCents ?? 0, 0);
   const [paymentForm, setPaymentForm] = useState(() => tripPaymentToForm());
   const [paymentAmountError, setPaymentAmountError] = useState<string | undefined>();
   const yearPayments = data.tripPayments.filter((payment) => payment.year === year);
 
   function printAdvertisingCostsExport() {
-    const rows = buildTripAdvertisingCostsExportRows(data.trips, year);
+    const rows = buildTripAdvertisingCostsExportRows(data.trips, year, publicTransportTaxFreeYearLimitCents);
     if (rows.length === 0) {
       showToast("Keine Reisen für dieses Jahr vorhanden.");
       return;
@@ -2029,8 +2058,8 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
             <div><dt>Werbungskosten Sonstiges</dt><dd>{formatEuroCents(summary.otherCostsDifferentialCents)}</dd></div>
             <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(summary.differentialCents)}</dd></div>
           </dl>
-          <div className="limit-bar" aria-label={`Beförderungszuschuss Jahresgrenze: ${formatEuroCents(summary.transportSubsidyCents)} von ${formatEuroCents(TRIP_RULES.transportSubsidyYearLimitCents)}`}>
-            <span style={{ width: `${Math.min(summary.transportSubsidyCents / TRIP_RULES.transportSubsidyYearLimitCents, 1) * 100}%` }} />
+          <div className="limit-bar" aria-label={`Beförderungszuschuss Jahresgrenze: ${formatEuroCents(summary.transportSubsidyCents)} von ${formatEuroCents(transportSubsidyYearLimitCents)}`}>
+            <span style={{ width: `${transportSubsidyYearLimitCents > 0 ? Math.min(summary.transportSubsidyCents / transportSubsidyYearLimitCents, 1) * 100 : 0}%` }} />
           </div>
           {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
         </div>
@@ -2665,14 +2694,15 @@ function entryToForm(entry: TimeEntry | undefined, selectedDate: string, setting
   };
 }
 
-function settingsToForm(settings: Settings | null) {
+export function settingsToForm(settings: Settings | null) {
   return {
     dailyTargetMinutes: minutesToHourInput(settings?.dailyTargetMinutes ?? 480),
     weeklyTargetMinutes: minutesToHourInput(settings?.weeklyTargetMinutes ?? 2400),
     flexLimitMinutes: minutesToHourInput(settings?.flexLimitMinutes ?? 6000),
     flexStartMinutes: settings?.flexStartMinutes === null || settings?.flexStartMinutes === undefined ? "" : minutesToHourInput(settings.flexStartMinutes),
     vacationEntitlementMinutes: settings?.vacationEntitlementMinutes === null || settings?.vacationEntitlementMinutes === undefined ? "" : minutesToHourInput(settings.vacationEntitlementMinutes),
-    vacationUsedMinutes: minutesToHourInput(settings?.vacationUsedMinutes ?? 0)
+    vacationUsedMinutes: minutesToHourInput(settings?.vacationUsedMinutes ?? 0),
+    publicTransportTaxFreeYearLimitEuros: settings?.publicTransportTaxFreeYearLimitCents === null || settings?.publicTransportTaxFreeYearLimitCents === undefined ? "" : centsToEuroInput(settings.publicTransportTaxFreeYearLimitCents)
   };
 }
 
@@ -2859,7 +2889,7 @@ export function duplicatedTripDraft(trip: Trip, date = todayKey()): Omit<Trip, "
   };
 }
 
-function validateSettingsForm(form: SettingsForm): SettingsErrors {
+export function validateSettingsForm(form: SettingsForm): SettingsErrors {
   const errors: SettingsErrors = {};
   const fields: Array<[keyof SettingsForm, string | undefined]> = [
     ["dailyTargetMinutes", validateHourField(form.dailyTargetMinutes, 1, 900)],
@@ -2867,7 +2897,8 @@ function validateSettingsForm(form: SettingsForm): SettingsErrors {
     ["flexLimitMinutes", validateHourField(form.flexLimitMinutes, 0, 20000)],
     ["flexStartMinutes", validateHourField(form.flexStartMinutes, -20000, 20000, true)],
     ["vacationEntitlementMinutes", validateHourField(form.vacationEntitlementMinutes, 0, 20000, true)],
-    ["vacationUsedMinutes", validateHourField(form.vacationUsedMinutes, 0, 20000)]
+    ["vacationUsedMinutes", validateHourField(form.vacationUsedMinutes, 0, 20000)],
+    ["publicTransportTaxFreeYearLimitEuros", validateEuroField(form.publicTransportTaxFreeYearLimitEuros, true)]
   ];
 
   for (const [field, error] of fields) {
@@ -2875,6 +2906,13 @@ function validateSettingsForm(form: SettingsForm): SettingsErrors {
   }
 
   return errors;
+}
+
+function validateEuroField(value: string, optional = false): string | undefined {
+  if (optional && value.trim() === "") return undefined;
+  const cents = parseEuroCentsInput(value);
+  if (cents === null || cents < 0) return "Bitte einen EUR-Betrag mit maximal zwei Dezimalstellen eingeben.";
+  return undefined;
 }
 
 function validateHourField(value: string, minMinutes: number, maxMinutes: number, optional = false): string | undefined {
