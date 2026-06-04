@@ -137,6 +137,7 @@ function validateSettings(value: unknown): void {
   requireNullableNumber(value, "vacationEntitlementMinutes", "Urlaubsanspruch ist ungültig.");
   requireNumber(value, "vacationUsedMinutes", "Verbrauchter Urlaub fehlt.");
   requireOptionalNullableNumber(value, "publicTransportTaxFreeYearLimitCents", "Öffi-BEZU-Jahresdeckel ist ungültig.");
+  requireOptionalNullableNumberRecord(value, "publicTransportTaxFreeYearLimitsCents", "Öffi-BEZU-Jahresdeckel je Jahr ist ungültig.");
   requireString(value, "updatedAt", "Einstellungs-Zeitstempel fehlt.");
 }
 
@@ -368,6 +369,17 @@ function requireOptionalNumber(value: Record<string, unknown>, key: string, mess
 
 function requireOptionalNullableNumber(value: Record<string, unknown>, key: string, message: string): void {
   if (value[key] !== undefined && value[key] !== null && (typeof value[key] !== "number" || !Number.isFinite(value[key]))) throw new Error(message);
+}
+
+function requireOptionalNullableNumberRecord(value: Record<string, unknown>, key: string, message: string): void {
+  const record = value[key];
+  if (record === undefined) return;
+  if (!isObject(record)) throw new Error(message);
+  Object.entries(record).forEach(([recordKey, recordValue]) => {
+    if (!/^\d{4}$/.test(recordKey) || (recordValue !== null && (typeof recordValue !== "number" || !Number.isFinite(recordValue)))) {
+      throw new Error(message);
+    }
+  });
 }
 
 function requireOptionalBoolean(value: Record<string, unknown>, key: string, message: string): void {

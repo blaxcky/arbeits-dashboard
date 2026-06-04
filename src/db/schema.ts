@@ -11,7 +11,8 @@ export interface Settings {
   flexStartMinutes: number | null;
   vacationEntitlementMinutes: number | null;
   vacationUsedMinutes: number;
-  publicTransportTaxFreeYearLimitCents: number | null;
+  publicTransportTaxFreeYearLimitCents?: number | null;
+  publicTransportTaxFreeYearLimitsCents: Record<string, number | null>;
   updatedAt: string;
 }
 
@@ -196,7 +197,7 @@ export function defaultSettings(now = new Date()): Settings {
     flexStartMinutes: null,
     vacationEntitlementMinutes: null,
     vacationUsedMinutes: 0,
-    publicTransportTaxFreeYearLimitCents: null,
+    publicTransportTaxFreeYearLimitsCents: {},
     updatedAt: now.toISOString()
   };
 }

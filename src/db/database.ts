@@ -143,7 +143,7 @@ export async function ensureDefaults(): Promise<Settings> {
   if (!settings) {
     settings = defaultSettings();
     await db.settings.put(settings);
-  } else if (settings.publicTransportTaxFreeYearLimitCents === undefined) {
+  } else if (settings.publicTransportTaxFreeYearLimitsCents === undefined) {
     settings = normalizeSettings(settings);
     await db.settings.put(settings);
   }
@@ -479,9 +479,16 @@ function normalizeTrip(trip: Trip): Trip {
 }
 
 function normalizeSettings(settings: Settings): Settings {
+  const legacyYearLimitCents = settings.publicTransportTaxFreeYearLimitCents;
+  const existingYearLimits = settings.publicTransportTaxFreeYearLimitsCents ?? {};
+  const publicTransportTaxFreeYearLimitsCents = legacyYearLimitCents === undefined
+    ? existingYearLimits
+    : { [String(currentYear())]: legacyYearLimitCents, ...existingYearLimits };
+
   return {
     ...settings,
-    publicTransportTaxFreeYearLimitCents: settings.publicTransportTaxFreeYearLimitCents ?? null
+    publicTransportTaxFreeYearLimitCents: undefined,
+    publicTransportTaxFreeYearLimitsCents
   };
 }
 
