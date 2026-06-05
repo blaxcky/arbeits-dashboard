@@ -1804,6 +1804,30 @@ button:disabled {
   font-weight: 800;
 }
 
+.open-trip-cost-details {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 12px;
+}
+
+.open-trip-cost-details div {
+  min-width: 0;
+}
+
+.open-trip-evidence {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #eef1f5;
+  padding-top: 12px;
+}
+
+.open-trip-evidence .panel-heading {
+  min-height: 0;
+}
+
+.open-trip-evidence .muted {
+  margin: 0;
+}
+
 .copy-field-grid > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

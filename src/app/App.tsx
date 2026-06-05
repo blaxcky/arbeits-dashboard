@@ -1988,6 +1988,17 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
           ))}
         </div>
       </div>
+      {openTripsDialogOpen ? (
+        <OpenTripsDialog
+          trips={openTrips}
+          filesByTripId={filesByTripId}
+          showToast={showToast}
+          onPreviewFile={setPreviewFile}
+          onDownloadFile={downloadTripFile}
+          onClose={() => setOpenTripsDialogOpen(false)}
+          onDone={(trip) => data.saveTrip({ ...stripTripMeta(trip), id: trip.id, done: true })}
+        />
+      ) : null}
       {previewFile ? (
         <ModalOverlay labelledBy="trip-file-preview-title" onClose={() => setPreviewFile(null)}>
           <div className="trip-file-modal-card" onClick={(event) => event.stopPropagation()}>
@@ -2016,14 +2027,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             </div>
           </div>
         </ModalOverlay>
-      ) : null}
-      {openTripsDialogOpen ? (
-        <OpenTripsDialog
-          trips={openTrips}
-          showToast={showToast}
-          onClose={() => setOpenTripsDialogOpen(false)}
-          onDone={(trip) => data.saveTrip({ ...stripTripMeta(trip), id: trip.id, done: true })}
-        />
       ) : null}
       {destinationPickerOpen ? (
         <DestinationPicker
@@ -2322,7 +2325,7 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
   );
 }
 
-function OpenTripsDialog({ trips, showToast, onClose, onDone }: { trips: Trip[]; showToast: ShowToast; onClose: () => void; onDone: (trip: Trip) => Promise<unknown> }) {
+function OpenTripsDialog({ trips, filesByTripId, showToast, onPreviewFile, onDownloadFile, onClose, onDone }: { trips: Trip[]; filesByTripId: Map<string, TripFile[]>; showToast: ShowToast; onPreviewFile: (file: TripFile) => void; onDownloadFile: (file: TripFile) => void; onClose: () => void; onDone: (trip: Trip) => Promise<unknown> }) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -2344,15 +2347,16 @@ function OpenTripsDialog({ trips, showToast, onClose, onDone }: { trips: Trip[];
             <X size={18} />
           </button>
         </div>
-        <OpenTripsWorklist trips={trips} showToast={showToast} onDone={onDone} />
+        <OpenTripsWorklist trips={trips} filesByTripId={filesByTripId} showToast={showToast} onPreviewFile={onPreviewFile} onDownloadFile={onDownloadFile} onDone={onDone} />
       </div>
     </ModalOverlay>
   );
 }
 
-function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showToast: ShowToast; onDone: (trip: Trip) => Promise<unknown> }) {
+function OpenTripsWorklist({ trips, filesByTripId, showToast, onPreviewFile, onDownloadFile, onDone }: { trips: Trip[]; filesByTripId: Map<string, TripFile[]>; showToast: ShowToast; onPreviewFile: (file: TripFile) => void; onDownloadFile: (file: TripFile) => void; onDone: (trip: Trip) => Promise<unknown> }) {
   const openTrips = sortedOpenTrips(trips);
   const activeTrip = openTrips[0];
+  const activeTripFiles = activeTrip ? filesByTripId.get(activeTrip.id) ?? [] : [];
   const [copiedFieldKeys, setCopiedFieldKeys] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
@@ -2385,6 +2389,10 @@ function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showTo
           {activeTrip.transportType === "oeffi-zuschuss" ? (
             <p className="open-trip-ticket-note">Ticketpreis ist der Einzelpreis je Richtung; Hin- und Rückreise werden mit diesem Preis gerechnet.</p>
           ) : null}
+          <dl className="detail-list open-trip-cost-details">
+            <div><dt>Fahrtkostenart</dt><dd>{TRANSPORT_LABELS[activeTrip.transportType]}</dd></div>
+            {(activeTrip.ticketPriceCents ?? 0) > 0 ? <div><dt>Ticketpreis je Richtung</dt><dd>{formatEuroCents(activeTrip.ticketPriceCents ?? 0)}</dd></div> : null}
+          </dl>
           <div className="copy-field-grid">
             {openTripFields(activeTrip).map((field) => {
               const fieldKey = `${activeTrip.id}:${field.label}`;
@@ -2403,6 +2411,33 @@ function OpenTripsWorklist({ trips, showToast, onDone }: { trips: Trip[]; showTo
               );
             })}
           </div>
+          <section className="open-trip-evidence" aria-label="Screenshots und Nachweise">
+            <div className="panel-heading">
+              <span className="section-label">Screenshots / Nachweise</span>
+              <strong>{activeTripFiles.length}</strong>
+            </div>
+            {activeTripFiles.length === 0 ? <p className="muted">Keine Screenshots gespeichert.</p> : null}
+            {activeTripFiles.map((file) => (
+              <div key={file.id} className="trip-evidence-item">
+                <button className="trip-evidence-preview-button" type="button" onClick={() => onPreviewFile(file)}>
+                  <img src={file.dataUrl} alt="" />
+                  <span>
+                    <strong>{file.fileName}</strong>
+                    <small>{tripFileTypeLabel(file.type)} · {formatFileSize(file.size)}</small>
+                  </span>
+                </button>
+                <div className="trip-evidence-actions">
+                  <button className="secondary-button" type="button" onClick={() => onPreviewFile(file)}>
+                    Anzeigen
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => onDownloadFile(file)}>
+                    <DownloadSimple size={17} />
+                    Herunterladen
+                  </button>
+                </div>
+              </div>
+            ))}
+          </section>
           <button className="secondary-button" type="button" onClick={() => void onDone(activeTrip)}>
             <CheckCircle size={17} /> Als erledigt markieren
           </button>
