@@ -1074,19 +1074,20 @@ button:disabled {
 
 .points-year-table {
   width: 100%;
-  min-width: 580px;
+  min-width: 440px;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  table-layout: auto;
+  font-size: 0.86rem;
 }
 
 .points-other-year-table {
-  min-width: 420px;
+  min-width: 390px;
 }
 
 .points-year-table th,
 .points-year-table td {
   border: 1px solid #e5ebf2;
-  padding: 9px 10px;
+  padding: 8px 7px;
   text-align: right;
   white-space: nowrap;
 }
@@ -1107,6 +1108,16 @@ button:disabled {
 .points-year-table tbody th {
   color: #334155;
   font-weight: 900;
+}
+
+.points-year-table tbody tr.points-year-current-month {
+  background: #eef6f4;
+  font-weight: 900;
+}
+
+.points-year-table tbody tr.points-year-current-month th,
+.points-year-table tbody tr.points-year-current-month td {
+  border-color: #d2e5e1;
 }
 
 .points-year-ok {
@@ -1547,7 +1558,11 @@ button:disabled {
 .trip-row-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: center;
+  align-items: center;
   gap: 10px;
+  min-height: 54px;
+  justify-items: end;
   text-align: right;
 }
 
@@ -2326,6 +2341,7 @@ button:disabled {
   }
 
   .trip-row-metrics {
+    justify-items: start;
     text-align: left;
   }
 

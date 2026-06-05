@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase, Settings } from "../db/schema";
 
@@ -116,6 +116,14 @@ describe("audit point helpers", () => {
 
   it("accepts an empty audit point tax number", () => {
     expect(validateAuditPointCaseForm({ ...baseForm, taxNumber: "" })).toMatchObject({ valid: true });
+  });
+
+  it("formats audit point tax numbers while typing or saving", () => {
+    expect(formatAuditTaxNumber("123456789")).toBe("12-345/6789");
+    expect(formatAuditTaxNumber("12-345/6789")).toBe("12-345/6789");
+    expect(formatAuditTaxNumber("1")).toBe("1");
+    expect(formatAuditTaxNumber("1234")).toBe("12-34");
+    expect(formatAuditTaxNumber("12 abc 345 6789 0")).toBe("12-345/6789");
   });
 
   it("rejects invalid years, categories and amounts", () => {

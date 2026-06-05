@@ -75,6 +75,7 @@ import {
   buildOtherMeasureTypeBreakdown,
   buildOtherMeasureYearRows,
   buildUsoYearRows,
+  formatMonthName,
   isAuditPointCategory,
   pointsForAuditCase,
   summarizeAuditPoints,
@@ -755,7 +756,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
   const sortedOtherMeasures = [...data.otherMeasures].sort(compareOtherMeasures);
 
   function updateField(field: keyof AuditPointCaseForm, value: string | boolean) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => ({ ...current, [field]: field === "taxNumber" && typeof value === "string" ? formatAuditTaxNumber(value) : value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
   }
 
@@ -770,7 +771,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
     await data.saveAuditPointCase({
       id: editingId ?? undefined,
       name: form.name.trim(),
-      taxNumber: form.taxNumber.trim(),
+      taxNumber: formatAuditTaxNumber(form.taxNumber),
       firm: form.firm.trim(),
       category: validation.category,
       periodStartYear: validation.periodStartYear,
@@ -799,6 +800,23 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
       setForm(auditPointCaseToForm());
     }
     showToast("Punkte-Fall gelöscht.");
+  }
+
+  async function toggleAuditPointCase(pointCase: AuditPointCase) {
+    await data.saveAuditPointCase({
+      id: pointCase.id,
+      name: pointCase.name,
+      taxNumber: pointCase.taxNumber,
+      firm: pointCase.firm,
+      category: pointCase.category,
+      periodStartYear: pointCase.periodStartYear,
+      periodEndYear: pointCase.periodEndYear,
+      additionalResultCents: pointCase.additionalResultCents,
+      section99: pointCase.section99,
+      submissionMonth: pointCase.submissionMonth,
+      status: pointCase.status === "completed" ? "in_progress" : "completed"
+    });
+    showToast("Punkte-Status geändert.");
   }
 
   function updateUsoField(field: keyof ReturnType<typeof usoCaseToForm>, value: string) {
@@ -1039,8 +1057,15 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
                 <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
               </div>
               <div className="trip-actions">
-                <button className="secondary-button" type="button" onClick={() => editCase(pointCase)}>Bearbeiten</button>
-                <button className="danger-button" type="button" onClick={() => void removeCase(pointCase)}>Löschen</button>
+                <button className="icon-button trip-action-button" type="button" title={pointCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={pointCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleAuditPointCase(pointCase)}>
+                  {pointCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
+                </button>
+                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editCase(pointCase)}>
+                  <PencilSimple size={17} />
+                </button>
+                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeCase(pointCase)}>
+                  <Trash size={17} />
+                </button>
               </div>
             </article>
           ))}
@@ -1061,9 +1086,15 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
                 <span className="trip-badges"><em>{usoCase.status === "completed" ? "Erledigt" : "Offen"}</em>{usoCase.submissionMonth === "" ? <em>ohne Abgabemonat</em> : null}</span>
               </div>
               <div className="trip-actions">
-                <button className="secondary-button" type="button" onClick={() => void toggleUsoCase(usoCase)}>{usoCase.status === "completed" ? "Auf offen setzen" : "Erledigt"}</button>
-                <button className="secondary-button" type="button" onClick={() => editUsoCase(usoCase)}>Bearbeiten</button>
-                <button className="danger-button" type="button" onClick={() => void removeUsoCase(usoCase)}>Löschen</button>
+                <button className="icon-button trip-action-button" type="button" title={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleUsoCase(usoCase)}>
+                  {usoCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
+                </button>
+                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editUsoCase(usoCase)}>
+                  <PencilSimple size={17} />
+                </button>
+                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeUsoCase(usoCase)}>
+                  <Trash size={17} />
+                </button>
               </div>
             </article>
           ))}
@@ -1084,9 +1115,15 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
                 <span className="trip-badges"><em>{measure.status === "completed" ? "Erledigt" : "Offen"}</em>{measure.submissionMonth === "" ? <em>ohne Abgabemonat</em> : null}</span>
               </div>
               <div className="trip-actions">
-                <button className="secondary-button" type="button" onClick={() => void toggleOtherMeasure(measure)}>{measure.status === "completed" ? "Auf offen setzen" : "Erledigt"}</button>
-                <button className="secondary-button" type="button" onClick={() => editOtherMeasure(measure)}>Bearbeiten</button>
-                <button className="danger-button" type="button" onClick={() => void removeOtherMeasure(measure)}>Löschen</button>
+                <button className="icon-button trip-action-button" type="button" title={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleOtherMeasure(measure)}>
+                  {measure.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
+                </button>
+                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editOtherMeasure(measure)}>
+                  <PencilSimple size={17} />
+                </button>
+                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeOtherMeasure(measure)}>
+                  <Trash size={17} />
+                </button>
               </div>
             </article>
           ))}
@@ -1141,6 +1178,8 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
   const usoOpen = usoRows.reduce((sum, row) => sum + row.openValue, 0);
   const otherCompleted = otherRows[otherRows.length - 1]?.cumulativeValue ?? 0;
   const otherOpen = otherRows.reduce((sum, row) => sum + row.openValue, 0);
+  const currentMonth = todayKey().slice(0, 7);
+  const highlightedMonth = currentMonth.startsWith(`${year}-`) ? currentMonth : null;
   const [auditGoalInput, setAuditGoalInput] = useState("");
   const [usoGoalInput, setUsoGoalInput] = useState("");
 
@@ -1212,7 +1251,7 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
               </button>
             </div>
           </div>
-          <PointsYearTable rows={auditRows} valueFormatter={formatPointTenths} />
+          <PointsYearTable rows={auditRows} valueFormatter={formatPointTenths} highlightedMonth={highlightedMonth} />
         </section>
         <section className="panel">
           <div className="panel-heading">
@@ -1226,13 +1265,13 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
               </button>
             </div>
           </div>
-          <PointsYearTable rows={usoRows} valueFormatter={(value) => String(value)} />
+          <PointsYearTable rows={usoRows} valueFormatter={(value) => String(value)} highlightedMonth={highlightedMonth} />
         </section>
         <section className="panel">
           <div className="panel-heading">
             <span className="section-label">Sonstige Maßnahmen</span>
           </div>
-          <OtherMeasureYearTable rows={otherRows} />
+          <OtherMeasureYearTable rows={otherRows} highlightedMonth={highlightedMonth} />
           <div className="points-type-breakdown">
             <span className="section-label">Art</span>
             {otherTypeBreakdown.length === 0 ? <p className="muted">Keine sonstigen Maßnahmen in diesem Jahr.</p> : null}
@@ -1253,7 +1292,7 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
   );
 }
 
-function PointsYearTable({ rows, valueFormatter }: { rows: ReturnType<typeof buildAuditPointYearRows>; valueFormatter: (value: number) => string }) {
+function PointsYearTable({ rows, valueFormatter, highlightedMonth }: { rows: ReturnType<typeof buildAuditPointYearRows>; valueFormatter: (value: number) => string; highlightedMonth: string | null }) {
   return (
     <div className="points-year-table-wrap">
       <table className="points-year-table">
@@ -1264,18 +1303,16 @@ function PointsYearTable({ rows, valueFormatter }: { rows: ReturnType<typeof bui
             <th>Soll</th>
             <th>Stand</th>
             <th>noch offen</th>
-            <th>Offen</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.month}>
-              <th scope="row">{row.month.slice(5)}</th>
+            <tr key={row.month} className={row.month === highlightedMonth ? "points-year-current-month" : undefined}>
+              <th scope="row">{formatMonthName(row.month)}</th>
               <td>{valueFormatter(row.submissionValue)}</td>
               <td>{row.targetValue === null ? "-" : valueFormatter(row.targetValue)}</td>
               <td>{valueFormatter(row.cumulativeValue)}</td>
               <td className={row.targetReached ? "points-year-ok" : ""}>{row.targetReached ? "OK" : row.remainingValue === null ? "-" : valueFormatter(row.remainingValue)}</td>
-              <td>{valueFormatter(row.openValue)}</td>
             </tr>
           ))}
         </tbody>
@@ -1284,7 +1321,7 @@ function PointsYearTable({ rows, valueFormatter }: { rows: ReturnType<typeof bui
   );
 }
 
-function OtherMeasureYearTable({ rows }: { rows: ReturnType<typeof buildOtherMeasureYearRows> }) {
+function OtherMeasureYearTable({ rows, highlightedMonth }: { rows: ReturnType<typeof buildOtherMeasureYearRows>; highlightedMonth: string | null }) {
   return (
     <div className="points-year-table-wrap">
       <table className="points-year-table points-other-year-table">
@@ -1298,8 +1335,8 @@ function OtherMeasureYearTable({ rows }: { rows: ReturnType<typeof buildOtherMea
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.month}>
-              <th scope="row">{row.month.slice(5)}</th>
+            <tr key={row.month} className={row.month === highlightedMonth ? "points-year-current-month" : undefined}>
+              <th scope="row">{formatMonthName(row.month)}</th>
               <td>{row.completedValue}</td>
               <td>{row.openValue}</td>
               <td>{row.cumulativeValue}</td>
@@ -1376,6 +1413,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const needsKilometerEvidence = form.transportType === "kilometergeld";
   const needsPublicTransportEvidence = form.transportType === "oeffi-zuschuss";
   const openTrips = data.trips.filter((trip) => !trip.done);
+  const completedTrips = data.trips.filter((trip) => trip.done);
   const filesByTripId = useMemo(() => {
     const grouped = new Map<string, TripFile[]>();
     data.files.forEach((file) => {
@@ -1953,18 +1991,18 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
       </div>
       <div className="panel">
         <div className="panel-heading">
-          <span className="section-label">Erfasste Reisen</span>
-          <strong>{data.trips.length}</strong>
+          <span className="section-label">Offene Reisen</span>
+          <strong>{openTrips.length}</strong>
         </div>
         <div className="trip-list">
-          {data.trips.length === 0 ? <p className="muted">Noch keine Reisen erfasst.</p> : null}
-          {data.trips.map((trip) => (
+          {openTrips.length === 0 ? <p className="muted">Keine offenen Reisen.</p> : null}
+          {openTrips.map((trip) => (
             <article key={trip.id} className={`trip-row ${trip.done ? "trip-row-done" : ""} ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`}>
               <div>
                 <strong>{formatDateKey(trip.date)} · {trip.reason || "Ohne Grund"}</strong>
                 <span>{formatTripOrigin(trip.origin)}{formatTripOrigin(trip.origin) ? " → " : ""}{trip.destination || "-"} · {TRANSPORT_LABELS[trip.transportType]}</span>
                 {trip.note ? <span>{trip.note}</span> : null}
-                <span className="trip-badges">{!trip.done ? <em>Offen</em> : null}{isTripIncomplete(trip) ? <em>Unvollständig</em> : null}</span>
+                {isTripIncomplete(trip) ? <span className="trip-badges"><em>Unvollständig</em></span> : null}
               </div>
               <div className="trip-row-metrics">
                 <span>{formatMinutes(trip.durationMinutes)}</span>
@@ -1975,6 +2013,45 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <div className="trip-actions">
                 <button className="icon-button trip-action-button" type="button" title={trip.done ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={trip.done ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleDone(trip)}>
                   {trip.done ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
+                </button>
+                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editTrip(trip)}>
+                  <PencilSimple size={17} />
+                </button>
+                <button className="icon-button trip-action-button" type="button" title="Duplizieren" aria-label="Duplizieren" onClick={() => void duplicateTrip(trip)}>
+                  <Copy size={17} />
+                </button>
+                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeTrip(trip.id)}>
+                  <Trash size={17} />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel-heading">
+          <span className="section-label">Erledigte Reisen</span>
+          <strong>{completedTrips.length}</strong>
+        </div>
+        <div className="trip-list">
+          {completedTrips.length === 0 ? <p className="muted">Keine erledigten Reisen.</p> : null}
+          {completedTrips.map((trip) => (
+            <article key={trip.id} className={`trip-row trip-row-done ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`}>
+              <div>
+                <strong>{formatDateKey(trip.date)} · {trip.reason || "Ohne Grund"}</strong>
+                <span>{formatTripOrigin(trip.origin)}{formatTripOrigin(trip.origin) ? " → " : ""}{trip.destination || "-"} · {TRANSPORT_LABELS[trip.transportType]}</span>
+                {trip.note ? <span>{trip.note}</span> : null}
+                {isTripIncomplete(trip) ? <span className="trip-badges"><em>Unvollständig</em></span> : null}
+              </div>
+              <div className="trip-row-metrics">
+                <span>{formatMinutes(trip.durationMinutes)}</span>
+                <span>{(trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</span>
+                <strong>{formatEuroCents(calculateTripTotalCents(trip))}</strong>
+                <small>Diff. {formatEuroCents(calculateTripDifferentialCents(trip))}</small>
+              </div>
+              <div className="trip-actions">
+                <button className="icon-button trip-action-button" type="button" title="Auf offen setzen" aria-label="Auf offen setzen" onClick={() => void toggleDone(trip)}>
+                  <ArrowClockwise size={17} />
                 </button>
                 <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editTrip(trip)}>
                   <PencilSimple size={17} />
@@ -2994,6 +3071,13 @@ export function parsePointTenthsInput(value: string): number | null {
   const numeric = Number(normalized);
   if (!Number.isFinite(numeric)) return null;
   return Math.round(numeric * 10);
+}
+
+export function formatAuditTaxNumber(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 9);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 5)}/${digits.slice(5)}`;
 }
 
 function parseUsoTargetInput(value: string): number | null {

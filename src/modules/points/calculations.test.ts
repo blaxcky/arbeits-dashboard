@@ -11,6 +11,7 @@ import {
   calculateAdditionalResultBonusTenths,
   calculateAuditPointBreakdown,
   cappedAuditPeriodYears,
+  formatMonthName,
   pointsForAuditCase,
   summarizeAuditPoints
 } from "./calculations";
@@ -158,6 +159,16 @@ describe("audit point calculations", () => {
     expect(rows[11]).toMatchObject({ targetValue: 120, cumulativeValue: 100, remainingValue: 20, targetReached: false });
   });
 
+  it("evaluates BP yearly targets against the current annual completed value", () => {
+    const rows = buildAuditPointYearRows([
+      { ...baseCase, status: "completed", submittedPointsTenths: 20, submissionMonth: "2026-12" }
+    ], 2026, [{ id: "goal-2026", year: 2026, targetPointsTenths: 120, updatedAt: "2026-05-01T08:00:00.000Z" }]);
+
+    expect(rows[0]).toMatchObject({ targetValue: 10, cumulativeValue: 0, remainingValue: 0, targetReached: true });
+    expect(rows[1]).toMatchObject({ targetValue: 20, cumulativeValue: 0, remainingValue: 0, targetReached: true });
+    expect(rows[2]).toMatchObject({ targetValue: 30, cumulativeValue: 0, remainingValue: 10, targetReached: false });
+  });
+
   it("builds USO yearly rows with one completed case as one count and default target eight", () => {
     const rows = buildUsoYearRows([
       baseUsoCase,
@@ -166,7 +177,7 @@ describe("audit point calculations", () => {
     ], 2026);
 
     expect(DEFAULT_USO_TARGET_COUNT).toBe(8);
-    expect(rows[4]).toMatchObject({ submissionValue: 1, openValue: 1, cumulativeValue: 1, targetValue: 4, remainingValue: 3, targetReached: false });
+    expect(rows[4]).toMatchObject({ submissionValue: 1, openValue: 1, cumulativeValue: 1, targetValue: 4, remainingValue: 2, targetReached: false });
     expect(rows[5]).toMatchObject({ submissionValue: 1, openValue: 0, cumulativeValue: 2, targetValue: 4, remainingValue: 2, targetReached: false });
     expect(rows[11]).toMatchObject({ targetValue: 8, cumulativeValue: 2, remainingValue: 6 });
   });
@@ -203,5 +214,11 @@ describe("audit point calculations", () => {
       { measureType: "CLO-Anfrage", completedCount: 1, openCount: 1, totalCount: 2 },
       { measureType: "Registrierkassennachschau", completedCount: 1, openCount: 0, totalCount: 1 }
     ]);
+  });
+
+  it("formats yearly row months with Austrian month names", () => {
+    expect(formatMonthName("2026-01")).toBe("Jänner");
+    expect(formatMonthName("2026-02")).toBe("Februar");
+    expect(formatMonthName("2026-13")).toBe("2026-13");
   });
 });

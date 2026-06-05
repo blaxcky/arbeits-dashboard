@@ -52,6 +52,7 @@ export interface OtherMeasureTypeBreakdown {
 }
 
 export const DEFAULT_USO_TARGET_COUNT = 8;
+const AUSTRIAN_MONTH_NAMES = ["Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
 export const AUDIT_POINT_CATEGORY_RULES: Record<AuditPointCategory, AuditPointCategoryRule> = {
   K3: { label: "K3", baseTenths: 30, yearlyTenths: 5 },
@@ -219,14 +220,23 @@ export function buildOtherMeasureTypeBreakdown(measures: OtherMeasure[], year: n
   return Array.from(grouped.values()).sort((left, right) => right.totalCount - left.totalCount || left.measureType.localeCompare(right.measureType, "de-AT"));
 }
 
+export function formatMonthName(month: string): string {
+  const monthNumber = Number(month.slice(5, 7));
+  return AUSTRIAN_MONTH_NAMES[monthNumber - 1] ?? month;
+}
+
 function buildYearRows(year: number, targetValue: number | null, monthValue: (month: string) => { submissionValue: number; openValue: number }): YearlyMonthlyRow[] {
   let cumulativeValue = 0;
-  return Array.from({ length: 12 }, (_, index) => {
+  const monthlyValues = Array.from({ length: 12 }, (_, index) => {
     const month = `${year}-${String(index + 1).padStart(2, "0")}`;
-    const { submissionValue, openValue } = monthValue(month);
+    return { month, ...monthValue(month) };
+  });
+  const currentYearValue = monthlyValues.reduce((sum, row) => sum + row.submissionValue, 0);
+
+  return monthlyValues.map(({ month, submissionValue, openValue }, index) => {
     cumulativeValue += submissionValue;
     const monthlyTarget = targetValue === null ? null : Math.ceil((targetValue * (index + 1)) / 12);
-    const remainingValue = monthlyTarget === null ? null : Math.max(monthlyTarget - cumulativeValue, 0);
+    const remainingValue = monthlyTarget === null ? null : Math.max(monthlyTarget - currentYearValue, 0);
     return {
       month,
       submissionValue,
@@ -234,7 +244,7 @@ function buildYearRows(year: number, targetValue: number | null, monthValue: (mo
       targetValue: monthlyTarget,
       cumulativeValue,
       remainingValue,
-      targetReached: monthlyTarget === null ? null : cumulativeValue >= monthlyTarget
+      targetReached: monthlyTarget === null ? null : currentYearValue >= monthlyTarget
     };
   });
 }
