@@ -33,7 +33,7 @@ import {
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, type PointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { AuditPointCase, AuditPointCategory, AuditPointStatus, SavedDestination, Settings, TimeEntry, UsoCase, UsoCaseStatus, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
+import type { AuditPointCase, AuditPointCategory, AuditPointStatus, OtherMeasure, OtherMeasureStatus, SavedDestination, Settings, TimeEntry, UsoCase, UsoCaseStatus, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isValidDateKey, isoWeekDays, parseDateKey, todayKey, weekdayName } from "../lib/dates";
@@ -72,6 +72,8 @@ import {
   AUDIT_POINT_CATEGORY_RULES,
   calculateAuditPointBreakdown,
   buildAuditPointYearRows,
+  buildOtherMeasureTypeBreakdown,
+  buildOtherMeasureYearRows,
   buildUsoYearRows,
   isAuditPointCategory,
   pointsForAuditCase,
@@ -743,10 +745,14 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
   const [usoEditingId, setUsoEditingId] = useState<string | null>(null);
   const [usoForm, setUsoForm] = useState(() => usoCaseToForm());
   const [usoErrors, setUsoErrors] = useState<Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>>>({});
+  const [otherEditingId, setOtherEditingId] = useState<string | null>(null);
+  const [otherForm, setOtherForm] = useState(() => otherMeasureToForm());
+  const [otherErrors, setOtherErrors] = useState<Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>>>({});
   const previewCase = auditPointCaseDraftForPreview(form);
   const previewBreakdown = previewCase ? calculateAuditPointBreakdown(previewCase) : null;
   const sortedAuditCases = [...data.auditPointCases].sort(comparePointCases);
   const sortedUsoCases = [...data.usoCases].sort(compareUsoCases);
+  const sortedOtherMeasures = [...data.otherMeasures].sort(compareOtherMeasures);
 
   function updateField(field: keyof AuditPointCaseForm, value: string | boolean) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -845,6 +851,58 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
     showToast("USO-Status geändert.");
   }
 
+  function updateOtherField(field: keyof ReturnType<typeof otherMeasureToForm>, value: string) {
+    setOtherForm((current) => ({ ...current, [field]: value }));
+    setOtherErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  async function saveOtherMeasure() {
+    const validation = validateOtherMeasureForm(otherForm);
+    setOtherErrors(validation.errors);
+    if (!validation.valid) {
+      showToast("Bitte die markierten Sonstige-Felder prüfen.");
+      return;
+    }
+
+    await data.saveOtherMeasure({
+      id: otherEditingId ?? undefined,
+      title: otherForm.title.trim(),
+      measureType: otherForm.measureType.trim(),
+      submissionMonth: otherForm.submissionMonth,
+      status: otherForm.status
+    });
+    setOtherEditingId(null);
+    setOtherForm(otherMeasureToForm());
+    showToast("Sonstige Maßnahme gespeichert.");
+  }
+
+  function editOtherMeasure(measure: OtherMeasure) {
+    setOtherEditingId(measure.id);
+    setOtherForm(otherMeasureToForm(measure));
+    setOtherErrors({});
+  }
+
+  async function removeOtherMeasure(measure: OtherMeasure) {
+    if (!window.confirm(`Sonstige Maßnahme "${measure.title}" löschen?`)) return;
+    await data.removeOtherMeasure(measure.id);
+    if (otherEditingId === measure.id) {
+      setOtherEditingId(null);
+      setOtherForm(otherMeasureToForm());
+    }
+    showToast("Sonstige Maßnahme gelöscht.");
+  }
+
+  async function toggleOtherMeasure(measure: OtherMeasure) {
+    await data.saveOtherMeasure({
+      id: measure.id,
+      title: measure.title,
+      measureType: measure.measureType,
+      submissionMonth: measure.submissionMonth,
+      status: measure.status === "completed" ? "in_progress" : "completed"
+    });
+    showToast("Sonstige-Status geändert.");
+  }
+
   return (
     <section className="page-stack">
       <Header eyebrow="Betriebsprüfungen" title="Punkte" />
@@ -925,6 +983,39 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
           </div>
           <button className="primary-button trip-payment-save" type="button" onClick={() => void saveUsoCase()}>{usoEditingId ? "Änderungen speichern" : "USO-Fall speichern"}</button>
         </section>
+        <section className="panel form-panel">
+          <div className="panel-heading">
+            <span className="section-label">{otherEditingId ? "Sonstige Maßnahme bearbeiten" : "Neue sonstige Maßnahme"}</span>
+            <button className="secondary-button" type="button" onClick={() => {
+              setOtherEditingId(null);
+              setOtherForm(otherMeasureToForm());
+              setOtherErrors({});
+            }}>Neu</button>
+          </div>
+          <div className="form-grid">
+            <Field label="Titel" className="field-wide" error={otherErrors.title}>
+              <input value={otherForm.title} aria-invalid={Boolean(otherErrors.title)} onChange={(event) => updateOtherField("title", event.target.value)} />
+            </Field>
+            <Field label="Art" className="field-wide" error={otherErrors.measureType}>
+              <input list="other-measure-types" value={otherForm.measureType} aria-invalid={Boolean(otherErrors.measureType)} onChange={(event) => updateOtherField("measureType", event.target.value)} />
+              <datalist id="other-measure-types">
+                <option value="Registrierkassennachschau" />
+                <option value="CLO-Anfrage" />
+                <option value="Sonstige" />
+              </datalist>
+            </Field>
+            <Field label="Abgabemonat" error={otherErrors.submissionMonth}>
+              <input type="month" value={otherForm.submissionMonth} aria-invalid={Boolean(otherErrors.submissionMonth)} onChange={(event) => updateOtherField("submissionMonth", event.target.value)} />
+            </Field>
+            <Field label="Status">
+              <select value={otherForm.status} onChange={(event) => updateOtherField("status", event.target.value as OtherMeasureStatus)}>
+                <option value="in_progress">Offen</option>
+                <option value="completed">Erledigt</option>
+              </select>
+            </Field>
+          </div>
+          <button className="primary-button trip-payment-save" type="button" onClick={() => void saveOtherMeasure()}>{otherEditingId ? "Änderungen speichern" : "Maßnahme speichern"}</button>
+        </section>
       </div>
       <div className="panel">
         <div className="panel-heading">
@@ -976,6 +1067,29 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
           ))}
         </div>
       </div>
+      <div className="panel">
+        <div className="panel-heading">
+          <span className="section-label">Sonstige Maßnahmen</span>
+          <strong>{sortedOtherMeasures.length}</strong>
+        </div>
+        <div className="trip-list">
+          {sortedOtherMeasures.length === 0 ? <p className="muted">Noch keine sonstigen Maßnahmen erfasst.</p> : null}
+          {sortedOtherMeasures.map((measure) => (
+            <article key={measure.id} className={`trip-row points-uso-row ${measure.status === "completed" ? "trip-row-done" : ""}`}>
+              <div>
+                <strong>{measure.title}</strong>
+                <span>{measure.measureType} · {measure.submissionMonth || "Kein Abgabemonat"}</span>
+                <span className="trip-badges"><em>{measure.status === "completed" ? "Erledigt" : "Offen"}</em>{measure.submissionMonth === "" ? <em>ohne Abgabemonat</em> : null}</span>
+              </div>
+              <div className="trip-actions">
+                <button className="secondary-button" type="button" onClick={() => void toggleOtherMeasure(measure)}>{measure.status === "completed" ? "Auf offen setzen" : "Erledigt"}</button>
+                <button className="secondary-button" type="button" onClick={() => editOtherMeasure(measure)}>Bearbeiten</button>
+                <button className="danger-button" type="button" onClick={() => void removeOtherMeasure(measure)}>Löschen</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -1012,15 +1126,19 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
   const navigate = useNavigate();
   const params = useParams();
   const year = yearFromUrlParam(params.year);
-  const yearOptions = pointYearOptions(data.auditPointCases, data.usoCases, currentYear(), year);
+  const yearOptions = pointYearOptions(data.auditPointCases, data.usoCases, data.otherMeasures, currentYear(), year);
   const auditRows = buildAuditPointYearRows(data.auditPointCases, year, data.auditPointGoals);
   const usoRows = buildUsoYearRows(data.usoCases, year, data.usoGoals);
+  const otherRows = buildOtherMeasureYearRows(data.otherMeasures, year);
+  const otherTypeBreakdown = buildOtherMeasureTypeBreakdown(data.otherMeasures, year);
   const auditGoal = data.auditPointGoals.find((goal) => goal.year === year);
   const usoGoal = data.usoGoals.find((goal) => goal.year === year);
   const auditCompleted = auditRows[auditRows.length - 1]?.cumulativeValue ?? 0;
   const auditOpen = auditRows.reduce((sum, row) => sum + row.openValue, 0);
   const usoCompleted = usoRows[usoRows.length - 1]?.cumulativeValue ?? 0;
   const usoOpen = usoRows.reduce((sum, row) => sum + row.openValue, 0);
+  const otherCompleted = otherRows[otherRows.length - 1]?.cumulativeValue ?? 0;
+  const otherOpen = otherRows.reduce((sum, row) => sum + row.openValue, 0);
   const [auditGoalInput, setAuditGoalInput] = useState("");
   const [usoGoalInput, setUsoGoalInput] = useState("");
 
@@ -1074,6 +1192,9 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
           <div><dt>USO Ist</dt><dd>{usoCompleted}</dd></div>
           <div><dt>USO offen</dt><dd>{usoOpen}</dd></div>
           <div><dt>USO Jahresziel</dt><dd>{usoTargetForYear(data.usoGoals, year)}</dd></div>
+          <div><dt>Sonstige Ist</dt><dd>{otherCompleted}</dd></div>
+          <div><dt>Sonstige offen</dt><dd>{otherOpen}</dd></div>
+          <div><dt>Sonstige gesamt</dt><dd>{otherCompleted + otherOpen}</dd></div>
         </dl>
       </div>
       <div className="settings-grid">
@@ -1105,6 +1226,26 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
           </div>
           <PointsYearTable rows={usoRows} valueFormatter={(value) => String(value)} />
         </section>
+        <section className="panel">
+          <div className="panel-heading">
+            <span className="section-label">Sonstige Maßnahmen</span>
+          </div>
+          <OtherMeasureYearTable rows={otherRows} />
+          <div className="points-type-breakdown">
+            <span className="section-label">Art</span>
+            {otherTypeBreakdown.length === 0 ? <p className="muted">Keine sonstigen Maßnahmen in diesem Jahr.</p> : null}
+            {otherTypeBreakdown.length > 0 ? (
+              <dl className="detail-list">
+                {otherTypeBreakdown.map((item) => (
+                  <div key={item.measureType}>
+                    <dt>{item.measureType}</dt>
+                    <dd>{item.completedCount} erledigt / {item.openCount} offen / {item.totalCount} gesamt</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </div>
+        </section>
       </div>
     </section>
   );
@@ -1133,6 +1274,33 @@ function PointsYearTable({ rows, valueFormatter }: { rows: ReturnType<typeof bui
               <td>{valueFormatter(row.cumulativeValue)}</td>
               <td className={row.targetReached ? "points-year-ok" : ""}>{row.targetReached ? "OK" : row.remainingValue === null ? "-" : valueFormatter(row.remainingValue)}</td>
               <td>{valueFormatter(row.openValue)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function OtherMeasureYearTable({ rows }: { rows: ReturnType<typeof buildOtherMeasureYearRows> }) {
+  return (
+    <div className="points-year-table-wrap">
+      <table className="points-year-table points-other-year-table">
+        <thead>
+          <tr>
+            <th>Monat</th>
+            <th>Erledigt</th>
+            <th>Offen</th>
+            <th>Stand</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.month}>
+              <th scope="row">{row.month.slice(5)}</th>
+              <td>{row.completedValue}</td>
+              <td>{row.openValue}</td>
+              <td>{row.cumulativeValue}</td>
             </tr>
           ))}
         </tbody>
@@ -2494,11 +2662,11 @@ export function tripYearOptions(trips: Pick<Trip, "date">[], fallbackYear = curr
   return Array.from(years).sort((left, right) => right - left);
 }
 
-export function pointYearOptions(auditCases: Pick<AuditPointCase, "submissionMonth">[], usoCases: Pick<UsoCase, "submissionMonth">[], fallbackYear = currentYear(), selectedYear?: number): number[] {
+export function pointYearOptions(auditCases: Pick<AuditPointCase, "submissionMonth">[], usoCases: Pick<UsoCase, "submissionMonth">[], otherMeasures: Pick<OtherMeasure, "submissionMonth">[] = [], fallbackYear = currentYear(), selectedYear?: number): number[] {
   const years = new Set<number>([fallbackYear]);
   if (selectedYear !== undefined) years.add(selectedYear);
 
-  [...auditCases, ...usoCases].forEach((pointCase) => {
+  [...auditCases, ...usoCases, ...otherMeasures].forEach((pointCase) => {
     const match = /^(\d{4})-/.exec(pointCase.submissionMonth);
     if (match) years.add(Number(match[1]));
   });
@@ -2772,6 +2940,15 @@ function usoCaseToForm(usoCase?: UsoCase, fallbackMonth = "") {
   };
 }
 
+function otherMeasureToForm(measure?: OtherMeasure, fallbackMonth = "") {
+  return {
+    title: measure?.title ?? "",
+    measureType: measure?.measureType ?? "",
+    submissionMonth: measure?.submissionMonth ?? fallbackMonth,
+    status: measure?.status ?? "in_progress" as OtherMeasureStatus
+  };
+}
+
 export function parsePointTenthsInput(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -2824,6 +3001,17 @@ function validateUsoCaseForm(form: ReturnType<typeof usoCaseToForm>):
   return { valid: true, errors };
 }
 
+function validateOtherMeasureForm(form: ReturnType<typeof otherMeasureToForm>):
+  | { valid: true; errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>> }
+  | { valid: false; errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>> } {
+  const errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>> = {};
+  if (!form.title.trim()) errors.title = "Bitte einen Titel eingeben.";
+  if (!form.measureType.trim()) errors.measureType = "Bitte eine Art eingeben.";
+  if (form.submissionMonth !== "" && !isValidAuditPointMonth(form.submissionMonth)) errors.submissionMonth = "Bitte einen gültigen Abgabemonat wählen.";
+  if (Object.keys(errors).length > 0) return { valid: false, errors };
+  return { valid: true, errors };
+}
+
 function auditPointCaseDraftForPreview(form: AuditPointCaseForm): Pick<AuditPointCase, "category" | "periodStartYear" | "periodEndYear" | "additionalResultCents" | "section99"> | null {
   const validation = validateAuditPointCaseForm({ ...form, name: form.name || "x" });
   if (!validation.valid) return null;
@@ -2853,6 +3041,14 @@ function comparePointCases(left: AuditPointCase, right: AuditPointCase): number 
 }
 
 function compareUsoCases(left: UsoCase, right: UsoCase): number {
+  const leftMonth = left.submissionMonth || "9999-99";
+  const rightMonth = right.submissionMonth || "9999-99";
+  const monthOrder = leftMonth.localeCompare(rightMonth);
+  if (monthOrder !== 0) return monthOrder;
+  return left.title.localeCompare(right.title, "de-AT");
+}
+
+function compareOtherMeasures(left: OtherMeasure, right: OtherMeasure): number {
   const leftMonth = left.submissionMonth || "9999-99";
   const rightMonth = right.submissionMonth || "9999-99";
   const monthOrder = leftMonth.localeCompare(rightMonth);

@@ -1,4 +1,4 @@
-import type { AuditPointCase, AuditPointCategory, AuditPointGoal, UsoCase, UsoGoal } from "../../db/schema";
+import type { AuditPointCase, AuditPointCategory, AuditPointGoal, OtherMeasure, UsoCase, UsoGoal } from "../../db/schema";
 
 export interface AuditPointCategoryRule {
   label: string;
@@ -35,6 +35,20 @@ export interface YearlyMonthlyRow {
   cumulativeValue: number;
   remainingValue: number | null;
   targetReached: boolean | null;
+}
+
+export interface OtherMeasureYearRow {
+  month: string;
+  completedValue: number;
+  openValue: number;
+  cumulativeValue: number;
+}
+
+export interface OtherMeasureTypeBreakdown {
+  measureType: string;
+  completedCount: number;
+  openCount: number;
+  totalCount: number;
 }
 
 export const DEFAULT_USO_TARGET_COUNT = 8;
@@ -166,6 +180,43 @@ export function buildUsoYearRows(cases: UsoCase[], year: number, goals: UsoGoal[
       return { ...current, openValue: current.openValue + 1 };
     }, { submissionValue: 0, openValue: 0 });
   });
+}
+
+export function buildOtherMeasureYearRows(measures: OtherMeasure[], year: number): OtherMeasureYearRow[] {
+  let cumulativeValue = 0;
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = `${year}-${String(index + 1).padStart(2, "0")}`;
+    const monthlyMeasures = measures.filter((measure) => measure.submissionMonth === month);
+    const completedValue = monthlyMeasures.filter((measure) => measure.status === "completed").length;
+    const openValue = monthlyMeasures.length - completedValue;
+    cumulativeValue += completedValue;
+    return {
+      month,
+      completedValue,
+      openValue,
+      cumulativeValue
+    };
+  });
+}
+
+export function buildOtherMeasureTypeBreakdown(measures: OtherMeasure[], year: number): OtherMeasureTypeBreakdown[] {
+  const yearPrefix = `${year}-`;
+  const grouped = measures
+    .filter((measure) => measure.submissionMonth.startsWith(yearPrefix))
+    .reduce<Map<string, OtherMeasureTypeBreakdown>>((current, measure) => {
+      const measureType = measure.measureType.trim() || "Ohne Art";
+      const existing = current.get(measureType) ?? { measureType, completedCount: 0, openCount: 0, totalCount: 0 };
+      if (measure.status === "completed") {
+        existing.completedCount += 1;
+      } else {
+        existing.openCount += 1;
+      }
+      existing.totalCount += 1;
+      current.set(measureType, existing);
+      return current;
+    }, new Map());
+
+  return Array.from(grouped.values()).sort((left, right) => right.totalCount - left.totalCount || left.measureType.localeCompare(right.measureType, "de-AT"));
 }
 
 function buildYearRows(year: number, targetValue: number | null, monthValue: (month: string) => { submissionValue: number; openValue: number }): YearlyMonthlyRow[] {

@@ -1,9 +1,9 @@
 import JSZip from "jszip";
 import { readAllData, replaceAllData } from "../db/database";
-import { APP_NAME, BACKUP_SCHEMA_VERSION, type AuditPointCase, type AuditPointGoal, type BackupData, type BackupManifest, type BackupPayload, type UsoCase, type UsoGoal, type TravelExpensePayment, type TripFile } from "../db/schema";
+import { APP_NAME, BACKUP_SCHEMA_VERSION, type AuditPointCase, type AuditPointGoal, type BackupData, type BackupManifest, type BackupPayload, type OtherMeasure, type UsoCase, type UsoGoal, type TravelExpensePayment, type TripFile } from "../db/schema";
 
 type SerializedTripFile = Omit<TripFile, "dataUrl"> & ({ dataUrl: string; path?: never } | { path: string; dataUrl?: never });
-type SerializedBackupData = Omit<BackupData, "files" | "tripPayments" | "auditPointCases" | "auditPointGoals" | "usoCases" | "usoGoals"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[]; auditPointCases?: AuditPointCase[]; auditPointGoals?: AuditPointGoal[]; usoCases?: UsoCase[]; usoGoals?: UsoGoal[] };
+type SerializedBackupData = Omit<BackupData, "files" | "tripPayments" | "auditPointCases" | "auditPointGoals" | "usoCases" | "usoGoals" | "otherMeasures"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[]; auditPointCases?: AuditPointCase[]; auditPointGoals?: AuditPointGoal[]; usoCases?: UsoCase[]; usoGoals?: UsoGoal[]; otherMeasures?: OtherMeasure[] };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -36,6 +36,7 @@ export async function exportBackup(): Promise<Blob> {
       auditPointGoals: data.auditPointGoals.length,
       usoCases: data.usoCases.length,
       usoGoals: data.usoGoals.length,
+      otherMeasures: data.otherMeasures.length,
       todos: 0,
       files: data.files.length,
       savedDestinations: data.savedDestinations.length
@@ -103,6 +104,7 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   if (value.auditPointGoals !== undefined && !Array.isArray(value.auditPointGoals)) throw new Error("Punkte-Jahresziele sind ungültig.");
   if (value.usoCases !== undefined && !Array.isArray(value.usoCases)) throw new Error("USO-Fälle sind ungültig.");
   if (value.usoGoals !== undefined && !Array.isArray(value.usoGoals)) throw new Error("USO-Jahresziele sind ungültig.");
+  if (value.otherMeasures !== undefined && !Array.isArray(value.otherMeasures)) throw new Error("Sonstige Maßnahmen sind ungültig.");
   if (!Array.isArray(value.files)) throw new Error("Nachweise fehlen.");
   if (value.savedDestinations !== undefined && !Array.isArray(value.savedDestinations)) throw new Error("Gespeicherte Zieladressen sind ungültig.");
   if (value.settings !== null) validateSettings(value.settings);
@@ -115,6 +117,7 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   (value.auditPointGoals ?? []).forEach(validateAuditPointGoal);
   (value.usoCases ?? []).forEach(validateUsoCase);
   (value.usoGoals ?? []).forEach(validateUsoGoal);
+  (value.otherMeasures ?? []).forEach(validateOtherMeasure);
   (value.savedDestinations ?? []).forEach(validateSavedDestination);
   value.files.forEach(validateTripFile);
 }
@@ -266,6 +269,17 @@ function validateUsoGoal(value: unknown): void {
   requireString(value, "updatedAt", "USO-Jahresziel-Zeitstempel fehlt.");
 }
 
+function validateOtherMeasure(value: unknown): void {
+  if (!isObject(value)) throw new Error("Sonstige Maßnahme ist ungültig.");
+  requireString(value, "id", "Sonstige-Maßnahme-ID fehlt.");
+  requireString(value, "title", "Sonstige-Maßnahme-Titel fehlt.");
+  requireString(value, "measureType", "Sonstige-Maßnahme-Art fehlt.");
+  requireString(value, "submissionMonth", "Sonstige-Maßnahme-Abgabemonat fehlt.");
+  requireString(value, "status", "Sonstige-Maßnahme-Status fehlt.");
+  requireString(value, "createdAt", "Sonstige-Maßnahme-Erstellt-Zeit fehlt.");
+  requireString(value, "updatedAt", "Sonstige-Maßnahme-Aktualisiert-Zeit fehlt.");
+}
+
 function validateTripFile(value: unknown): void {
   if (!isObject(value)) throw new Error("Nachweis ist ungültig.");
   requireString(value, "id", "Nachweis-ID fehlt.");
@@ -297,7 +311,7 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
       };
     })
   );
-  return { ...data, files, savedDestinations: data.savedDestinations ?? [], tripPayments: data.tripPayments ?? [], auditPointCases: data.auditPointCases ?? [], auditPointGoals: data.auditPointGoals ?? [], usoCases: data.usoCases ?? [], usoGoals: data.usoGoals ?? [] };
+  return { ...data, files, savedDestinations: data.savedDestinations ?? [], tripPayments: data.tripPayments ?? [], auditPointCases: data.auditPointCases ?? [], auditPointGoals: data.auditPointGoals ?? [], usoCases: data.usoCases ?? [], usoGoals: data.usoGoals ?? [], otherMeasures: data.otherMeasures ?? [] };
 }
 
 function backupFilePath(file: TripFile, index: number): string {

@@ -7,6 +7,7 @@ import {
   type BackupData,
   type AppMeta,
   type FlexCorrection,
+  type OtherMeasure,
   type SavedDestination,
   type Settings,
   type TimeEntry,
@@ -34,6 +35,7 @@ class WorkDashboardDb extends Dexie {
   auditPointGoals!: Table<AuditPointGoal, string>;
   usoCases!: Table<UsoCase, string>;
   usoGoals!: Table<UsoGoal, string>;
+  otherMeasures!: Table<OtherMeasure, string>;
 
   constructor() {
     super("arbeits-dashboard");
@@ -131,6 +133,22 @@ class WorkDashboardDb extends Dexie {
       auditPointGoals: "id, &year",
       usoCases: "id, submissionMonth, status",
       usoGoals: "id, &year"
+    });
+    this.version(9).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt",
+      tripPayments: "id, year, date",
+      auditPointCases: "id, submissionMonth, status, category",
+      auditPointGoals: "id, &year",
+      usoCases: "id, submissionMonth, status",
+      usoGoals: "id, &year",
+      otherMeasures: "id, submissionMonth, status, measureType"
     });
   }
 }
@@ -419,6 +437,30 @@ export async function upsertUsoGoal(input: Omit<UsoGoal, "id" | "updatedAt"> & {
   return goal;
 }
 
+export async function listOtherMeasures(): Promise<OtherMeasure[]> {
+  return db.otherMeasures.orderBy("submissionMonth").reverse().toArray();
+}
+
+export async function upsertOtherMeasure(input: Omit<OtherMeasure, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<OtherMeasure> {
+  const existing = input.id ? await db.otherMeasures.get(input.id) : undefined;
+  const now = new Date().toISOString();
+  const measure: OtherMeasure = {
+    id: input.id ?? crypto.randomUUID(),
+    title: input.title.trim(),
+    measureType: input.measureType.trim(),
+    submissionMonth: input.submissionMonth,
+    status: input.status,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+  await db.otherMeasures.put(measure);
+  return measure;
+}
+
+export async function deleteOtherMeasure(id: string): Promise<void> {
+  await db.otherMeasures.delete(id);
+}
+
 export async function readAllData(): Promise<BackupData> {
   await ensureDefaults();
   return {
@@ -434,14 +476,15 @@ export async function readAllData(): Promise<BackupData> {
     auditPointGoals: await db.auditPointGoals.toArray(),
     usoCases: await db.usoCases.toArray(),
     usoGoals: await db.usoGoals.toArray(),
+    otherMeasures: await db.otherMeasures.toArray(),
     todos: [],
     files: await db.files.toArray()
   };
 }
 
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals, db.otherMeasures], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear(), db.otherMeasures.clear()]);
     if (data.settings) await db.settings.put(normalizeSettings(data.settings));
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
@@ -455,13 +498,14 @@ export async function replaceAllData(data: BackupData): Promise<void> {
     await db.auditPointGoals.bulkPut((data.auditPointGoals ?? []).map(normalizeAuditPointGoal));
     await db.usoCases.bulkPut((data.usoCases ?? []).map(normalizeUsoCase));
     await db.usoGoals.bulkPut((data.usoGoals ?? []).map(normalizeUsoGoal));
+    await db.otherMeasures.bulkPut((data.otherMeasures ?? []).map(normalizeOtherMeasure));
   });
   await ensureDefaults();
 }
 
 export async function deleteAllLocalData(): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals, db.otherMeasures], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear(), db.otherMeasures.clear()]);
   });
 }
 
@@ -539,5 +583,15 @@ function normalizeUsoGoal(goal: UsoGoal): UsoGoal {
     ...goal,
     id: goal.id || `uso-goal-${goal.year}`,
     targetCount: Math.max(Math.round(goal.targetCount), 0)
+  };
+}
+
+function normalizeOtherMeasure(measure: OtherMeasure): OtherMeasure {
+  return {
+    ...measure,
+    title: measure.title ?? "",
+    measureType: measure.measureType ?? "",
+    submissionMonth: measure.submissionMonth ?? "",
+    status: measure.status === "completed" ? "completed" : "in_progress"
   };
 }

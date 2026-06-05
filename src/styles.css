@@ -1073,6 +1073,10 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.points-other-year-table {
+  min-width: 420px;
+}
+
 .points-year-table th,
 .points-year-table td {
   border: 1px solid #e5ebf2;
@@ -1106,6 +1110,14 @@ button:disabled {
 
 .points-uso-row {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.points-type-breakdown {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eef1f5;
 }
 
 .trip-payment-box {

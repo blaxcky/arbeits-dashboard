@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { AuditPointCase, UsoCase } from "../../db/schema";
+import type { AuditPointCase, OtherMeasure, UsoCase } from "../../db/schema";
 import {
   ADDITIONAL_RESULT_BONUSES,
   AUDIT_POINT_CATEGORY_RULES,
   DEFAULT_USO_TARGET_COUNT,
   buildAuditPointYearRows,
+  buildOtherMeasureTypeBreakdown,
+  buildOtherMeasureYearRows,
   buildUsoYearRows,
   calculateAdditionalResultBonusTenths,
   calculateAuditPointBreakdown,
@@ -34,6 +36,16 @@ const baseCase: AuditPointCase = {
 const baseUsoCase: UsoCase = {
   id: "uso-1",
   title: "USO Muster",
+  submissionMonth: "2026-05",
+  status: "completed",
+  createdAt: "2026-05-01T08:00:00.000Z",
+  updatedAt: "2026-05-01T08:00:00.000Z"
+};
+
+const baseOtherMeasure: OtherMeasure = {
+  id: "other-1",
+  title: "Nachschau Muster",
+  measureType: "Registrierkassennachschau",
   submissionMonth: "2026-05",
   status: "completed",
   createdAt: "2026-05-01T08:00:00.000Z",
@@ -164,5 +176,32 @@ describe("audit point calculations", () => {
 
     expect(rows[0].targetValue).toBe(1);
     expect(rows[11].targetValue).toBe(12);
+  });
+
+  it("builds other measure yearly rows without targets", () => {
+    const rows = buildOtherMeasureYearRows([
+      baseOtherMeasure,
+      { ...baseOtherMeasure, id: "other-2", status: "in_progress", submissionMonth: "2026-05" },
+      { ...baseOtherMeasure, id: "other-3", status: "completed", submissionMonth: "2026-06" },
+      { ...baseOtherMeasure, id: "other-4", status: "completed", submissionMonth: "" }
+    ], 2026);
+
+    expect(rows[4]).toEqual({ month: "2026-05", completedValue: 1, openValue: 1, cumulativeValue: 1 });
+    expect(rows[5]).toEqual({ month: "2026-06", completedValue: 1, openValue: 0, cumulativeValue: 2 });
+    expect(rows[11]).toMatchObject({ completedValue: 0, openValue: 0, cumulativeValue: 2 });
+  });
+
+  it("builds other measure type breakdown for a year", () => {
+    const breakdown = buildOtherMeasureTypeBreakdown([
+      baseOtherMeasure,
+      { ...baseOtherMeasure, id: "other-2", status: "in_progress", measureType: "CLO-Anfrage" },
+      { ...baseOtherMeasure, id: "other-3", status: "completed", measureType: "CLO-Anfrage" },
+      { ...baseOtherMeasure, id: "other-4", status: "completed", measureType: "Sonstige", submissionMonth: "2025-06" }
+    ], 2026);
+
+    expect(breakdown).toEqual([
+      { measureType: "CLO-Anfrage", completedCount: 1, openCount: 1, totalCount: 2 },
+      { measureType: "Registrierkassennachschau", completedCount: 1, openCount: 0, totalCount: 1 }
+    ]);
   });
 });

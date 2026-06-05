@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.6.0";
-export const DB_SCHEMA_VERSION = 8;
+export const BACKUP_SCHEMA_VERSION = "1.7.0";
+export const DB_SCHEMA_VERSION = 9;
 
 export interface Settings {
   id: "main";
@@ -159,6 +159,18 @@ export interface UsoGoal {
   updatedAt: string;
 }
 
+export type OtherMeasureStatus = "in_progress" | "completed";
+
+export interface OtherMeasure {
+  id: string;
+  title: string;
+  measureType: string;
+  submissionMonth: string;
+  status: OtherMeasureStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BackupManifest {
   appName: typeof APP_NAME;
   schemaVersion: string;
@@ -179,6 +191,7 @@ export interface BackupData {
   auditPointGoals: AuditPointGoal[];
   usoCases: UsoCase[];
   usoGoals: UsoGoal[];
+  otherMeasures: OtherMeasure[];
   todos: unknown[];
   files: TripFile[];
 }

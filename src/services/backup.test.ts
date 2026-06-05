@@ -102,6 +102,17 @@ function backupData(): BackupData {
         updatedAt: "2026-05-10T08:00:00.000Z"
       }
     ],
+    otherMeasures: [
+      {
+        id: "other-1",
+        title: "Nachschau Muster",
+        measureType: "Registrierkassennachschau",
+        submissionMonth: "2026-05",
+        status: "completed",
+        createdAt: "2026-05-10T08:00:00.000Z",
+        updatedAt: "2026-05-10T08:00:00.000Z"
+      }
+    ],
     savedDestinations: [],
     todos: [],
     files: [
@@ -199,6 +210,18 @@ describe("backup service", () => {
     expect(data.usoGoals).toHaveLength(1);
   });
 
+  it("exports other measures in the backup counts and data", async () => {
+    dbMocks.readAllData.mockResolvedValue(backupData());
+
+    const blob = await exportBackup();
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { otherMeasures: number } };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { otherMeasures: unknown[] };
+
+    expect(manifest.counts.otherMeasures).toBe(1);
+    expect(data.otherMeasures).toHaveLength(1);
+  });
+
   it("imports new backups and restores TripFile dataUrl for IndexedDB", async () => {
     const data = backupData();
     const { dataUrl: _dataUrl, ...fileMetadata } = data.files[0];
@@ -250,6 +273,20 @@ describe("backup service", () => {
     await importBackup(await makeZip(oldData, "1.5.0"));
 
     expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, usoCases: [], usoGoals: [] });
+  });
+
+  it("normalizes old backups without other measures to an empty list", async () => {
+    const { otherMeasures: _otherMeasures, ...oldData } = backupData();
+
+    await importBackup(await makeZip(oldData, "1.6.0"));
+
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, otherMeasures: [] });
+  });
+
+  it("rejects backups with invalid other measures", async () => {
+    const data = { ...backupData(), otherMeasures: [{ id: "other-1" }] };
+
+    await expect(inspectBackup(await makeZip(data, "1.7.0"))).rejects.toThrow("Sonstige-Maßnahme-Titel fehlt.");
   });
 
   it("rejects new backups when the referenced evidence file is missing", async () => {
