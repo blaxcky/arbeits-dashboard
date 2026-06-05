@@ -659,6 +659,12 @@ button:disabled {
   gap: 18px;
 }
 
+.points-secondary-forms {
+  display: grid;
+  gap: 16px;
+  align-self: start;
+}
+
 .trip-form-stack {
   display: grid;
   gap: 16px;

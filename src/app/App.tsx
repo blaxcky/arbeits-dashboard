@@ -958,64 +958,66 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
             <button className="primary-button" type="button" onClick={() => void saveCase()}>{editingId ? "Änderungen speichern" : "Fall speichern"}</button>
           </div>
         </div>
-        <section className="panel form-panel">
-          <div className="panel-heading">
-            <span className="section-label">{usoEditingId ? "USO-Fall bearbeiten" : "Neuer USO-Fall"}</span>
-            <button className="secondary-button" type="button" onClick={() => {
-              setUsoEditingId(null);
-              setUsoForm(usoCaseToForm());
-              setUsoErrors({});
-            }}>Neu</button>
-          </div>
-          <div className="form-grid">
-            <Field label="Titel" className="field-wide" error={usoErrors.title}>
-              <input value={usoForm.title} aria-invalid={Boolean(usoErrors.title)} onChange={(event) => updateUsoField("title", event.target.value)} />
-            </Field>
-            <Field label="Abgabemonat" error={usoErrors.submissionMonth}>
-              <input type="month" value={usoForm.submissionMonth} aria-invalid={Boolean(usoErrors.submissionMonth)} onChange={(event) => updateUsoField("submissionMonth", event.target.value)} />
-            </Field>
-            <Field label="Status">
-              <select value={usoForm.status} onChange={(event) => updateUsoField("status", event.target.value as UsoCaseStatus)}>
-                <option value="in_progress">Offen</option>
-                <option value="completed">Erledigt</option>
-              </select>
-            </Field>
-          </div>
-          <button className="primary-button trip-payment-save" type="button" onClick={() => void saveUsoCase()}>{usoEditingId ? "Änderungen speichern" : "USO-Fall speichern"}</button>
-        </section>
-        <section className="panel form-panel">
-          <div className="panel-heading">
-            <span className="section-label">{otherEditingId ? "Sonstige Maßnahme bearbeiten" : "Neue sonstige Maßnahme"}</span>
-            <button className="secondary-button" type="button" onClick={() => {
-              setOtherEditingId(null);
-              setOtherForm(otherMeasureToForm());
-              setOtherErrors({});
-            }}>Neu</button>
-          </div>
-          <div className="form-grid">
-            <Field label="Titel" className="field-wide" error={otherErrors.title}>
-              <input value={otherForm.title} aria-invalid={Boolean(otherErrors.title)} onChange={(event) => updateOtherField("title", event.target.value)} />
-            </Field>
-            <Field label="Art" className="field-wide" error={otherErrors.measureType}>
-              <input list="other-measure-types" value={otherForm.measureType} aria-invalid={Boolean(otherErrors.measureType)} onChange={(event) => updateOtherField("measureType", event.target.value)} />
-              <datalist id="other-measure-types">
-                <option value="Registrierkassennachschau" />
-                <option value="CLO-Anfrage" />
-                <option value="Sonstige" />
-              </datalist>
-            </Field>
-            <Field label="Abgabemonat" error={otherErrors.submissionMonth}>
-              <input type="month" value={otherForm.submissionMonth} aria-invalid={Boolean(otherErrors.submissionMonth)} onChange={(event) => updateOtherField("submissionMonth", event.target.value)} />
-            </Field>
-            <Field label="Status">
-              <select value={otherForm.status} onChange={(event) => updateOtherField("status", event.target.value as OtherMeasureStatus)}>
-                <option value="in_progress">Offen</option>
-                <option value="completed">Erledigt</option>
-              </select>
-            </Field>
-          </div>
-          <button className="primary-button trip-payment-save" type="button" onClick={() => void saveOtherMeasure()}>{otherEditingId ? "Änderungen speichern" : "Maßnahme speichern"}</button>
-        </section>
+        <div className="points-secondary-forms">
+          <section className="panel form-panel">
+            <div className="panel-heading">
+              <span className="section-label">{usoEditingId ? "USO-Fall bearbeiten" : "Neuer USO-Fall"}</span>
+              <button className="secondary-button" type="button" onClick={() => {
+                setUsoEditingId(null);
+                setUsoForm(usoCaseToForm());
+                setUsoErrors({});
+              }}>Neu</button>
+            </div>
+            <div className="form-grid">
+              <Field label="Titel" className="field-wide" error={usoErrors.title}>
+                <input value={usoForm.title} aria-invalid={Boolean(usoErrors.title)} onChange={(event) => updateUsoField("title", event.target.value)} />
+              </Field>
+              <Field label="Abgabemonat" error={usoErrors.submissionMonth}>
+                <input type="month" value={usoForm.submissionMonth} aria-invalid={Boolean(usoErrors.submissionMonth)} onChange={(event) => updateUsoField("submissionMonth", event.target.value)} />
+              </Field>
+              <Field label="Status">
+                <select value={usoForm.status} onChange={(event) => updateUsoField("status", event.target.value as UsoCaseStatus)}>
+                  <option value="in_progress">Offen</option>
+                  <option value="completed">Erledigt</option>
+                </select>
+              </Field>
+            </div>
+            <button className="primary-button trip-payment-save" type="button" onClick={() => void saveUsoCase()}>{usoEditingId ? "Änderungen speichern" : "USO-Fall speichern"}</button>
+          </section>
+          <section className="panel form-panel">
+            <div className="panel-heading">
+              <span className="section-label">{otherEditingId ? "Sonstige Maßnahme bearbeiten" : "Neue sonstige Maßnahme"}</span>
+              <button className="secondary-button" type="button" onClick={() => {
+                setOtherEditingId(null);
+                setOtherForm(otherMeasureToForm());
+                setOtherErrors({});
+              }}>Neu</button>
+            </div>
+            <div className="form-grid">
+              <Field label="Titel" className="field-wide" error={otherErrors.title}>
+                <input value={otherForm.title} aria-invalid={Boolean(otherErrors.title)} onChange={(event) => updateOtherField("title", event.target.value)} />
+              </Field>
+              <Field label="Art" className="field-wide" error={otherErrors.measureType}>
+                <input list="other-measure-types" value={otherForm.measureType} aria-invalid={Boolean(otherErrors.measureType)} onChange={(event) => updateOtherField("measureType", event.target.value)} />
+                <datalist id="other-measure-types">
+                  <option value="Registrierkassennachschau" />
+                  <option value="CLO-Anfrage" />
+                  <option value="Sonstige" />
+                </datalist>
+              </Field>
+              <Field label="Abgabemonat" error={otherErrors.submissionMonth}>
+                <input type="month" value={otherForm.submissionMonth} aria-invalid={Boolean(otherErrors.submissionMonth)} onChange={(event) => updateOtherField("submissionMonth", event.target.value)} />
+              </Field>
+              <Field label="Status">
+                <select value={otherForm.status} onChange={(event) => updateOtherField("status", event.target.value as OtherMeasureStatus)}>
+                  <option value="in_progress">Offen</option>
+                  <option value="completed">Erledigt</option>
+                </select>
+              </Field>
+            </div>
+            <button className="primary-button trip-payment-save" type="button" onClick={() => void saveOtherMeasure()}>{otherEditingId ? "Änderungen speichern" : "Maßnahme speichern"}</button>
+          </section>
+        </div>
       </div>
       <div className="panel">
         <div className="panel-heading">
