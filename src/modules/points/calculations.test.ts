@@ -113,9 +113,22 @@ describe("audit point calculations", () => {
   });
 
   it("adds additional result bonuses cumulatively and strictly above thresholds", () => {
-    expect(calculateAdditionalResultBonusTenths(ADDITIONAL_RESULT_BONUSES[0].thresholdCents)).toBe(0);
-    expect(calculateAdditionalResultBonusTenths(ADDITIONAL_RESULT_BONUSES[0].thresholdCents + 1)).toBe(5);
-    expect(calculateAdditionalResultBonusTenths(ADDITIONAL_RESULT_BONUSES[2].thresholdCents + 1)).toBe(35);
+    expect(ADDITIONAL_RESULT_BONUSES).toEqual([
+      { thresholdCents: 5_000_00, pointsTenths: 10 },
+      { thresholdCents: 50_000_00, pointsTenths: 25 },
+      { thresholdCents: 100_000_00, pointsTenths: 20 },
+      { thresholdCents: 200_000_00, pointsTenths: 20 },
+      { thresholdCents: 500_000_00, pointsTenths: 25 },
+      { thresholdCents: 1_000_000_00, pointsTenths: 25 }
+    ]);
+
+    const expectedCumulativeTenths = [10, 35, 55, 75, 100, 125];
+
+    ADDITIONAL_RESULT_BONUSES.forEach((bonus, index) => {
+      const previousCumulativeTenths = expectedCumulativeTenths[index - 1] ?? 0;
+      expect(calculateAdditionalResultBonusTenths(bonus.thresholdCents)).toBe(previousCumulativeTenths);
+      expect(calculateAdditionalResultBonusTenths(bonus.thresholdCents + 1)).toBe(expectedCumulativeTenths[index]);
+    });
   });
 
   it("rejects invalid categories", () => {

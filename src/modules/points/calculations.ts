@@ -70,10 +70,12 @@ export const AUDIT_POINT_CATEGORY_RULES: Record<AuditPointCategory, AuditPointCa
 export const AUDIT_POINT_CATEGORIES = Object.keys(AUDIT_POINT_CATEGORY_RULES) as AuditPointCategory[];
 
 export const ADDITIONAL_RESULT_BONUSES: Array<{ thresholdCents: number; pointsTenths: number }> = [
-  { thresholdCents: 100_000_00, pointsTenths: 5 },
-  { thresholdCents: 250_000_00, pointsTenths: 10 },
-  { thresholdCents: 500_000_00, pointsTenths: 20 },
-  { thresholdCents: 1_000_000_00, pointsTenths: 30 }
+  { thresholdCents: 5_000_00, pointsTenths: 10 },
+  { thresholdCents: 50_000_00, pointsTenths: 25 },
+  { thresholdCents: 100_000_00, pointsTenths: 20 },
+  { thresholdCents: 200_000_00, pointsTenths: 20 },
+  { thresholdCents: 500_000_00, pointsTenths: 25 },
+  { thresholdCents: 1_000_000_00, pointsTenths: 25 }
 ];
 
 export function isAuditPointCategory(value: string): value is AuditPointCategory {
