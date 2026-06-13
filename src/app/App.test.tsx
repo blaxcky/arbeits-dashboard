@@ -212,11 +212,25 @@ describe("trip copy fields", () => {
     expect(openTripFields({ ...baseTrip, ticketPriceCents: undefined }).find((field) => field.label === "Ticketpreis je Richtung")).toMatchObject({ value: "0", ready: false, unit: "EUR" });
   });
 
-  it("adds kilometer allowance copy fields with the exact remark", () => {
+  it("derives missing municipality codes from the destination for trips without kilometers", () => {
+    const fields = openTripFields(
+      { ...baseTrip, transportType: "dienstauto", municipalityCode: undefined, oneWayKilometers: 0 },
+      [{ code: "90001", name: "Wien", localityName: "Wien", postalCodes: "1010" }]
+    );
+
+    expect(fields.find((field) => field.label === "Gemeindekennzahl")).toMatchObject({ value: "90001", ready: true });
+  });
+
+  it("adds kilometer allowance copy fields with destination and Google Maps remark", () => {
     const fields = openTripFields({ ...baseTrip, transportType: "kilometergeld", oneWayKilometers: 60.25 });
     expect(fields.find((field) => field.label === "Beschreibung")).toMatchObject({ value: "Kilometergeld", ready: true });
+    expect(fields.find((field) => field.label === "Zieladresse")).toMatchObject({
+      value: "Stephansplatz 1, 1010 Wien",
+      ready: true,
+      layout: "wide"
+    });
     expect(fields.find((field) => field.label === "Bemerkungen")).toMatchObject({
-      value: "Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet",
+      value: "Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien Kilometer lt. Google Maps",
       ready: true,
       layout: "wide"
     });

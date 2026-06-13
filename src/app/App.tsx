@@ -2072,6 +2072,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         <OpenTripsDialog
           trips={openTrips}
           filesByTripId={filesByTripId}
+          municipalities={municipalities}
           showToast={showToast}
           onPreviewFile={setPreviewFile}
           onDownloadFile={downloadTripFile}
@@ -2405,7 +2406,7 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
   );
 }
 
-function OpenTripsDialog({ trips, filesByTripId, showToast, onPreviewFile, onDownloadFile, onClose, onDone }: { trips: Trip[]; filesByTripId: Map<string, TripFile[]>; showToast: ShowToast; onPreviewFile: (file: TripFile) => void; onDownloadFile: (file: TripFile) => void; onClose: () => void; onDone: (trip: Trip) => Promise<unknown> }) {
+function OpenTripsDialog({ trips, filesByTripId, municipalities, showToast, onPreviewFile, onDownloadFile, onClose, onDone }: { trips: Trip[]; filesByTripId: Map<string, TripFile[]>; municipalities: Municipality[]; showToast: ShowToast; onPreviewFile: (file: TripFile) => void; onDownloadFile: (file: TripFile) => void; onClose: () => void; onDone: (trip: Trip) => Promise<unknown> }) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -2427,13 +2428,13 @@ function OpenTripsDialog({ trips, filesByTripId, showToast, onPreviewFile, onDow
             <X size={18} />
           </button>
         </div>
-        <OpenTripsWorklist trips={trips} filesByTripId={filesByTripId} showToast={showToast} onPreviewFile={onPreviewFile} onDownloadFile={onDownloadFile} onDone={onDone} />
+        <OpenTripsWorklist trips={trips} filesByTripId={filesByTripId} municipalities={municipalities} showToast={showToast} onPreviewFile={onPreviewFile} onDownloadFile={onDownloadFile} onDone={onDone} />
       </div>
     </ModalOverlay>
   );
 }
 
-function OpenTripsWorklist({ trips, filesByTripId, showToast, onPreviewFile, onDownloadFile, onDone }: { trips: Trip[]; filesByTripId: Map<string, TripFile[]>; showToast: ShowToast; onPreviewFile: (file: TripFile) => void; onDownloadFile: (file: TripFile) => void; onDone: (trip: Trip) => Promise<unknown> }) {
+function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, onPreviewFile, onDownloadFile, onDone }: { trips: Trip[]; filesByTripId: Map<string, TripFile[]>; municipalities: Municipality[]; showToast: ShowToast; onPreviewFile: (file: TripFile) => void; onDownloadFile: (file: TripFile) => void; onDone: (trip: Trip) => Promise<unknown> }) {
   const openTrips = sortedOpenTrips(trips);
   const activeTrip = openTrips[0];
   const activeTripFiles = activeTrip ? filesByTripId.get(activeTrip.id) ?? [] : [];
@@ -2474,7 +2475,7 @@ function OpenTripsWorklist({ trips, filesByTripId, showToast, onPreviewFile, onD
             {(activeTrip.ticketPriceCents ?? 0) > 0 ? <div><dt>Ticketpreis je Richtung</dt><dd>{formatEuroCents(activeTrip.ticketPriceCents ?? 0)}</dd></div> : null}
           </dl>
           <div className="copy-field-grid">
-            {openTripFields(activeTrip).map((field) => {
+            {openTripFields(activeTrip, municipalities).map((field) => {
               const fieldKey = `${activeTrip.id}:${field.label}`;
               return (
                 <div key={field.label} className={`${field.ready ? "" : "copy-field-missing"} ${copiedFieldKeys.has(fieldKey) ? "copy-field-copied" : ""} copy-field-${field.layout}`}>
@@ -3389,27 +3390,30 @@ export function sortedOpenTrips(trips: Trip[]): Trip[] {
     ));
 }
 
-export function openTripFields(trip: Trip): OpenTripField[] {
+export function openTripFields(trip: Trip, municipalities: Municipality[] = []): OpenTripField[] {
   const isPublicTransport = trip.transportType === "oeffi-zuschuss";
   const isKilometerAllowance = trip.transportType === "kilometergeld";
+  const destination = trip.destination.trim();
+  const municipalityCode = trip.municipalityCode?.trim() || findMunicipalityForAddress(destination, municipalities)?.code || "";
   const fields: OpenTripField[] = [
     { label: "Zeit von", value: formatTripCopyDateTime(trip, "startTime"), ready: Boolean(trip.startTime), layout: "short" },
     { label: "Zeit bis", value: formatTripCopyDateTime(trip, "endTime"), ready: Boolean(trip.endTime), layout: "short" },
     { label: "Grund", value: trip.reason, ready: Boolean(trip.reason.trim()), layout: "short" },
-    { label: "Gemeindekennzahl", value: trip.municipalityCode ?? "", ready: Boolean(trip.municipalityCode?.trim()), layout: "short" }
+    { label: "Gemeindekennzahl", value: municipalityCode, ready: Boolean(municipalityCode), layout: "short" }
   ];
   if (isPublicTransport) {
     fields.push(
       { label: "Ticketpreis je Richtung", value: centsToEuroInput(trip.ticketPriceCents ?? 0), ready: (trip.ticketPriceCents ?? 0) > 0, layout: "short", unit: "EUR" },
       { label: "Beschreibung", value: "Fahrt Öffis", ready: true, layout: "short" },
-      { label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${trip.destination} Kilometer lt. Google Maps`, ready: Boolean(trip.destination.trim()), layout: "wide" },
+      { label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${destination} Kilometer lt. Google Maps`, ready: Boolean(destination), layout: "wide" },
       { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }
     );
   }
   if (isKilometerAllowance) {
     fields.push(
       { label: "Beschreibung", value: "Kilometergeld", ready: true, layout: "short" },
-      { label: "Bemerkungen", value: "Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet", ready: true, layout: "wide" },
+      { label: "Zieladresse", value: destination, ready: Boolean(destination), layout: "wide" },
+      { label: "Bemerkungen", value: `Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet. ${formatTripOrigin(trip.origin) || DEFAULT_TRIP_ORIGIN} -> ${destination} Kilometer lt. Google Maps`, ready: Boolean(destination), layout: "wide" },
       { label: "Anzahl", value: (trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }
     );
   }
