@@ -195,6 +195,7 @@ function validateTrip(value: unknown): void {
   requireOptionalString(value, "otherCostsDescription", "Beschreibung sonstige Kosten ist ungültig.");
   requireOptionalBoolean(value, "employerReimbursedCosts", "Arbeitgeber-Erstattung ist ungültig.");
   requireOptionalNumber(value, "ticketPriceCents", "Ticketpreis ist ungültig.");
+  requireOptionalString(value, "publicTransportTicketQueryDate", "ÖBB-Abfragedatum ist ungültig.");
   requireOptionalNumber(value, "taxableTransportSubsidyCents", "Steuerpflichtiger Beförderungszuschuss ist ungültig.");
   requireOptionalNumber(value, "transportSubsidyTaxCents", "Altes Steuerfeld ist ungültig.");
   requireOptionalString(value, "note", "Reise-Notiz ist ungültig.");

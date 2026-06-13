@@ -261,6 +261,7 @@ export async function upsertTrip(input: Omit<Trip, "id" | "createdAt" | "updated
     ...input,
     employerReimbursedCosts: input.employerReimbursedCosts ?? true,
     ticketPriceCents: input.ticketPriceCents ?? 0,
+    publicTransportTicketQueryDate: input.transportType === "oeffi-zuschuss" ? input.publicTransportTicketQueryDate?.trim() || undefined : undefined,
     transportSubsidyTaxCents: 0,
     id: input.id ?? crypto.randomUUID(),
     createdAt: existing?.createdAt ?? now,
@@ -518,6 +519,7 @@ function normalizeTrip(trip: Trip): Trip {
     taxableTransportSubsidyCents: trip.taxableTransportSubsidyCents ?? 0,
     transportSubsidyTaxCents: 0,
     ticketPriceCents: trip.ticketPriceCents ?? 0,
+    publicTransportTicketQueryDate: trip.transportType === "oeffi-zuschuss" ? trip.publicTransportTicketQueryDate?.trim() || undefined : undefined,
     note: trip.note ?? ""
   };
 }

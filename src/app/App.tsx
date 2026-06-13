@@ -1477,6 +1477,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         otherCostsDescription: draft.form.otherCostsDescription.trim(),
         employerReimbursedCosts: tripCosts.employerReimbursedCosts,
         ticketPriceCents: tripCosts.ticketPriceCents,
+        publicTransportTicketQueryDate: draft.form.transportType === "oeffi-zuschuss" ? draft.form.publicTransportTicketQueryDate || undefined : undefined,
         taxableTransportSubsidyCents: calculateTaxablePublicTransportSubsidyCents(tripCosts),
         transportSubsidyTaxCents: 0,
         note: draft.form.note.trim(),
@@ -1605,6 +1606,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
       otherCostsDescription: form.otherCostsDescription.trim(),
       employerReimbursedCosts: !form.employerDoesNotReimburseCosts,
       ticketPriceCents: previewTripCosts.ticketPriceCents,
+      publicTransportTicketQueryDate: form.transportType === "oeffi-zuschuss" ? form.publicTransportTicketQueryDate || undefined : undefined,
       taxableTransportSubsidyCents: previewTaxableTransportSubsidyCents,
       transportSubsidyTaxCents: 0,
       note: form.note.trim(),
@@ -1811,6 +1813,9 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <Field label="Ticketpreis je Richtung (EUR)" className="trip-field-half trip-cost-field">
                 <input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} />
                 {form.transportType === "oeffi-zuschuss" ? <span className="field-help">Einzelpreis erfassen; Hin- und Rückreise gelten jeweils mit diesem Preis.</span> : null}
+              </Field>
+              <Field label="ÖBB-Abfrage am" className="trip-field-half">
+                <input type="date" value={form.publicTransportTicketQueryDate} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("publicTransportTicketQueryDate", event.target.value)} />
               </Field>
             </TripFormSection>
             <TripFormSection id="trip-section-other" title="Sonstiges" icon={Receipt} className="trip-form-section-split">
@@ -3223,6 +3228,7 @@ export function tripToForm(trip?: Trip) {
     otherCostsDescription: trip?.otherCostsDescription ?? "",
     employerDoesNotReimburseCosts: trip?.employerReimbursedCosts === false,
     ticketPriceEuros: trip ? centsToEuroInput(trip.ticketPriceCents ?? 0) : "0",
+    publicTransportTicketQueryDate: trip?.transportType === "oeffi-zuschuss" ? trip.publicTransportTicketQueryDate ?? "" : "",
     note: trip?.note ?? "",
     done: trip?.done ?? false
   };
@@ -3253,6 +3259,7 @@ export function stripTripMeta(trip: Trip): Omit<Trip, "id" | "createdAt" | "upda
     otherCostsDescription: trip.otherCostsDescription ?? "",
     employerReimbursedCosts: trip.employerReimbursedCosts ?? true,
     ticketPriceCents: trip.ticketPriceCents ?? 0,
+    publicTransportTicketQueryDate: trip.transportType === "oeffi-zuschuss" ? trip.publicTransportTicketQueryDate?.trim() || undefined : undefined,
     taxableTransportSubsidyCents: trip.taxableTransportSubsidyCents ?? 0,
     transportSubsidyTaxCents: 0,
     note: trip.note ?? "",
@@ -3363,6 +3370,10 @@ function formatEuroCents(cents: number): string {
   return `${(cents / 100).toLocaleString("de-AT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`;
 }
 
+function formatEuroSymbolCents(cents: number): string {
+  return `${(cents / 100).toLocaleString("de-AT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+}
+
 export function formatDateOnly(dateKey: string): string {
   if (!isValidDateKey(dateKey)) return "-";
   const [year, month, day] = dateKey.split("-");
@@ -3415,6 +3426,9 @@ export function openTripFields(trip: Trip, municipalities: Municipality[] = []):
   const isPublicTransport = trip.transportType === "oeffi-zuschuss";
   const isKilometerAllowance = trip.transportType === "kilometergeld";
   const destination = trip.destination.trim();
+  const publicTransportDestination = publicTransportDestinationPlace(destination, municipalities);
+  const ticketPriceCents = trip.ticketPriceCents ?? 0;
+  const ticketQueryDate = trip.publicTransportTicketQueryDate ?? "";
   const municipalityCode = trip.municipalityCode?.trim() || findMunicipalityForAddress(destination, municipalities)?.code || "";
   const fields: OpenTripField[] = [
     { group: "travel", label: "Zeit von", value: formatTripCopyDateTime(trip, "startTime"), ready: Boolean(trip.startTime), layout: "short" },
@@ -3427,7 +3441,15 @@ export function openTripFields(trip: Trip, municipalities: Municipality[] = []):
   }
   if (isPublicTransport) {
     fields.push(
-      { group: "costs", label: "Ticketpreis je Richtung", value: centsToEuroInput(trip.ticketPriceCents ?? 0), ready: (trip.ticketPriceCents ?? 0) > 0, layout: "short", unit: "EUR" },
+      { group: "costs", label: "Ticketpreis je Richtung", value: centsToEuroInput(ticketPriceCents), ready: ticketPriceCents > 0, layout: "short", unit: "EUR" },
+      {
+        group: "costs",
+        label: "Ticketnachweis",
+        value: `Abfrage im ÖBB Scotty, ÖBB-Ticket, 2. Klasse, ohne Vergünstigungen, Eisenstadt - ${publicTransportDestination}, je Strecke ${formatEuroSymbolCents(ticketPriceCents)} (=> ${formatEuroSymbolCents(ticketPriceCents * 2)}), Abfrage am ${formatDateOnly(ticketQueryDate)}, für die Dienstreise vom ${formatDateOnly(trip.date)})`,
+        ready: ticketPriceCents > 0 && Boolean(ticketQueryDate) && Boolean(publicTransportDestination),
+        layout: "wide",
+        unit: ""
+      },
       { group: "costs", label: "Beschreibung", value: "Fahrt Öffis", ready: true, layout: "short" },
       { group: "costs", label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" },
       { group: "remarks", label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${destination}\n\nKilometer laut Google Maps`, ready: Boolean(destination), layout: "wide" }
@@ -3441,6 +3463,13 @@ export function openTripFields(trip: Trip, municipalities: Municipality[] = []):
     );
   }
   return fields;
+}
+
+export function publicTransportDestinationPlace(destination: string, municipalities: Municipality[]): string {
+  const municipality = findMunicipalityForAddress(destination, municipalities);
+  if (municipality?.localityName?.trim()) return municipality.localityName.trim();
+  if (municipality?.name.trim()) return municipality.name.trim();
+  return municipalityQueryFromAddress(destination).trim();
 }
 
 function deltaTone(minutes: number): "plus" | "minus" | "zero" {

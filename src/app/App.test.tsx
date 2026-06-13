@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase, Settings } from "../db/schema";
 
@@ -177,6 +177,7 @@ describe("trip copy fields", () => {
     otherCostsDescription: "",
     employerReimbursedCosts: true,
     ticketPriceCents: 0,
+    publicTransportTicketQueryDate: "2026-05-01",
     taxableTransportSubsidyCents: 0,
     transportSubsidyTaxCents: 0,
     note: "",
@@ -196,8 +197,16 @@ describe("trip copy fields", () => {
   });
 
   it("uses the exact public transport copy text", () => {
-    const fields = openTripFields({ ...baseTrip, ticketPriceCents: 550 });
-    expect(fields.find((field) => field.label === "Ticketpreis je Richtung")).toMatchObject({ value: "5,5", ready: true, layout: "short", unit: "EUR" });
+    const fields = openTripFields({ ...baseTrip, ticketPriceCents: 1440 }, [
+      { code: "90001", name: "Wien", localityName: "Wien", postalCodes: "1010" }
+    ]);
+    expect(fields.find((field) => field.label === "Ticketpreis je Richtung")).toMatchObject({ value: "14,4", ready: true, layout: "short", unit: "EUR" });
+    expect(fields.find((field) => field.label === "Ticketnachweis")).toMatchObject({
+      value: "Abfrage im ÖBB Scotty, ÖBB-Ticket, 2. Klasse, ohne Vergünstigungen, Eisenstadt - Wien, je Strecke 14,40 € (=> 28,80 €), Abfrage am 01.05.2026, für die Dienstreise vom 09.05.2026)",
+      ready: true,
+      layout: "wide",
+      unit: ""
+    });
     expect(fields.find((field) => field.label === "Beschreibung")).toMatchObject({ value: "Fahrt Öffis", ready: true });
     expect(fields.find((field) => field.label === "Bemerkungen")).toMatchObject({
       value: "Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien\n\nKilometer laut Google Maps",
@@ -205,6 +214,24 @@ describe("trip copy fields", () => {
       layout: "wide"
     });
     expect(fields.find((field) => field.label === "Anzahl")).toMatchObject({ value: "60", ready: true });
+  });
+
+  it("keeps the public transport ticket proof unavailable without a query date", () => {
+    const fields = openTripFields({ ...baseTrip, ticketPriceCents: 1440, publicTransportTicketQueryDate: undefined });
+    expect(fields.find((field) => field.label === "Ticketnachweis")).toMatchObject({
+      ready: false,
+      layout: "wide"
+    });
+  });
+
+  it("derives the public transport ticket destination from locality, municipality, or address", () => {
+    expect(publicTransportDestinationPlace("Stephansplatz 1, 1010 Wien", [
+      { code: "90001", name: "Wien", localityName: "Wien-Innere Stadt", postalCodes: "1010" }
+    ])).toBe("Wien-Innere Stadt");
+    expect(publicTransportDestinationPlace("Ernst-Mach-Straße 1, 7100 Neusiedl am See", [
+      { code: "10713", name: "Neusiedl am See", postalCodes: "7100" }
+    ])).toBe("Neusiedl am See");
+    expect(publicTransportDestinationPlace("Hauptstraße 1, 7000 Eisenstadt", [])).toBe("Eisenstadt");
   });
 
   it("groups copy fields by travel data, route, costs, and remarks", () => {
@@ -216,6 +243,7 @@ describe("trip copy fields", () => {
       ["route", "Gemeindekennzahl"],
       ["route", "Zieladresse"],
       ["costs", "Ticketpreis je Richtung"],
+      ["costs", "Ticketnachweis"],
       ["costs", "Beschreibung"],
       ["costs", "Anzahl"],
       ["remarks", "Bemerkungen"]
@@ -225,6 +253,14 @@ describe("trip copy fields", () => {
   it("keeps missing public transport ticket prices unavailable for copying", () => {
     expect(openTripFields(baseTrip).find((field) => field.label === "Ticketpreis je Richtung")).toMatchObject({ value: "0", ready: false, unit: "EUR" });
     expect(openTripFields({ ...baseTrip, ticketPriceCents: undefined }).find((field) => field.label === "Ticketpreis je Richtung")).toMatchObject({ value: "0", ready: false, unit: "EUR" });
+  });
+
+  it("loads, strips, and duplicates the public transport ticket query date", () => {
+    expect(tripToForm(baseTrip).publicTransportTicketQueryDate).toBe("2026-05-01");
+    expect(tripToForm({ ...baseTrip, transportType: "kilometergeld" }).publicTransportTicketQueryDate).toBe("");
+    expect(stripTripMeta(baseTrip)).toMatchObject({ publicTransportTicketQueryDate: "2026-05-01" });
+    expect(stripTripMeta({ ...baseTrip, transportType: "kilometergeld" })).toMatchObject({ publicTransportTicketQueryDate: undefined });
+    expect(duplicatedTripDraft(baseTrip, "2026-05-18")).toMatchObject({ publicTransportTicketQueryDate: "2026-05-01" });
   });
 
   it("derives missing municipality codes from the destination for trips without kilometers", () => {
