@@ -61,9 +61,10 @@ describe("settings helpers", () => {
 
     expect(publicTransportTaxFreeYearLimitForYear(nextSettings, 2026)).toBe(245000);
     expect(publicTransportTaxFreeYearLimitForYear(nextSettings, 2027)).toBeNull();
-    expect(publicTransportTaxFreeYearLimitForYear(nextSettings, 2028)).toBeNull();
+    expect(publicTransportTaxFreeYearLimitForYear(nextSettings, 2028)).toBe(140000);
     expect(publicTransportYearLimitToForm(nextSettings, 2026)).toBe("2\u00a0450");
     expect(publicTransportYearLimitToForm(nextSettings, 2027)).toBe("");
+    expect(publicTransportYearLimitToForm(nextSettings, 2028)).toBe("1\u00a0400");
   });
 });
 

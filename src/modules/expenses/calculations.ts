@@ -23,7 +23,7 @@ export const TRIP_RULES = {
     beyond300KmCents: 10,
     maxPerWayCents: 10900
   },
-  transportSubsidyYearLimitCents: 245000,
+  transportSubsidyYearLimitCents: 140000,
   taxPerDiemHourlyCents: 250,
   taxPerDiemMaxCents: 3000,
   domesticPerDiemCents: {

@@ -64,6 +64,7 @@ import {
   calculateTripTravelCostCents,
   remainingTransportSubsidyYearLimitCents,
   summarizeTripsByYear,
+  TRIP_RULES,
   TRANSPORT_LABELS
 } from "../modules/expenses/calculations";
 import { buildTripAdvertisingCostsExportRows, buildTripAdvertisingCostsPrintHtml, summarizeTripAdvertisingCostsExport } from "../modules/expenses/advertisingCostsExport";
@@ -3023,7 +3024,7 @@ export function settingsToForm(settings: Settings | null) {
 export function publicTransportTaxFreeYearLimitForYear(settings: Settings | null, year: number): number | null {
   const limits = settings?.publicTransportTaxFreeYearLimitsCents ?? {};
   if (Object.prototype.hasOwnProperty.call(limits, String(year))) return limits[String(year)] ?? null;
-  return null;
+  return TRIP_RULES.transportSubsidyYearLimitCents;
 }
 
 export function publicTransportYearLimitToForm(settings: Settings | null, year: number): string {

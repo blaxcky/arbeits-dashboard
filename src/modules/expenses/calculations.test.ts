@@ -117,6 +117,13 @@ describe("expense calculations", () => {
     expect(calculateTaxablePublicTransportSubsidyCents({ ...baseTrip, transportType: "befoerderungszuschuss", oneWayKilometers: 100, ticketPriceCents: 3000 })).toBe(0);
   });
 
+  it("keeps the taxable public transport subsidy formula independent from the yearly limit", () => {
+    const trip = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 52, ticketPriceCents: 1140 };
+
+    expect(calculateTripTravelCostCents(trip)).toBe(5080);
+    expect(calculateTaxablePublicTransportSubsidyCents(trip)).toBe(2800);
+  });
+
   it("treats public transport ticket price as one direction for tax-free round trip costs", () => {
     const trip = { ...baseTrip, transportType: "oeffi-zuschuss" as const, oneWayKilometers: 50, ticketPriceCents: 1500 };
 
