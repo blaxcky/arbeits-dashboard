@@ -200,11 +200,26 @@ describe("trip copy fields", () => {
     expect(fields.find((field) => field.label === "Ticketpreis je Richtung")).toMatchObject({ value: "5,5", ready: true, layout: "short", unit: "EUR" });
     expect(fields.find((field) => field.label === "Beschreibung")).toMatchObject({ value: "Fahrt Öffis", ready: true });
     expect(fields.find((field) => field.label === "Bemerkungen")).toMatchObject({
-      value: "Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien Kilometer lt. Google Maps",
+      value: "Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien\n\nKilometer laut Google Maps",
       ready: true,
       layout: "wide"
     });
     expect(fields.find((field) => field.label === "Anzahl")).toMatchObject({ value: "60", ready: true });
+  });
+
+  it("groups copy fields by travel data, route, costs, and remarks", () => {
+    const fields = openTripFields({ ...baseTrip, ticketPriceCents: 550 });
+    expect(fields.map((field) => [field.group, field.label])).toEqual([
+      ["travel", "Zeit von"],
+      ["travel", "Zeit bis"],
+      ["travel", "Grund"],
+      ["route", "Gemeindekennzahl"],
+      ["route", "Zieladresse"],
+      ["costs", "Ticketpreis je Richtung"],
+      ["costs", "Beschreibung"],
+      ["costs", "Anzahl"],
+      ["remarks", "Bemerkungen"]
+    ]);
   });
 
   it("keeps missing public transport ticket prices unavailable for copying", () => {
@@ -227,10 +242,11 @@ describe("trip copy fields", () => {
     expect(fields.find((field) => field.label === "Zieladresse")).toMatchObject({
       value: "Stephansplatz 1, 1010 Wien",
       ready: true,
-      layout: "wide"
+      layout: "wide",
+      group: "route"
     });
     expect(fields.find((field) => field.label === "Bemerkungen")).toMatchObject({
-      value: "Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien Kilometer lt. Google Maps",
+      value: "Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet. Eisenstadt Finanzamt -> Stephansplatz 1, 1010 Wien\n\nKilometer laut Google Maps",
       ready: true,
       layout: "wide"
     });

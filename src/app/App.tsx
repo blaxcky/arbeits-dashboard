@@ -97,12 +97,20 @@ const navItems = [
 const DEFAULT_TRIP_ORIGIN = "Finanzamt Österreich - Dienststelle Bruck Eisenstadt Oberwart, Neusiedler Str. 46, 7001 Eisenstadt";
 type Toast = { id: string; text: string };
 type OpenTripField = {
+  group: "travel" | "route" | "costs" | "remarks";
   label: string;
   value: string;
   ready: boolean;
   layout: "short" | "wide";
   unit?: string;
 };
+
+const openTripCopyGroups: { key: OpenTripField["group"]; title: string; icon: Icon }[] = [
+  { key: "travel", title: "Reisedaten", icon: CalendarBlank },
+  { key: "route", title: "Route", icon: MapTrifold },
+  { key: "costs", title: "Fahrtkosten", icon: Car },
+  { key: "remarks", title: "Bemerkungen", icon: NotePencil }
+];
 
 export function App() {
   const data = useWorkData();
@@ -2454,6 +2462,8 @@ function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, on
     }
   }
 
+  const copyFields = activeTrip ? openTripFields(activeTrip, municipalities) : [];
+
   return (
     <div className="open-trips-worklist">
       {!activeTrip ? <p className="open-trip-empty muted">Keine offenen Reisekosten vorhanden.</p> : null}
@@ -2470,31 +2480,42 @@ function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, on
           {activeTrip.transportType === "oeffi-zuschuss" ? (
             <p className="open-trip-ticket-note">Ticketpreis ist der Einzelpreis je Richtung; Hin- und Rückreise werden mit diesem Preis gerechnet.</p>
           ) : null}
-          <dl className="detail-list open-trip-cost-details">
-            <div><dt>Fahrtkostenart</dt><dd>{TRANSPORT_LABELS[activeTrip.transportType]}</dd></div>
-            {(activeTrip.ticketPriceCents ?? 0) > 0 ? <div><dt>Ticketpreis je Richtung</dt><dd>{formatEuroCents(activeTrip.ticketPriceCents ?? 0)}</dd></div> : null}
-          </dl>
-          <div className="copy-field-grid">
-            {openTripFields(activeTrip, municipalities).map((field) => {
-              const fieldKey = `${activeTrip.id}:${field.label}`;
+          <div className="open-trip-section-grid">
+            {openTripCopyGroups.map((group) => {
+              const groupFields = copyFields.filter((field) => field.group === group.key);
+              if (groupFields.length === 0 && group.key !== "costs") return null;
               return (
-                <div key={field.label} className={`${field.ready ? "" : "copy-field-missing"} ${copiedFieldKeys.has(fieldKey) ? "copy-field-copied" : ""} copy-field-${field.layout}`}>
-                  <span>{field.label}{field.unit ? ` · ${field.unit}` : ""}</span>
-                  {field.layout === "wide" ? (
-                    <textarea value={field.value || "Nicht kopierfertig"} readOnly rows={3} aria-label={field.label} />
-                  ) : (
-                    <strong>{field.value || "Nicht kopierfertig"}</strong>
-                  )}
-                  <button className="icon-button" type="button" title={`${field.label} kopieren`} aria-label={`${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value, fieldKey)}>
-                    <Copy size={16} />
-                  </button>
-                </div>
+                <TripFormSection key={group.key} id={`open-trip-section-${group.key}`} title={group.title} icon={group.icon} className="open-trip-section">
+                  {group.key === "costs" ? (
+                    <dl className="detail-list open-trip-cost-details">
+                      <div><dt>Fahrtkostenart</dt><dd>{TRANSPORT_LABELS[activeTrip.transportType]}</dd></div>
+                    </dl>
+                  ) : null}
+                  <div className="copy-field-grid">
+                    {groupFields.map((field) => {
+                      const fieldKey = `${activeTrip.id}:${field.label}`;
+                      return (
+                        <div key={field.label} className={`${field.ready ? "" : "copy-field-missing"} ${copiedFieldKeys.has(fieldKey) ? "copy-field-copied" : ""} copy-field-${field.layout}`}>
+                          <span>{field.label}{field.unit ? ` · ${field.unit}` : ""}</span>
+                          {field.layout === "wide" ? (
+                            <textarea value={field.value || "Nicht kopierfertig"} readOnly rows={3} aria-label={field.label} />
+                          ) : (
+                            <strong>{field.value || "Nicht kopierfertig"}</strong>
+                          )}
+                          <button className="icon-button" type="button" title={`${field.label} kopieren`} aria-label={`${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value, fieldKey)}>
+                            <Copy size={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TripFormSection>
               );
             })}
           </div>
-          <section className="open-trip-evidence" aria-label="Screenshots und Nachweise">
-            <div className="panel-heading">
-              <span className="section-label">Screenshots / Nachweise</span>
+          <TripFormSection id="open-trip-section-evidence" title="Nachweise" icon={Receipt} className="open-trip-section open-trip-evidence">
+            <div className="open-trip-evidence-count">
+              <span>Screenshots / Nachweise</span>
               <strong>{activeTripFiles.length}</strong>
             </div>
             {activeTripFiles.length === 0 ? <p className="muted">Keine Screenshots gespeichert.</p> : null}
@@ -2518,7 +2539,7 @@ function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, on
                 </div>
               </div>
             ))}
-          </section>
+          </TripFormSection>
           <button className="secondary-button" type="button" onClick={() => void onDone(activeTrip)}>
             <CheckCircle size={17} /> Als erledigt markieren
           </button>
@@ -3396,25 +3417,27 @@ export function openTripFields(trip: Trip, municipalities: Municipality[] = []):
   const destination = trip.destination.trim();
   const municipalityCode = trip.municipalityCode?.trim() || findMunicipalityForAddress(destination, municipalities)?.code || "";
   const fields: OpenTripField[] = [
-    { label: "Zeit von", value: formatTripCopyDateTime(trip, "startTime"), ready: Boolean(trip.startTime), layout: "short" },
-    { label: "Zeit bis", value: formatTripCopyDateTime(trip, "endTime"), ready: Boolean(trip.endTime), layout: "short" },
-    { label: "Grund", value: trip.reason, ready: Boolean(trip.reason.trim()), layout: "short" },
-    { label: "Gemeindekennzahl", value: municipalityCode, ready: Boolean(municipalityCode), layout: "short" }
+    { group: "travel", label: "Zeit von", value: formatTripCopyDateTime(trip, "startTime"), ready: Boolean(trip.startTime), layout: "short" },
+    { group: "travel", label: "Zeit bis", value: formatTripCopyDateTime(trip, "endTime"), ready: Boolean(trip.endTime), layout: "short" },
+    { group: "travel", label: "Grund", value: trip.reason, ready: Boolean(trip.reason.trim()), layout: "short" },
+    { group: "route", label: "Gemeindekennzahl", value: municipalityCode, ready: Boolean(municipalityCode), layout: "short" }
   ];
+  if (destination) {
+    fields.push({ group: "route", label: "Zieladresse", value: destination, ready: true, layout: "wide" });
+  }
   if (isPublicTransport) {
     fields.push(
-      { label: "Ticketpreis je Richtung", value: centsToEuroInput(trip.ticketPriceCents ?? 0), ready: (trip.ticketPriceCents ?? 0) > 0, layout: "short", unit: "EUR" },
-      { label: "Beschreibung", value: "Fahrt Öffis", ready: true, layout: "short" },
-      { label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${destination} Kilometer lt. Google Maps`, ready: Boolean(destination), layout: "wide" },
-      { label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }
+      { group: "costs", label: "Ticketpreis je Richtung", value: centsToEuroInput(trip.ticketPriceCents ?? 0), ready: (trip.ticketPriceCents ?? 0) > 0, layout: "short", unit: "EUR" },
+      { group: "costs", label: "Beschreibung", value: "Fahrt Öffis", ready: true, layout: "short" },
+      { group: "costs", label: "Anzahl", value: trip.oneWayKilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" },
+      { group: "remarks", label: "Bemerkungen", value: `Fahrt wurde mit öffentlichen Verkehrsmitteln angetreten. Eisenstadt Finanzamt -> ${destination}\n\nKilometer laut Google Maps`, ready: Boolean(destination), layout: "wide" }
     );
   }
   if (isKilometerAllowance) {
     fields.push(
-      { label: "Beschreibung", value: "Kilometergeld", ready: true, layout: "short" },
-      { label: "Zieladresse", value: destination, ready: Boolean(destination), layout: "wide" },
-      { label: "Bemerkungen", value: `Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet. ${formatTripOrigin(trip.origin) || DEFAULT_TRIP_ORIGIN} -> ${destination} Kilometer lt. Google Maps`, ready: Boolean(destination), layout: "wide" },
-      { label: "Anzahl", value: (trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" }
+      { group: "costs", label: "Beschreibung", value: "Kilometergeld", ready: true, layout: "short" },
+      { group: "costs", label: "Anzahl", value: (trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 }), ready: trip.oneWayKilometers > 0, layout: "short", unit: "km" },
+      { group: "remarks", label: "Bemerkungen", value: `Alle Dienstautos waren belegt (siehe Screenshot), daher wurde das amtliche Kilometergeld verrechnet. ${formatTripOrigin(trip.origin) || DEFAULT_TRIP_ORIGIN} -> ${destination}\n\nKilometer laut Google Maps`, ready: Boolean(destination), layout: "wide" }
     );
   }
   return fields;

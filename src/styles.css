@@ -1808,6 +1808,27 @@ button:disabled {
   padding-bottom: 12px;
 }
 
+.open-trip-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.open-trip-section {
+  box-shadow: none;
+}
+
+.open-trip-section .trip-form-section-header {
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.open-trip-section .trip-form-section-body {
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 12px;
+}
+
 .copy-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1826,7 +1847,7 @@ button:disabled {
 }
 
 .open-trip-cost-details {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 0 12px;
 }
 
@@ -1835,14 +1856,23 @@ button:disabled {
 }
 
 .open-trip-evidence {
-  display: grid;
-  gap: 10px;
-  border-top: 1px solid #eef1f5;
-  padding-top: 12px;
+  display: block;
 }
 
-.open-trip-evidence .panel-heading {
-  min-height: 0;
+.open-trip-evidence .trip-form-section-body {
+  gap: 10px;
+}
+
+.open-trip-evidence-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .open-trip-evidence .muted {
@@ -1923,6 +1953,7 @@ button:disabled {
 }
 
 @media (max-width: 720px) {
+  .open-trip-section-grid,
   .copy-field-grid {
     grid-template-columns: 1fr;
   }
