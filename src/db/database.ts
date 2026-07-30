@@ -161,7 +161,11 @@ export async function ensureDefaults(): Promise<Settings> {
   if (!settings) {
     settings = defaultSettings();
     await db.settings.put(settings);
-  } else if (settings.publicTransportTaxFreeYearLimitsCents === undefined) {
+  } else if (
+    settings.publicTransportTaxFreeYearLimitsCents === undefined
+    || settings.preferredWorkStartTime === undefined
+    || settings.preferredWorkEndTime === undefined
+  ) {
     settings = normalizeSettings(settings);
     await db.settings.put(settings);
   }
@@ -533,6 +537,8 @@ function normalizeSettings(settings: Settings): Settings {
 
   return {
     ...settings,
+    preferredWorkStartTime: settings.preferredWorkStartTime ?? null,
+    preferredWorkEndTime: settings.preferredWorkEndTime ?? null,
     publicTransportTaxFreeYearLimitCents: undefined,
     publicTransportTaxFreeYearLimitsCents
   };

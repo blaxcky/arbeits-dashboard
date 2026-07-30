@@ -285,6 +285,13 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
     await autoSave(draft, normalized !== "");
   }
 
+  async function selectPreferredTime(field: "startTime" | "endTime", value: string) {
+    const draft = { ...form, [field]: value };
+    setForm(draft);
+    setTimeErrors((current) => ({ ...current, [field]: undefined }));
+    await autoSave(draft);
+  }
+
   async function handleBreakBlur(value: string) {
     const breakMinutes = parseIntegerInRange(value, 0, 720);
     if (breakMinutes === null) {
@@ -373,28 +380,28 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             <button type="button" className="secondary-button" onClick={() => selectDate(addDays(selectedDate, 1))}>Weiter</button>
           </div>
           <div className="form-grid day-entry-grid">
-            <Field label="Dienstbeginn" error={timeErrors.startTime}>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="07:30"
-                value={form.startTime}
-                aria-invalid={Boolean(timeErrors.startTime)}
-                onChange={(event) => setForm({ ...form, startTime: event.target.value })}
-                onBlur={(event) => void handleTimeBlur("startTime", event.target.value)}
-              />
-            </Field>
-            <Field label="Dienstende" error={endTimeError}>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="15:30"
-                value={form.endTime}
-                aria-invalid={Boolean(endTimeError)}
-                onChange={(event) => setForm({ ...form, endTime: event.target.value })}
-                onBlur={(event) => void handleTimeBlur("endTime", event.target.value)}
-              />
-            </Field>
+            <WorkTimeField
+              id="work-start-time"
+              label="Dienstbeginn"
+              value={form.startTime}
+              placeholder="07:30"
+              error={timeErrors.startTime}
+              preferredTime={settings?.preferredWorkStartTime ?? null}
+              onChange={(value) => setForm({ ...form, startTime: value })}
+              onBlur={(value) => void handleTimeBlur("startTime", value)}
+              onPreferredTime={(value) => void selectPreferredTime("startTime", value)}
+            />
+            <WorkTimeField
+              id="work-end-time"
+              label="Dienstende"
+              value={form.endTime}
+              placeholder="15:30"
+              error={endTimeError}
+              preferredTime={settings?.preferredWorkEndTime ?? null}
+              onChange={(value) => setForm({ ...form, endTime: value })}
+              onBlur={(value) => void handleTimeBlur("endTime", value)}
+              onPreferredTime={(value) => void selectPreferredTime("endTime", value)}
+            />
           </div>
           <div className="button-row">
             <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Löschen</button>
@@ -504,6 +511,8 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
       weeklyTargetMinutes: clampHoursToMinutes(form.weeklyTargetMinutes, 1, 4000),
       flexLimitMinutes: clampHoursToMinutes(form.flexLimitMinutes, 0, 20000),
       flexStartMinutes: form.flexStartMinutes === "" ? null : hoursToMinutes(form.flexStartMinutes),
+      preferredWorkStartTime: normalizeTimeInput(form.preferredWorkStartTime) || null,
+      preferredWorkEndTime: normalizeTimeInput(form.preferredWorkEndTime) || null,
       vacationEntitlementMinutes: form.vacationEntitlementMinutes === "" ? null : hoursToMinutes(form.vacationEntitlementMinutes),
       vacationUsedMinutes: clampHoursToMinutes(form.vacationUsedMinutes, 0, 20000)
     });
@@ -513,6 +522,16 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
   function updateSettingsField(field: keyof SettingsForm, value: string) {
     setSettingsErrors((current) => ({ ...current, [field]: undefined }));
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function normalizeSettingsTimeField(field: "preferredWorkStartTime" | "preferredWorkEndTime", value: string) {
+    const normalized = normalizeTimeInput(value);
+    if (normalized === null) {
+      setSettingsErrors((current) => ({ ...current, [field]: "Bitte als HH:MM eingeben, z.B. 07:30." }));
+      return;
+    }
+    setSettingsErrors((current) => ({ ...current, [field]: undefined }));
+    setForm((current) => ({ ...current, [field]: normalized }));
   }
 
   async function handleImport(file: File, replace: boolean) {
@@ -536,6 +555,12 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
             <Field label="Wochenarbeitszeit (Stunden)" error={settingsErrors.weeklyTargetMinutes}><input type="number" step="0.25" value={form.weeklyTargetMinutes} aria-invalid={Boolean(settingsErrors.weeklyTargetMinutes)} onChange={(event) => updateSettingsField("weeklyTargetMinutes", event.target.value)} /></Field>
             <Field label="Gleitzeitgrenze (Stunden)" error={settingsErrors.flexLimitMinutes}><input type="number" step="0.25" value={form.flexLimitMinutes} aria-invalid={Boolean(settingsErrors.flexLimitMinutes)} onChange={(event) => updateSettingsField("flexLimitMinutes", event.target.value)} /></Field>
             <Field label="Gleitzeitstartwert (Stunden)" error={settingsErrors.flexStartMinutes}><input type="number" step="0.25" value={form.flexStartMinutes} aria-invalid={Boolean(settingsErrors.flexStartMinutes)} onChange={(event) => updateSettingsField("flexStartMinutes", event.target.value)} placeholder="leer" /></Field>
+            <Field label="Schnellwahl Dienstbeginn" error={settingsErrors.preferredWorkStartTime}>
+              <input type="text" inputMode="numeric" placeholder="optional, z.B. 07:30" value={form.preferredWorkStartTime} aria-invalid={Boolean(settingsErrors.preferredWorkStartTime)} onChange={(event) => updateSettingsField("preferredWorkStartTime", event.target.value)} onBlur={(event) => normalizeSettingsTimeField("preferredWorkStartTime", event.target.value)} />
+            </Field>
+            <Field label="Schnellwahl Dienstende" error={settingsErrors.preferredWorkEndTime}>
+              <input type="text" inputMode="numeric" placeholder="optional, z.B. 15:30" value={form.preferredWorkEndTime} aria-invalid={Boolean(settingsErrors.preferredWorkEndTime)} onChange={(event) => updateSettingsField("preferredWorkEndTime", event.target.value)} onBlur={(event) => normalizeSettingsTimeField("preferredWorkEndTime", event.target.value)} />
+            </Field>
             <Field label="Urlaubsanspruch (Stunden)" error={settingsErrors.vacationEntitlementMinutes}><input type="number" step="0.25" value={form.vacationEntitlementMinutes} aria-invalid={Boolean(settingsErrors.vacationEntitlementMinutes)} onChange={(event) => updateSettingsField("vacationEntitlementMinutes", event.target.value)} placeholder="leer" /></Field>
             <Field label="Verbrauchter Urlaub (Stunden)" error={settingsErrors.vacationUsedMinutes}><input type="number" step="0.25" value={form.vacationUsedMinutes} aria-invalid={Boolean(settingsErrors.vacationUsedMinutes)} onChange={(event) => updateSettingsField("vacationUsedMinutes", event.target.value)} /></Field>
           </div>
@@ -2962,6 +2987,57 @@ function Field({ label, children, error, className = "" }: { label: string; chil
   return <label className={`field ${className}`.trim()}><span>{label}</span>{children}{error ? <small className="field-error">{error}</small> : null}</label>;
 }
 
+export function WorkTimeField({
+  id,
+  label,
+  value,
+  placeholder,
+  error,
+  preferredTime,
+  onChange,
+  onBlur,
+  onPreferredTime
+}: {
+  id: string;
+  label: string;
+  value: string;
+  placeholder: string;
+  error?: string;
+  preferredTime: string | null;
+  onChange: (value: string) => void;
+  onBlur: (value: string) => void;
+  onPreferredTime: (value: string) => void;
+}) {
+  return (
+    <div className="field work-time-field">
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        placeholder={placeholder}
+        value={value}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : undefined}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={(event) => onBlur(event.target.value)}
+      />
+      {preferredTime ? (
+        <button
+          className="time-quick-select"
+          type="button"
+          aria-label={`${preferredTime} als ${label} eintragen`}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => onPreferredTime(preferredTime)}
+        >
+          {preferredTime} eintragen
+        </button>
+      ) : null}
+      {error ? <small id={`${id}-error`} className="field-error">{error}</small> : null}
+    </div>
+  );
+}
+
 function TripFormSection({ id, title, icon: IconComponent, className = "", children }: { id: string; title: string; icon: Icon; className?: string; children: React.ReactNode }) {
   return (
     <section className={`trip-form-section ${className}`.trim()} aria-labelledby={id}>
@@ -3043,6 +3119,8 @@ export function settingsToForm(settings: Settings | null) {
     weeklyTargetMinutes: minutesToHourInput(settings?.weeklyTargetMinutes ?? 2400),
     flexLimitMinutes: minutesToHourInput(settings?.flexLimitMinutes ?? 6000),
     flexStartMinutes: settings?.flexStartMinutes === null || settings?.flexStartMinutes === undefined ? "" : minutesToHourInput(settings.flexStartMinutes),
+    preferredWorkStartTime: settings?.preferredWorkStartTime ?? "",
+    preferredWorkEndTime: settings?.preferredWorkEndTime ?? "",
     vacationEntitlementMinutes: settings?.vacationEntitlementMinutes === null || settings?.vacationEntitlementMinutes === undefined ? "" : minutesToHourInput(settings.vacationEntitlementMinutes),
     vacationUsedMinutes: minutesToHourInput(settings?.vacationUsedMinutes ?? 0)
   };
@@ -3286,6 +3364,8 @@ export function validateSettingsForm(form: SettingsForm): SettingsErrors {
     ["weeklyTargetMinutes", validateHourField(form.weeklyTargetMinutes, 1, 4000)],
     ["flexLimitMinutes", validateHourField(form.flexLimitMinutes, 0, 20000)],
     ["flexStartMinutes", validateHourField(form.flexStartMinutes, -20000, 20000, true)],
+    ["preferredWorkStartTime", validateOptionalTimeField(form.preferredWorkStartTime)],
+    ["preferredWorkEndTime", validateOptionalTimeField(form.preferredWorkEndTime)],
     ["vacationEntitlementMinutes", validateHourField(form.vacationEntitlementMinutes, 0, 20000, true)],
     ["vacationUsedMinutes", validateHourField(form.vacationUsedMinutes, 0, 20000)]
   ];
@@ -3295,6 +3375,10 @@ export function validateSettingsForm(form: SettingsForm): SettingsErrors {
   }
 
   return errors;
+}
+
+function validateOptionalTimeField(value: string): string | undefined {
+  return normalizeTimeInput(value) === null ? "Bitte als HH:MM eingeben, z.B. 07:30." : undefined;
 }
 
 function validateEuroField(value: string, optional = false): string | undefined {

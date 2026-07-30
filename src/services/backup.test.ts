@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BackupData } from "../db/schema";
+import type { BackupData, Settings } from "../db/schema";
 
 const dbMocks = vi.hoisted(() => ({
   readAllData: vi.fn(),
@@ -13,6 +13,22 @@ const { exportBackup, importBackup, inspectBackup } = await import("./backup");
 
 const screenshotBytes = new Uint8Array([137, 80, 78, 71, 13, 10]);
 const screenshotDataUrl = `data:image/png;base64,${btoa(String.fromCharCode(...screenshotBytes))}`;
+
+function backupSettings(): Settings {
+  return {
+    id: "main",
+    dailyTargetMinutes: 480,
+    weeklyTargetMinutes: 2400,
+    flexLimitMinutes: 6000,
+    flexStartMinutes: null,
+    preferredWorkStartTime: "07:30",
+    preferredWorkEndTime: null,
+    vacationEntitlementMinutes: null,
+    vacationUsedMinutes: 0,
+    publicTransportTaxFreeYearLimitsCents: {},
+    updatedAt: "2026-05-07T08:00:00.000Z"
+  };
+}
 
 function backupData(): BackupData {
   return {
@@ -170,6 +186,16 @@ describe("backup service", () => {
     expect(await zip.file("files/file-1-screenshot.png")?.async("uint8array")).toEqual(screenshotBytes);
   });
 
+  it("exports backup schema 1.9.0", async () => {
+    dbMocks.readAllData.mockResolvedValue(backupData());
+
+    const blob = await exportBackup();
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { schemaVersion: string };
+
+    expect(manifest.schemaVersion).toBe("1.9.0");
+  });
+
   it("exports trip payments in the backup counts and data", async () => {
     dbMocks.readAllData.mockResolvedValue(backupData());
 
@@ -249,6 +275,26 @@ describe("backup service", () => {
     await importBackup(await makeZip(data, "1.0.0"));
 
     expect(dbMocks.replaceAllData).toHaveBeenCalledWith(data);
+  });
+
+  it("normalizes missing quick-select times in old backups to null", async () => {
+    const { preferredWorkStartTime: _start, preferredWorkEndTime: _end, ...legacySettings } = backupSettings();
+    const data = { ...backupData(), settings: legacySettings };
+
+    await importBackup(await makeZip(data, "1.8.0"));
+
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({
+      ...data,
+      settings: { ...legacySettings, preferredWorkStartTime: null, preferredWorkEndTime: null }
+    });
+  });
+
+  it("accepts nullable quick-select times and rejects malformed values", async () => {
+    const validData = { ...backupData(), settings: backupSettings() };
+    await expect(inspectBackup(await makeZip(validData, "1.9.0"))).resolves.toMatchObject({ data: validData });
+
+    const invalidData = { ...validData, settings: { ...backupSettings(), preferredWorkStartTime: "7:30" } };
+    await expect(inspectBackup(await makeZip(invalidData, "1.9.0"))).rejects.toThrow("Schnellwahl Dienstbeginn ist ungültig.");
   });
 
   it("normalizes old backups without trip payments to an empty list", async () => {

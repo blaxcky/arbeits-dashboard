@@ -137,6 +137,8 @@ function validateSettings(value: unknown): void {
   requireNumber(value, "weeklyTargetMinutes", "Wochenarbeitszeit fehlt.");
   requireNumber(value, "flexLimitMinutes", "Gleitzeitgrenze fehlt.");
   requireNullableNumber(value, "flexStartMinutes", "Gleitzeitstartwert ist ungültig.");
+  requireOptionalNullableClockTime(value, "preferredWorkStartTime", "Schnellwahl Dienstbeginn ist ungültig.");
+  requireOptionalNullableClockTime(value, "preferredWorkEndTime", "Schnellwahl Dienstende ist ungültig.");
   requireNullableNumber(value, "vacationEntitlementMinutes", "Urlaubsanspruch ist ungültig.");
   requireNumber(value, "vacationUsedMinutes", "Verbrauchter Urlaub fehlt.");
   requireOptionalNullableNumber(value, "publicTransportTaxFreeYearLimitCents", "Öffi-BEZU-Jahresdeckel ist ungültig.");
@@ -312,7 +314,22 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
       };
     })
   );
-  return { ...data, files, savedDestinations: data.savedDestinations ?? [], tripPayments: data.tripPayments ?? [], auditPointCases: data.auditPointCases ?? [], auditPointGoals: data.auditPointGoals ?? [], usoCases: data.usoCases ?? [], usoGoals: data.usoGoals ?? [], otherMeasures: data.otherMeasures ?? [] };
+  return {
+    ...data,
+    settings: data.settings ? {
+      ...data.settings,
+      preferredWorkStartTime: data.settings.preferredWorkStartTime ?? null,
+      preferredWorkEndTime: data.settings.preferredWorkEndTime ?? null
+    } : null,
+    files,
+    savedDestinations: data.savedDestinations ?? [],
+    tripPayments: data.tripPayments ?? [],
+    auditPointCases: data.auditPointCases ?? [],
+    auditPointGoals: data.auditPointGoals ?? [],
+    usoCases: data.usoCases ?? [],
+    usoGoals: data.usoGoals ?? [],
+    otherMeasures: data.otherMeasures ?? []
+  };
 }
 
 function backupFilePath(file: TripFile, index: number): string {
@@ -372,6 +389,12 @@ function requireOptionalString(value: Record<string, unknown>, key: string, mess
 
 function requireNullableString(value: Record<string, unknown>, key: string, message: string): void {
   if (value[key] !== null && typeof value[key] !== "string") throw new Error(message);
+}
+
+function requireOptionalNullableClockTime(value: Record<string, unknown>, key: string, message: string): void {
+  const clockTime = value[key];
+  if (clockTime === undefined || clockTime === null) return;
+  if (typeof clockTime !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(clockTime)) throw new Error(message);
 }
 
 function requireNumber(value: Record<string, unknown>, key: string, message: string): void {

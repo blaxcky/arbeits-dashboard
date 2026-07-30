@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, WorkTimeField, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase, Settings } from "../db/schema";
 
@@ -50,6 +51,8 @@ describe("settings helpers", () => {
     weeklyTargetMinutes: 2400,
     flexLimitMinutes: 6000,
     flexStartMinutes: null,
+    preferredWorkStartTime: null,
+    preferredWorkEndTime: null,
     vacationEntitlementMinutes: null,
     vacationUsedMinutes: 0,
     publicTransportTaxFreeYearLimitsCents: {},
@@ -62,6 +65,29 @@ describe("settings helpers", () => {
     expect(validateSettingsForm(form)).toEqual({});
   });
 
+  it("loads saved quick-select times and treats missing legacy values as empty", () => {
+    expect(settingsToForm({ ...settings, preferredWorkStartTime: "07:30", preferredWorkEndTime: "16:00" })).toMatchObject({
+      preferredWorkStartTime: "07:30",
+      preferredWorkEndTime: "16:00"
+    });
+    const { preferredWorkStartTime: _start, preferredWorkEndTime: _end, ...legacySettings } = settings;
+    expect(settingsToForm(legacySettings as Settings)).toMatchObject({
+      preferredWorkStartTime: "",
+      preferredWorkEndTime: ""
+    });
+  });
+
+  it("accepts optional normalized quick-select formats and rejects invalid times", () => {
+    const form = settingsToForm(settings);
+
+    expect(validateSettingsForm({ ...form, preferredWorkStartTime: "7", preferredWorkEndTime: "163" })).toEqual({});
+    expect(validateSettingsForm({ ...form, preferredWorkStartTime: "", preferredWorkEndTime: "" })).toEqual({});
+    expect(validateSettingsForm({ ...form, preferredWorkStartTime: "25:00", preferredWorkEndTime: "abc" })).toMatchObject({
+      preferredWorkStartTime: expect.any(String),
+      preferredWorkEndTime: expect.any(String)
+    });
+  });
+
   it("reads public transport tax-free limits per year", () => {
     const nextSettings = { ...settings, publicTransportTaxFreeYearLimitsCents: { "2026": 245000, "2027": null } };
 
@@ -71,6 +97,26 @@ describe("settings helpers", () => {
     expect(publicTransportYearLimitToForm(nextSettings, 2026)).toBe("2\u00a0450");
     expect(publicTransportYearLimitToForm(nextSettings, 2027)).toBe("");
     expect(publicTransportYearLimitToForm(nextSettings, 2028)).toBe("1\u00a0400");
+  });
+});
+
+describe("WorkTimeField", () => {
+  it("shows a quick-select only when configured and selects only that field", () => {
+    const selectStart = vi.fn();
+    const selectEnd = vi.fn();
+    const commonProps = { value: "", onChange: vi.fn(), onBlur: vi.fn() };
+    render(
+      <>
+        <WorkTimeField {...commonProps} id="work-start-time" label="Dienstbeginn" placeholder="07:30" preferredTime="07:30" onPreferredTime={selectStart} />
+        <WorkTimeField {...commonProps} id="work-end-time" label="Dienstende" placeholder="15:30" preferredTime={null} onPreferredTime={selectEnd} />
+      </>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "07:30 als Dienstbeginn eintragen" }));
+
+    expect(selectStart).toHaveBeenCalledWith("07:30");
+    expect(selectEnd).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /Dienstende eintragen/ })).not.toBeInTheDocument();
   });
 });
 

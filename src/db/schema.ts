@@ -1,6 +1,6 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.8.0";
+export const BACKUP_SCHEMA_VERSION = "1.9.0";
 export const DB_SCHEMA_VERSION = 9;
 
 export interface Settings {
@@ -9,6 +9,8 @@ export interface Settings {
   weeklyTargetMinutes: number;
   flexLimitMinutes: number;
   flexStartMinutes: number | null;
+  preferredWorkStartTime: string | null;
+  preferredWorkEndTime: string | null;
   vacationEntitlementMinutes: number | null;
   vacationUsedMinutes: number;
   publicTransportTaxFreeYearLimitCents?: number | null;
@@ -209,6 +211,8 @@ export function defaultSettings(now = new Date()): Settings {
     weeklyTargetMinutes: 2400,
     flexLimitMinutes: 6000,
     flexStartMinutes: null,
+    preferredWorkStartTime: null,
+    preferredWorkEndTime: null,
     vacationEntitlementMinutes: null,
     vacationUsedMinutes: 0,
     publicTransportTaxFreeYearLimitsCents: {},
