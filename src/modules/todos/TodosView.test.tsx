@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-import type { Todo } from "../../db/schema";
+import type { Todo, TodoProject } from "../../db/schema";
 import { TodosView } from "./TodosView";
 
 const baseTodo: Todo = {
@@ -22,7 +22,7 @@ function todoData(todos: Todo[] = [baseTodo]) {
     error: null,
     clock: new Date("2026-07-30T10:00:00.000Z"),
     todos,
-    todoProjects: [],
+    todoProjects: [] as TodoProject[],
     saveTodo: vi.fn().mockResolvedValue(baseTodo),
     completeTodo: vi.fn().mockResolvedValue(undefined),
     removeTodo: vi.fn().mockResolvedValue(undefined),
