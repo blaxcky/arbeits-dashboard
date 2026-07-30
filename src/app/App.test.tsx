@@ -16,9 +16,15 @@ describe("normalizeTimeInput", () => {
     expect(normalizeTimeInput("7:30")).toBe("07:30");
   });
 
+  it("adds a missing final digit when a three digit time has invalid HMM minutes", () => {
+    expect(normalizeTimeInput("163")).toBe("16:30");
+    expect(normalizeTimeInput("170")).toBe("17:00");
+  });
+
   it("rejects invalid time values", () => {
     expect(normalizeTimeInput("24")).toBeNull();
     expect(normalizeTimeInput("1760")).toBeNull();
+    expect(normalizeTimeInput("199")).toBeNull();
     expect(normalizeTimeInput("abc")).toBeNull();
   });
 });

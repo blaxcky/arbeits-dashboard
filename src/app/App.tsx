@@ -3590,8 +3590,14 @@ export function normalizeTimeInput(value: string): string | null {
   const compactMatch = /^(\d{3,4})$/.exec(trimmed);
   if (!hourMatch && !colonMatch && !compactMatch) return null;
 
-  const hours = hourMatch ? Number(hourMatch[1]) : colonMatch ? Number(colonMatch[1]) : Number(trimmed.slice(0, -2));
-  const minutes = hourMatch ? 0 : colonMatch ? Number(colonMatch[2]) : Number(trimmed.slice(-2));
+  let hours = hourMatch ? Number(hourMatch[1]) : colonMatch ? Number(colonMatch[1]) : Number(trimmed.slice(0, -2));
+  let minutes = hourMatch ? 0 : colonMatch ? Number(colonMatch[2]) : Number(trimmed.slice(-2));
+
+  if (compactMatch && trimmed.length === 3 && minutes > 59) {
+    hours = Number(trimmed.slice(0, 2));
+    minutes = Number(trimmed.slice(2)) * 10;
+  }
+
   if (hours > 23 || minutes > 59) return null;
 
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
