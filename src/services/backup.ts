@@ -1,9 +1,9 @@
 import JSZip from "jszip";
 import { readAllData, replaceAllData } from "../db/database";
-import { APP_NAME, BACKUP_SCHEMA_VERSION, type AuditPointCase, type AuditPointGoal, type BackupData, type BackupManifest, type BackupPayload, type OtherMeasure, type UsoCase, type UsoGoal, type TravelExpensePayment, type TripFile } from "../db/schema";
+import { APP_NAME, BACKUP_SCHEMA_VERSION, type AuditPointCase, type AuditPointGoal, type BackupData, type BackupManifest, type BackupPayload, type OtherMeasure, type Todo, type TodoProject, type UsoCase, type UsoGoal, type TravelExpensePayment, type TripFile } from "../db/schema";
 
 type SerializedTripFile = Omit<TripFile, "dataUrl"> & ({ dataUrl: string; path?: never } | { path: string; dataUrl?: never });
-type SerializedBackupData = Omit<BackupData, "files" | "tripPayments" | "auditPointCases" | "auditPointGoals" | "usoCases" | "usoGoals" | "otherMeasures"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[]; auditPointCases?: AuditPointCase[]; auditPointGoals?: AuditPointGoal[]; usoCases?: UsoCase[]; usoGoals?: UsoGoal[]; otherMeasures?: OtherMeasure[] };
+type SerializedBackupData = Omit<BackupData, "files" | "tripPayments" | "auditPointCases" | "auditPointGoals" | "usoCases" | "usoGoals" | "otherMeasures" | "todos" | "todoProjects"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[]; auditPointCases?: AuditPointCase[]; auditPointGoals?: AuditPointGoal[]; usoCases?: UsoCase[]; usoGoals?: UsoGoal[]; otherMeasures?: OtherMeasure[]; todos?: Todo[]; todoProjects?: TodoProject[] };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -37,7 +37,8 @@ export async function exportBackup(): Promise<Blob> {
       usoCases: data.usoCases.length,
       usoGoals: data.usoGoals.length,
       otherMeasures: data.otherMeasures.length,
-      todos: 0,
+      todos: data.todos.length,
+      todoProjects: data.todoProjects.length,
       files: data.files.length,
       savedDestinations: data.savedDestinations.length
     }
@@ -105,6 +106,8 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   if (value.usoCases !== undefined && !Array.isArray(value.usoCases)) throw new Error("USO-Fälle sind ungültig.");
   if (value.usoGoals !== undefined && !Array.isArray(value.usoGoals)) throw new Error("USO-Jahresziele sind ungültig.");
   if (value.otherMeasures !== undefined && !Array.isArray(value.otherMeasures)) throw new Error("Sonstige Maßnahmen sind ungültig.");
+  if (value.todos !== undefined && !Array.isArray(value.todos)) throw new Error("Aufgaben sind ungültig.");
+  if (value.todoProjects !== undefined && !Array.isArray(value.todoProjects)) throw new Error("Aufgabenprojekte sind ungültig.");
   if (!Array.isArray(value.files)) throw new Error("Nachweise fehlen.");
   if (value.savedDestinations !== undefined && !Array.isArray(value.savedDestinations)) throw new Error("Gespeicherte Zieladressen sind ungültig.");
   if (value.settings !== null) validateSettings(value.settings);
@@ -118,6 +121,8 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   (value.usoCases ?? []).forEach(validateUsoCase);
   (value.usoGoals ?? []).forEach(validateUsoGoal);
   (value.otherMeasures ?? []).forEach(validateOtherMeasure);
+  (value.todos ?? []).forEach(validateTodo);
+  (value.todoProjects ?? []).forEach(validateTodoProject);
   (value.savedDestinations ?? []).forEach(validateSavedDestination);
   value.files.forEach(validateTripFile);
 }
@@ -283,6 +288,31 @@ function validateOtherMeasure(value: unknown): void {
   requireString(value, "updatedAt", "Sonstige-Maßnahme-Aktualisiert-Zeit fehlt.");
 }
 
+function validateTodo(value: unknown): void {
+  if (!isObject(value)) throw new Error("Aufgabe ist ungültig.");
+  requireString(value, "id", "Aufgaben-ID fehlt.");
+  requireString(value, "title", "Aufgabentitel fehlt.");
+  requireString(value, "description", "Aufgabenbeschreibung fehlt.");
+  requireOptionalString(value, "projectId", "Aufgabenprojekt ist ungültig.");
+  requireOptionalString(value, "dueDate", "Aufgabendatum ist ungültig.");
+  if (typeof value.dueDate === "string" && !/^\d{4}-\d{2}-\d{2}$/.test(value.dueDate)) throw new Error("Aufgabendatum ist ungültig.");
+  requireString(value, "priority", "Aufgabenpriorität fehlt.");
+  if (!["P1", "P2", "P3", "P4"].includes(String(value.priority))) throw new Error("Aufgabenpriorität ist ungültig.");
+  if (!Array.isArray(value.labels) || value.labels.some((label) => typeof label !== "string")) throw new Error("Aufgabenetiketten sind ungültig.");
+  requireNullableString(value, "completedAt", "Aufgabenstatus ist ungültig.");
+  requireString(value, "createdAt", "Aufgaben-Erstellt-Zeit fehlt.");
+  requireString(value, "updatedAt", "Aufgaben-Aktualisiert-Zeit fehlt.");
+}
+
+function validateTodoProject(value: unknown): void {
+  if (!isObject(value)) throw new Error("Aufgabenprojekt ist ungültig.");
+  requireString(value, "id", "Aufgabenprojekt-ID fehlt.");
+  requireString(value, "name", "Aufgabenprojekt-Name fehlt.");
+  requireNumber(value, "sortOrder", "Aufgabenprojekt-Sortierung fehlt.");
+  requireString(value, "createdAt", "Aufgabenprojekt-Erstellt-Zeit fehlt.");
+  requireString(value, "updatedAt", "Aufgabenprojekt-Aktualisiert-Zeit fehlt.");
+}
+
 function validateTripFile(value: unknown): void {
   if (!isObject(value)) throw new Error("Nachweis ist ungültig.");
   requireString(value, "id", "Nachweis-ID fehlt.");
@@ -328,7 +358,9 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
     auditPointGoals: data.auditPointGoals ?? [],
     usoCases: data.usoCases ?? [],
     usoGoals: data.usoGoals ?? [],
-    otherMeasures: data.otherMeasures ?? []
+    otherMeasures: data.otherMeasures ?? [],
+    todos: data.todos ?? [],
+    todoProjects: data.todoProjects ?? []
   };
 }
 

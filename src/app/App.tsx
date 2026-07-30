@@ -85,6 +85,7 @@ import {
 import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
+import { TodosView } from "../modules/todos/TodosView";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: House },
@@ -172,7 +173,13 @@ export function App() {
             <Route path="/punkte" element={<AuditPointsView data={data} showToast={showToast} />} />
             <Route path="/punkte/jahr" element={<PointsYearView data={data} showToast={showToast} />} />
             <Route path="/punkte/jahr/:year" element={<PointsYearView data={data} showToast={showToast} />} />
-            <Route path="/aufgaben" element={<RoadmapView title="Aufgaben" icon={<ClipboardText size={28} />} items={["Aufgaben erfassen", "Fälligkeiten", "Prioritäten", "Tags", "Filter und Suche"]} />} />
+            <Route path="/aufgaben" element={<Navigate to="/aufgaben/heute" replace />} />
+            <Route path="/aufgaben/eingang" element={<TodosView data={data} showToast={showToast} />} />
+            <Route path="/aufgaben/heute" element={<TodosView data={data} showToast={showToast} />} />
+            <Route path="/aufgaben/demnaechst" element={<TodosView data={data} showToast={showToast} />} />
+            <Route path="/aufgaben/suche" element={<TodosView data={data} showToast={showToast} />} />
+            <Route path="/aufgaben/filter" element={<TodosView data={data} showToast={showToast} />} />
+            <Route path="/aufgaben/projekt/:projectId" element={<TodosView data={data} showToast={showToast} />} />
             <Route path="/einstellungen" element={<SettingsView data={data} showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

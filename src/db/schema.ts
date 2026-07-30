@@ -1,7 +1,30 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.9.0";
-export const DB_SCHEMA_VERSION = 9;
+export const BACKUP_SCHEMA_VERSION = "1.10.0";
+export const DB_SCHEMA_VERSION = 10;
+
+export type TodoPriority = "P1" | "P2" | "P3" | "P4";
+
+export interface Todo {
+  id: string;
+  title: string;
+  description: string;
+  projectId?: string;
+  dueDate?: string;
+  priority: TodoPriority;
+  labels: string[];
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TodoProject {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Settings {
   id: "main";
@@ -195,7 +218,8 @@ export interface BackupData {
   usoCases: UsoCase[];
   usoGoals: UsoGoal[];
   otherMeasures: OtherMeasure[];
-  todos: unknown[];
+  todos: Todo[];
+  todoProjects: TodoProject[];
   files: TripFile[];
 }
 

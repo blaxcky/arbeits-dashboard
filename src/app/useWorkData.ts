@@ -12,6 +12,8 @@ import {
   deleteTripFile,
   deleteTripPayment,
   deleteTrip,
+  deleteTodo,
+  deleteTodoProject,
   ensureDefaults,
   getTimeEntryByDate,
   listFlexCorrections,
@@ -25,6 +27,9 @@ import {
   listTimeEntries,
   listTripPayments,
   listTrips,
+  listTodos,
+  listTodoProjects,
+  setTodoCompleted,
   updateSettings,
   upsertAuditPointCase,
   upsertAuditPointGoal,
@@ -34,9 +39,11 @@ import {
   upsertTimeEntry,
   upsertTrip,
   upsertTripPayment,
-  upsertSavedDestination
+  upsertSavedDestination,
+  upsertTodo,
+  upsertTodoProject
 } from "../db/database";
-import type { AuditPointCase, AuditPointGoal, FlexCorrection, OtherMeasure, SavedDestination, Settings, TimeEntry, Trip, TripFile, UsoCase, UsoGoal, TravelExpensePayment } from "../db/schema";
+import type { AuditPointCase, AuditPointGoal, FlexCorrection, OtherMeasure, SavedDestination, Settings, TimeEntry, Todo, TodoProject, Trip, TripFile, UsoCase, UsoGoal, TravelExpensePayment } from "../db/schema";
 import { todayKey } from "../lib/dates";
 
 export interface WorkDataState {
@@ -54,6 +61,8 @@ export interface WorkDataState {
   otherMeasures: OtherMeasure[];
   files: TripFile[];
   savedDestinations: SavedDestination[];
+  todos: Todo[];
+  todoProjects: TodoProject[];
 }
 
 export function useWorkData() {
@@ -71,15 +80,17 @@ export function useWorkData() {
     usoGoals: [],
     otherMeasures: [],
     files: [],
-    savedDestinations: []
+    savedDestinations: [],
+    todos: [],
+    todoProjects: []
   });
   const [clock, setClock] = useState(new Date());
 
   const refresh = useCallback(async () => {
     try {
       const settings = await ensureDefaults();
-      const [timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, otherMeasures, files, savedDestinations] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripPayments(), listAuditPointCases(), listAuditPointGoals(), listUsoCases(), listUsoGoals(), listOtherMeasures(), listTripFiles(), listSavedDestinations()]);
-      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, otherMeasures, files, savedDestinations });
+      const [timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, otherMeasures, files, savedDestinations, todos, todoProjects] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripPayments(), listAuditPointCases(), listAuditPointGoals(), listUsoCases(), listUsoGoals(), listOtherMeasures(), listTripFiles(), listSavedDestinations(), listTodos(), listTodoProjects()]);
+      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, otherMeasures, files, savedDestinations, todos, todoProjects });
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Daten konnten nicht geladen werden." }));
     }
@@ -186,6 +197,28 @@ export function useWorkData() {
     },
     removeDestination: async (id: string) => {
       await deleteSavedDestination(id);
+      await refresh();
+    },
+    saveTodo: async (input: Omit<Todo, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
+      const todo = await upsertTodo(input);
+      await refresh();
+      return todo;
+    },
+    completeTodo: async (id: string, completed: boolean) => {
+      await setTodoCompleted(id, completed);
+      await refresh();
+    },
+    removeTodo: async (id: string) => {
+      await deleteTodo(id);
+      await refresh();
+    },
+    saveTodoProject: async (input: { id?: string; name: string; sortOrder?: number }) => {
+      const project = await upsertTodoProject(input);
+      await refresh();
+      return project;
+    },
+    removeTodoProject: async (id: string) => {
+      await deleteTodoProject(id);
       await refresh();
     },
     wipeData: async () => {

@@ -131,6 +131,7 @@ function backupData(): BackupData {
     ],
     savedDestinations: [],
     todos: [],
+    todoProjects: [],
     files: [
       {
         id: "file-1",
@@ -186,14 +187,14 @@ describe("backup service", () => {
     expect(await zip.file("files/file-1-screenshot.png")?.async("uint8array")).toEqual(screenshotBytes);
   });
 
-  it("exports backup schema 1.9.0", async () => {
+  it("exports backup schema 1.10.0", async () => {
     dbMocks.readAllData.mockResolvedValue(backupData());
 
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { schemaVersion: string };
 
-    expect(manifest.schemaVersion).toBe("1.9.0");
+    expect(manifest.schemaVersion).toBe("1.10.0");
   });
 
   it("exports trip payments in the backup counts and data", async () => {
@@ -246,6 +247,18 @@ describe("backup service", () => {
 
     expect(manifest.counts.otherMeasures).toBe(1);
     expect(data.otherMeasures).toHaveLength(1);
+  });
+
+  it("exports tasks and projects in the backup counts and data", async () => {
+    const data = backupData();
+    data.todos = [{ id: "todo-1", title: "Bescheid prüfen", description: "", projectId: "project-1", dueDate: "2026-07-30", priority: "P2", labels: ["Wichtig"], completedAt: null, createdAt: "2026-07-29T08:00:00.000Z", updatedAt: "2026-07-29T08:00:00.000Z" }];
+    data.todoProjects = [{ id: "project-1", name: "Außenprüfung", sortOrder: 0, createdAt: "2026-07-29T08:00:00.000Z", updatedAt: "2026-07-29T08:00:00.000Z" }];
+    dbMocks.readAllData.mockResolvedValue(data);
+
+    const blob = await exportBackup();
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { todos: number; todoProjects: number } };
+    expect(manifest.counts).toMatchObject({ todos: 1, todoProjects: 1 });
   });
 
   it("imports new backups and restores TripFile dataUrl for IndexedDB", async () => {
@@ -327,6 +340,19 @@ describe("backup service", () => {
     await importBackup(await makeZip(oldData, "1.6.0"));
 
     expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, otherMeasures: [] });
+  });
+
+  it("normalizes old backups without tasks and projects to empty lists", async () => {
+    const { todos: _todos, todoProjects: _todoProjects, ...oldData } = backupData();
+
+    await importBackup(await makeZip(oldData, "1.9.0"));
+
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, todos: [], todoProjects: [] });
+  });
+
+  it("rejects malformed tasks and projects", async () => {
+    await expect(inspectBackup(await makeZip({ ...backupData(), todos: [{ id: "todo-1" }] }, "1.10.0"))).rejects.toThrow("Aufgabentitel fehlt.");
+    await expect(inspectBackup(await makeZip({ ...backupData(), todoProjects: [{ id: "project-1" }] }, "1.10.0"))).rejects.toThrow("Aufgabenprojekt-Name fehlt.");
   });
 
   it("rejects backups with invalid other measures", async () => {
