@@ -180,7 +180,7 @@ function QuickTodoForm({ initial, projects, labels, onCancel, onSave }: { initia
   }
   function keyDown(event: ReactKeyboardEvent) {
     if (event.key === "Escape") onCancel();
-    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void submit(); }
+    if (event.key === "Enter" && (event.target === titleRef.current || event.ctrlKey || event.metaKey)) { event.preventDefault(); void submit(); }
   }
   return <div className="todo-quick-form" onKeyDown={keyDown}>
     <input ref={titleRef} className="todo-quick-title" value={draft.title} onChange={(event) => { setError(""); setDraft({ ...draft, title: event.target.value }); }} placeholder="Aufgabenname" aria-label="Aufgabenname" />
