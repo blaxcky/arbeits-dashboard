@@ -1072,10 +1072,42 @@ button:disabled {
   gap: 18px;
 }
 
-.points-secondary-forms {
+.points-form-workspace {
   display: grid;
-  gap: 16px;
-  align-self: start;
+  gap: 10px;
+}
+
+.points-form-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #eef2f5;
+}
+
+.points-form-tab {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--muted);
+  background: transparent;
+  font-weight: 800;
+}
+
+.points-form-tab[aria-selected="true"] {
+  border-color: var(--line);
+  color: var(--accent-dark);
+  background: #fff;
+  box-shadow: 0 4px 12px -10px rgba(31, 41, 55, 0.5);
+}
+
+.points-form-tab:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.24);
+  outline-offset: 2px;
 }
 
 .points-lists {
@@ -2470,6 +2502,15 @@ button:disabled {
   .open-trip-section-grid,
   .copy-field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .points-form-tabs {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .points-form-tab {
+    flex: 1 0 max-content;
   }
 
   .copy-field-grid > .copy-field-wide {

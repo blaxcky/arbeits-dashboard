@@ -32,7 +32,7 @@ import {
   Warning,
   type Icon
 } from "@phosphor-icons/react";
-import { type ClipboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import type { AuditPointCase, AuditPointCategory, OtherMeasure, SavedDestination, Settings, TimeEntry, UsoCase, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
@@ -846,6 +846,12 @@ const pointListLabels: Record<PointsListKey, string> = {
   other: "Sonstige Maßnahmen"
 };
 
+const pointFormTabs: { key: PointsListKey; label: string }[] = [
+  { key: "audit", label: "Betriebsprüfung" },
+  { key: "uso", label: "USO-Fall" },
+  { key: "other", label: "Sonstige Maßnahme" }
+];
+
 export function CollapsiblePointLists({ counts, content }: CollapsiblePointListsProps) {
   const [visibility, setVisibility] = useState<PointsListVisibility>(readPointsListVisibility);
   const allExpanded = Object.values(visibility).every(Boolean);
@@ -902,6 +908,8 @@ export function CollapsiblePointLists({ counts, content }: CollapsiblePointLists
 }
 
 export function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
+  const [activeForm, setActiveForm] = useState<PointsListKey>("audit");
+  const formTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(() => auditPointCaseToForm());
   const [errors, setErrors] = useState<Partial<Record<keyof AuditPointCaseForm, string>>>({});
@@ -916,6 +924,19 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
   const sortedAuditCases = [...data.auditPointCases].sort(compareAuditPointCases);
   const sortedUsoCases = [...data.usoCases].sort(compareUsoCases);
   const sortedOtherMeasures = [...data.otherMeasures].sort(compareOtherMeasures);
+
+  function handleFormTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, tabIndex: number) {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (tabIndex + 1) % pointFormTabs.length;
+    if (event.key === "ArrowLeft") nextIndex = (tabIndex - 1 + pointFormTabs.length) % pointFormTabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = pointFormTabs.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    setActiveForm(pointFormTabs[nextIndex].key);
+    formTabRefs.current[nextIndex]?.focus();
+  }
 
   function updateField(field: keyof AuditPointCaseForm, value: string | boolean) {
     setForm((current) => field === "submissionMonth" && typeof value === "string"
@@ -956,6 +977,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
   }
 
   function editCase(pointCase: AuditPointCase) {
+    setActiveForm("audit");
     setEditingId(pointCase.id);
     setForm(auditPointCaseToForm(pointCase));
     setErrors({});
@@ -1020,6 +1042,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
   }
 
   function editUsoCase(usoCase: UsoCase) {
+    setActiveForm("uso");
     setUsoEditingId(usoCase.id);
     setUsoForm(usoCaseToForm(usoCase));
     setUsoErrors({});
@@ -1078,6 +1101,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
   }
 
   function editOtherMeasure(measure: OtherMeasure) {
+    setActiveForm("other");
     setOtherEditingId(measure.id);
     setOtherForm(otherMeasureToForm(measure));
     setOtherErrors({});
@@ -1107,8 +1131,36 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
   return (
     <section className="page-stack">
       <Header eyebrow="Betriebsprüfungen" title="Punkte" />
-      <div className="settings-grid">
-        <div className="panel form-panel">
+      <div className="points-form-workspace">
+        <div className="points-form-tabs" role="tablist" aria-label="Falltyp auswählen">
+          {pointFormTabs.map((tab, tabIndex) => {
+            const selected = activeForm === tab.key;
+            return (
+              <button
+                key={tab.key}
+                ref={(element) => { formTabRefs.current[tabIndex] = element; }}
+                id={`points-form-tab-${tab.key}`}
+                className="points-form-tab"
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls={`points-form-panel-${tab.key}`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setActiveForm(tab.key)}
+                onKeyDown={(event) => handleFormTabKeyDown(event, tabIndex)}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        {activeForm === "audit" ? (
+        <div
+          className="panel form-panel"
+          id="points-form-panel-audit"
+          role="tabpanel"
+          aria-labelledby="points-form-tab-audit"
+        >
           <div className="panel-heading">
             <span className="section-label">{editingId ? "Fall bearbeiten" : "Neuer Fall"}</span>
             <button className="secondary-button" type="button" onClick={() => {
@@ -1160,8 +1212,14 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             <button className="primary-button" type="button" onClick={() => void saveCase()}>{editingId ? "Änderungen speichern" : "Fall speichern"}</button>
           </div>
         </div>
-        <div className="points-secondary-forms">
-          <section className="panel form-panel">
+        ) : null}
+        {activeForm === "uso" ? (
+          <section
+            className="panel form-panel"
+            id="points-form-panel-uso"
+            role="tabpanel"
+            aria-labelledby="points-form-tab-uso"
+          >
             <div className="panel-heading">
               <span className="section-label">{usoEditingId ? "USO-Fall bearbeiten" : "Neuer USO-Fall"}</span>
               <button className="secondary-button" type="button" onClick={() => {
@@ -1187,7 +1245,14 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             </div>
             <button className="primary-button trip-payment-save" type="button" onClick={() => void saveUsoCase()}>{usoEditingId ? "Änderungen speichern" : "USO-Fall speichern"}</button>
           </section>
-          <section className="panel form-panel">
+        ) : null}
+        {activeForm === "other" ? (
+          <section
+            className="panel form-panel"
+            id="points-form-panel-other"
+            role="tabpanel"
+            aria-labelledby="points-form-tab-other"
+          >
             <div className="panel-heading">
               <span className="section-label">{otherEditingId ? "Sonstige Maßnahme bearbeiten" : "Neue sonstige Maßnahme"}</span>
               <button className="secondary-button" type="button" onClick={() => {
@@ -1221,7 +1286,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             </div>
             <button className="primary-button trip-payment-save" type="button" onClick={() => void saveOtherMeasure()}>{otherEditingId ? "Änderungen speichern" : "Maßnahme speichern"}</button>
           </section>
-        </div>
+        ) : null}
       </div>
       <CollapsiblePointLists
         counts={{ audit: sortedAuditCases.length, uso: sortedUsoCases.length, other: sortedOtherMeasures.length }}

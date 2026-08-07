@@ -208,6 +208,150 @@ describe("CollapsiblePointLists", () => {
   });
 });
 
+describe("AuditPointsView form tabs", () => {
+  const timestamp = "2026-05-01T08:00:00.000Z";
+  const auditCase: AuditPointCase = {
+    id: "audit-1",
+    name: "BP Tab-Test",
+    taxNumber: "12 345/6789",
+    firm: "Kanzlei Test",
+    category: "M1",
+    periodStartYear: 2024,
+    periodEndYear: 2025,
+    additionalResultCents: 0,
+    section99: false,
+    submissionMonth: "2026-05",
+    status: "in_progress",
+    submittedPointsTenths: null,
+    submittedAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+  const usoCase: UsoCase = {
+    id: "uso-1",
+    title: "USO Tab-Test",
+    submissionMonth: "2026-06",
+    status: "in_progress",
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+  const otherMeasure: OtherMeasure = {
+    id: "other-1",
+    title: "Sonstige Tab-Test",
+    measureType: "CLO-Anfrage",
+    submissionMonth: "2026-07",
+    status: "in_progress",
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  function renderView(withCases = false) {
+    const data = {
+      auditPointCases: withCases ? [auditCase] : [],
+      usoCases: withCases ? [usoCase] : [],
+      otherMeasures: withCases ? [otherMeasure] : [],
+      saveAuditPointCase: vi.fn(),
+      removeAuditPointCase: vi.fn(),
+      saveUsoCase: vi.fn(),
+      removeUsoCase: vi.fn(),
+      saveOtherMeasure: vi.fn(),
+      removeOtherMeasure: vi.fn()
+    } as unknown as Parameters<typeof AuditPointsView>[0]["data"];
+
+    render(<AuditPointsView data={data} showToast={vi.fn()} />);
+  }
+
+  it("starts on the audit form and renders exactly one form panel", () => {
+    renderView();
+
+    expect(screen.getByRole("tab", { name: "Betriebsprüfung" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "Betriebsprüfung" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(screen.getByText("Neuer Fall")).toBeInTheDocument();
+    expect(screen.queryByText("Neuer USO-Fall")).not.toBeInTheDocument();
+    expect(screen.queryByText("Neue sonstige Maßnahme")).not.toBeInTheDocument();
+  });
+
+  it("keeps drafts per form and resets only the active form with Neu", () => {
+    renderView();
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Entwurf BP" } });
+    fireEvent.click(screen.getByRole("tab", { name: "USO-Fall" }));
+    fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "Entwurf USO" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Sonstige Maßnahme" }));
+    fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "Entwurf Sonstige" } });
+
+    fireEvent.click(screen.getByRole("tab", { name: "USO-Fall" }));
+    expect(screen.getByLabelText("Titel")).toHaveValue("Entwurf USO");
+    fireEvent.click(screen.getByRole("button", { name: "Neu" }));
+    expect(screen.getByLabelText("Titel")).toHaveValue("");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Betriebsprüfung" }));
+    expect(screen.getByLabelText("Name")).toHaveValue("Entwurf BP");
+    fireEvent.click(screen.getByRole("tab", { name: "Sonstige Maßnahme" }));
+    expect(screen.getByLabelText("Titel")).toHaveValue("Entwurf Sonstige");
+  });
+
+  it("supports arrow, Home and End keyboard navigation with focus", () => {
+    renderView();
+    const auditTab = screen.getByRole("tab", { name: "Betriebsprüfung" });
+
+    auditTab.focus();
+    fireEvent.keyDown(auditTab, { key: "ArrowRight" });
+    const usoTab = screen.getByRole("tab", { name: "USO-Fall" });
+    expect(usoTab).toHaveFocus();
+    expect(usoTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(usoTab, { key: "End" });
+    const otherTab = screen.getByRole("tab", { name: "Sonstige Maßnahme" });
+    expect(otherTab).toHaveFocus();
+    expect(otherTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(otherTab, { key: "Home" });
+    expect(auditTab).toHaveFocus();
+    expect(auditTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(auditTab, { key: "ArrowLeft" });
+    expect(otherTab).toHaveFocus();
+    expect(otherTab).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("stays on the current form after a validation error", () => {
+    renderView();
+
+    fireEvent.click(screen.getByRole("tab", { name: "USO-Fall" }));
+    fireEvent.click(screen.getByRole("button", { name: "USO-Fall speichern" }));
+
+    expect(screen.getByRole("tab", { name: "USO-Fall" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "USO-Fall" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /^Titel/ })).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("opens each saved case in its matching form from the lists", () => {
+    renderView(true);
+    const editButtons = screen.getAllByRole("button", { name: "Bearbeiten" });
+
+    fireEvent.click(editButtons[1]);
+    expect(screen.getByRole("tab", { name: "USO-Fall" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("USO-Fall bearbeiten")).toBeInTheDocument();
+    expect(screen.getByLabelText("Titel")).toHaveValue("USO Tab-Test");
+
+    fireEvent.click(editButtons[2]);
+    expect(screen.getByRole("tab", { name: "Sonstige Maßnahme" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Sonstige Maßnahme bearbeiten")).toBeInTheDocument();
+    expect(screen.getByLabelText("Titel")).toHaveValue("Sonstige Tab-Test");
+
+    fireEvent.click(editButtons[0]);
+    expect(screen.getByRole("tab", { name: "Betriebsprüfung" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Fall bearbeiten")).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveValue("BP Tab-Test");
+  });
+});
+
 describe("point case list status presentation", () => {
   beforeEach(() => {
     window.localStorage.clear();
