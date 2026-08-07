@@ -1078,6 +1078,71 @@ button:disabled {
   align-self: start;
 }
 
+.points-lists {
+  display: grid;
+  gap: 16px;
+}
+
+.points-lists-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.points-lists-toggle-all {
+  min-width: 154px;
+}
+
+.points-list-heading {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  transition: color 180ms ease, transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.points-list-heading:hover {
+  color: var(--accent-dark);
+}
+
+.points-list-heading:active {
+  transform: translateY(1px);
+}
+
+.points-list-heading:focus-visible {
+  border-radius: 5px;
+  outline: 3px solid rgba(37, 99, 235, 0.24);
+  outline-offset: 5px;
+}
+
+.points-list-heading-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.points-list-heading-meta strong {
+  min-width: 2ch;
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  text-align: right;
+}
+
+.points-list-caret {
+  color: var(--muted);
+  transform: rotate(0deg);
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms ease;
+}
+
+.points-list-heading[aria-expanded="true"] .points-list-caret {
+  color: var(--accent-dark);
+  transform: rotate(180deg);
+}
+
 .trip-form-stack {
   display: grid;
   gap: 16px;
@@ -2839,6 +2904,11 @@ button:disabled {
 
   .points-uso-row {
     grid-template-columns: 1fr;
+  }
+
+  .points-lists-toolbar,
+  .points-lists-toggle-all {
+    width: 100%;
   }
 
   .trip-evidence-item {

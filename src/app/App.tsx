@@ -6,6 +6,7 @@ import {
   CalendarBlank,
   CalendarCheck,
   CalendarPlus,
+  CaretDown,
   Car,
   ChartBar,
   CheckCircle,
@@ -31,7 +32,7 @@ import {
   Warning,
   type Icon
 } from "@phosphor-icons/react";
-import { type ClipboardEvent, type PointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ClipboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import type { AuditPointCase, AuditPointCategory, AuditPointStatus, OtherMeasure, OtherMeasureStatus, SavedDestination, Settings, TimeEntry, UsoCase, UsoCaseStatus, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
@@ -780,6 +781,115 @@ function RoadmapView({ title, icon, items }: { title: string; icon: React.ReactN
   );
 }
 
+const POINTS_LIST_VISIBILITY_STORAGE_KEY = "arbeits-dashboard:points-list-visibility";
+const defaultPointsListVisibility = {
+  audit: true,
+  uso: true,
+  other: true
+};
+
+type PointsListKey = keyof typeof defaultPointsListVisibility;
+type PointsListVisibility = Record<PointsListKey, boolean>;
+
+function readPointsListVisibility(): PointsListVisibility {
+  try {
+    const stored = window.localStorage.getItem(POINTS_LIST_VISIBILITY_STORAGE_KEY);
+    if (stored === null) return defaultPointsListVisibility;
+
+    const value: unknown = JSON.parse(stored);
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      !("audit" in value) ||
+      !("uso" in value) ||
+      !("other" in value) ||
+      typeof value.audit !== "boolean" ||
+      typeof value.uso !== "boolean" ||
+      typeof value.other !== "boolean"
+    ) {
+      return defaultPointsListVisibility;
+    }
+
+    return { audit: value.audit, uso: value.uso, other: value.other };
+  } catch {
+    return defaultPointsListVisibility;
+  }
+}
+
+function writePointsListVisibility(visibility: PointsListVisibility) {
+  try {
+    window.localStorage.setItem(POINTS_LIST_VISIBILITY_STORAGE_KEY, JSON.stringify(visibility));
+  } catch {
+    // The lists remain usable when storage is unavailable or full.
+  }
+}
+
+interface CollapsiblePointListsProps {
+  counts: Record<PointsListKey, number>;
+  content: Record<PointsListKey, ReactNode>;
+}
+
+const pointListLabels: Record<PointsListKey, string> = {
+  audit: "Betriebsprüfungen",
+  uso: "USO-Fälle",
+  other: "Sonstige Maßnahmen"
+};
+
+export function CollapsiblePointLists({ counts, content }: CollapsiblePointListsProps) {
+  const [visibility, setVisibility] = useState<PointsListVisibility>(readPointsListVisibility);
+  const allExpanded = Object.values(visibility).every(Boolean);
+
+  useEffect(() => {
+    writePointsListVisibility(visibility);
+  }, [visibility]);
+
+  function toggleList(list: PointsListKey) {
+    setVisibility((current) => ({ ...current, [list]: !current[list] }));
+  }
+
+  function toggleAllLists() {
+    const expanded = !allExpanded;
+    setVisibility({ audit: expanded, uso: expanded, other: expanded });
+  }
+
+  return (
+    <div className="points-lists">
+      <div className="points-lists-toolbar">
+        <button className="secondary-button points-lists-toggle-all" type="button" onClick={toggleAllLists}>
+          {allExpanded ? "Alle einklappen" : "Alle ausklappen"}
+        </button>
+      </div>
+      {(Object.keys(pointListLabels) as PointsListKey[]).map((list) => {
+        const expanded = visibility[list];
+        const label = pointListLabels[list];
+        const contentId = `points-list-${list}-content`;
+
+        return (
+          <section className="panel points-list-panel" key={list}>
+            <button
+              className="points-list-heading"
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={contentId}
+              aria-label={`${label} ${expanded ? "einklappen" : "ausklappen"}`}
+              onClick={() => toggleList(list)}
+            >
+              <span className="section-label">{label}</span>
+              <span className="points-list-heading-meta">
+                <strong>{counts[list]}</strong>
+                <CaretDown className="points-list-caret" size={18} weight="bold" aria-hidden="true" />
+              </span>
+            </button>
+            <div id={contentId} hidden={!expanded}>
+              {content[list]}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(() => auditPointCaseToForm());
@@ -1078,11 +1188,10 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
           </section>
         </div>
       </div>
-      <div className="panel">
-        <div className="panel-heading">
-          <span className="section-label">Betriebsprüfungen</span>
-          <strong>{sortedAuditCases.length}</strong>
-        </div>
+      <CollapsiblePointLists
+        counts={{ audit: sortedAuditCases.length, uso: sortedUsoCases.length, other: sortedOtherMeasures.length }}
+        content={{
+          audit: (
         <div className="trip-list">
           {sortedAuditCases.length === 0 ? <p className="muted">Noch keine Fälle erfasst.</p> : null}
           {sortedAuditCases.map((pointCase) => (
@@ -1111,12 +1220,8 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
             </article>
           ))}
         </div>
-      </div>
-      <div className="panel">
-        <div className="panel-heading">
-          <span className="section-label">USO-Fälle</span>
-          <strong>{sortedUsoCases.length}</strong>
-        </div>
+          ),
+          uso: (
         <div className="trip-list">
           {sortedUsoCases.length === 0 ? <p className="muted">Noch keine USO-Fälle erfasst.</p> : null}
           {sortedUsoCases.map((usoCase) => (
@@ -1140,12 +1245,8 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
             </article>
           ))}
         </div>
-      </div>
-      <div className="panel">
-        <div className="panel-heading">
-          <span className="section-label">Sonstige Maßnahmen</span>
-          <strong>{sortedOtherMeasures.length}</strong>
-        </div>
+          ),
+          other: (
         <div className="trip-list">
           {sortedOtherMeasures.length === 0 ? <p className="muted">Noch keine sonstigen Maßnahmen erfasst.</p> : null}
           {sortedOtherMeasures.map((measure) => (
@@ -1169,7 +1270,9 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
             </article>
           ))}
         </div>
-      </div>
+          )
+        }}
+      />
     </section>
   );
 }

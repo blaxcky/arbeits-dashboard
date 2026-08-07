@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, WorkTimeField, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, WorkTimeField, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase, Settings } from "../db/schema";
 
@@ -117,6 +117,94 @@ describe("WorkTimeField", () => {
     expect(selectStart).toHaveBeenCalledWith("07:30");
     expect(selectEnd).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /Dienstende eintragen/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("CollapsiblePointLists", () => {
+  const storageKey = "arbeits-dashboard:points-list-visibility";
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  function renderLists() {
+    return render(
+      <CollapsiblePointLists
+        counts={{ audit: 3, uso: 2, other: 1 }}
+        content={{
+          audit: <p>Inhalt Betriebsprüfungen</p>,
+          uso: <p>Inhalt USO</p>,
+          other: <p>Inhalt sonstige Maßnahmen</p>
+        }}
+      />
+    );
+  }
+
+  it("starts with all lists open and keeps headings and counts in the toggle buttons", () => {
+    renderLists();
+
+    expect(screen.getByRole("button", { name: "Betriebsprüfungen einklappen" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Betriebsprüfungen einklappen" })).toHaveTextContent("3");
+    expect(screen.getByRole("button", { name: "USO-Fälle einklappen" })).toHaveTextContent("2");
+    expect(screen.getByRole("button", { name: "Sonstige Maßnahmen einklappen" })).toHaveTextContent("1");
+    expect(screen.getByText("Inhalt Betriebsprüfungen")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Alle einklappen" })).toBeInTheDocument();
+  });
+
+  it("collapses one list while its accessible heading and count remain visible", () => {
+    renderLists();
+    const toggle = screen.getByRole("button", { name: "Betriebsprüfungen einklappen" });
+
+    toggle.focus();
+    expect(toggle).toHaveFocus();
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle).toHaveAttribute("aria-controls", "points-list-audit-content");
+    fireEvent.click(toggle);
+
+    const collapsedToggle = screen.getByRole("button", { name: "Betriebsprüfungen ausklappen" });
+    expect(collapsedToggle).toHaveAttribute("aria-expanded", "false");
+    expect(collapsedToggle).toHaveTextContent("Betriebsprüfungen");
+    expect(collapsedToggle).toHaveTextContent("3");
+    expect(screen.getByText("Inhalt Betriebsprüfungen").parentElement).toHaveAttribute("hidden");
+    expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}")).toEqual({ audit: false, uso: true, other: true });
+  });
+
+  it("collapses all lists and expands all lists from closed and mixed states", () => {
+    renderLists();
+
+    fireEvent.click(screen.getByRole("button", { name: "Alle einklappen" }));
+    expect(screen.getAllByRole("button", { name: /ausklappen$/ })).toHaveLength(4);
+
+    fireEvent.click(screen.getByRole("button", { name: "Betriebsprüfungen ausklappen" }));
+    expect(screen.getByRole("button", { name: "Alle ausklappen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Betriebsprüfungen einklappen" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "USO-Fälle ausklappen" })).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Alle ausklappen" }));
+    expect(screen.getByRole("button", { name: "Alle einklappen" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /einklappen$/ })).toHaveLength(4);
+  });
+
+  it("restores an individually saved visibility state", () => {
+    window.localStorage.setItem(storageKey, JSON.stringify({ audit: false, uso: true, other: false }));
+
+    renderLists();
+
+    expect(screen.getByRole("button", { name: "Betriebsprüfungen ausklappen" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "USO-Fälle einklappen" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Sonstige Maßnahmen ausklappen" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it.each([
+    "kein JSON",
+    JSON.stringify({ audit: false, uso: true })
+  ])("falls back to all lists open for invalid or incomplete storage: %s", (stored) => {
+    window.localStorage.setItem(storageKey, stored);
+
+    renderLists();
+
+    expect(screen.getByRole("button", { name: "Alle einklappen" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /einklappen$/ })).toHaveLength(4);
   });
 });
 
