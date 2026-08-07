@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, WorkTimeField, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, WorkTimeField, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase, Settings } from "../db/schema";
 
@@ -205,6 +205,99 @@ describe("CollapsiblePointLists", () => {
 
     expect(screen.getByRole("button", { name: "Alle einklappen" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /einklappen$/ })).toHaveLength(4);
+  });
+});
+
+describe("point case list status presentation", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("shows only missing-month warnings and dims only completed cases", () => {
+    const timestamp = "2026-05-01T08:00:00.000Z";
+    const auditCase = {
+      id: "audit-open-month",
+      name: "BP offen mit Monat",
+      taxNumber: "",
+      firm: "",
+      category: "M1" as const,
+      periodStartYear: 2024,
+      periodEndYear: 2025,
+      additionalResultCents: 0,
+      section99: false,
+      submissionMonth: "2026-05",
+      status: "in_progress" as const,
+      submittedPointsTenths: null,
+      submittedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const usoCase = {
+      id: "uso-open-month",
+      title: "USO offen mit Monat",
+      submissionMonth: "2026-05",
+      status: "in_progress" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const otherMeasure = {
+      id: "other-open-month",
+      title: "Maßnahme offen mit Monat",
+      measureType: "CLO-Anfrage",
+      submissionMonth: "2026-05",
+      status: "in_progress" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const data = {
+      auditPointCases: [
+        auditCase,
+        { ...auditCase, id: "audit-done-month", name: "BP erledigt mit Monat", status: "completed" as const, submittedPointsTenths: 60, submittedAt: timestamp },
+        { ...auditCase, id: "audit-open-empty", name: "BP offen ohne Monat", submissionMonth: "" },
+        { ...auditCase, id: "audit-done-empty", name: "BP erledigt ohne Monat", submissionMonth: "", status: "completed" as const, submittedPointsTenths: 60, submittedAt: timestamp }
+      ],
+      usoCases: [
+        usoCase,
+        { ...usoCase, id: "uso-done-month", title: "USO erledigt mit Monat", status: "completed" as const },
+        { ...usoCase, id: "uso-open-empty", title: "USO offen ohne Monat", submissionMonth: "" },
+        { ...usoCase, id: "uso-done-empty", title: "USO erledigt ohne Monat", submissionMonth: "", status: "completed" as const }
+      ],
+      otherMeasures: [
+        otherMeasure,
+        { ...otherMeasure, id: "other-done-month", title: "Maßnahme erledigt mit Monat", status: "completed" as const },
+        { ...otherMeasure, id: "other-open-empty", title: "Maßnahme offen ohne Monat", submissionMonth: "" },
+        { ...otherMeasure, id: "other-done-empty", title: "Maßnahme erledigt ohne Monat", submissionMonth: "", status: "completed" as const }
+      ],
+      saveAuditPointCase: vi.fn(),
+      removeAuditPointCase: vi.fn(),
+      saveUsoCase: vi.fn(),
+      removeUsoCase: vi.fn(),
+      saveOtherMeasure: vi.fn(),
+      removeOtherMeasure: vi.fn()
+    } as unknown as Parameters<typeof AuditPointsView>[0]["data"];
+
+    render(<AuditPointsView data={data} showToast={vi.fn()} />);
+
+    const rowFor = (title: string) => screen.getByText(title, { selector: "strong" }).closest("article");
+
+    for (const title of ["BP offen mit Monat", "USO offen mit Monat", "Maßnahme offen mit Monat", "BP erledigt mit Monat", "USO erledigt mit Monat", "Maßnahme erledigt mit Monat"]) {
+      expect(rowFor(title)?.querySelector(".trip-badges")).not.toBeInTheDocument();
+    }
+
+    for (const title of ["BP offen mit Monat", "USO offen mit Monat", "Maßnahme offen mit Monat", "BP offen ohne Monat", "USO offen ohne Monat", "Maßnahme offen ohne Monat"]) {
+      expect(rowFor(title)).not.toHaveClass("trip-row-done");
+    }
+
+    for (const title of ["BP erledigt mit Monat", "USO erledigt mit Monat", "Maßnahme erledigt mit Monat", "BP erledigt ohne Monat", "USO erledigt ohne Monat", "Maßnahme erledigt ohne Monat"]) {
+      expect(rowFor(title)).toHaveClass("trip-row-done");
+    }
+
+    for (const title of ["BP offen ohne Monat", "USO offen ohne Monat", "Maßnahme offen ohne Monat", "BP erledigt ohne Monat", "USO erledigt ohne Monat", "Maßnahme erledigt ohne Monat"]) {
+      const row = rowFor(title);
+      expect(row?.querySelectorAll(".trip-badges em")).toHaveLength(1);
+      expect(row?.querySelector(".trip-badges")).toHaveTextContent("ohne Abgabemonat");
+      expect(row?.querySelector(".trip-badges")).not.toHaveTextContent(/Offen|Erledigt|fixiert/);
+    }
   });
 });
 

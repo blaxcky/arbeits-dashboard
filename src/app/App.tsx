@@ -901,7 +901,7 @@ export function CollapsiblePointLists({ counts, content }: CollapsiblePointLists
   );
 }
 
-function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
+export function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(() => auditPointCaseToForm());
   const [errors, setErrors] = useState<Partial<Record<keyof AuditPointCaseForm, string>>>({});
@@ -1234,7 +1234,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
               <div>
                 <strong>{pointCase.name}{pointCase.taxNumber ? ` · ${pointCase.taxNumber}` : ""}</strong>
                 <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
-                <span className="trip-badges"><em>{pointCase.status === "completed" ? "Erledigt" : "Offen"}</em>{pointCase.submissionMonth === "" ? <em>ohne Abgabemonat</em> : null}{pointCase.status === "completed" && pointCase.submittedPointsTenths !== null ? <em>fixiert</em> : null}</span>
+                {pointCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
               </div>
               <div className="trip-row-metrics">
                 <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
@@ -1264,7 +1264,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
               <div>
                 <strong>{usoCase.title}</strong>
                 <span>{usoCase.submissionMonth || "Kein Abgabemonat"}</span>
-                <span className="trip-badges"><em>{usoCase.status === "completed" ? "Erledigt" : "Offen"}</em>{usoCase.submissionMonth === "" ? <em>ohne Abgabemonat</em> : null}</span>
+                {usoCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
               </div>
               <div className="trip-actions">
                 <button className="icon-button trip-action-button" type="button" title={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleUsoCase(usoCase)}>
@@ -1289,7 +1289,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
               <div>
                 <strong>{measure.title}</strong>
                 <span>{measure.measureType} · {measure.submissionMonth || "Kein Abgabemonat"}</span>
-                <span className="trip-badges"><em>{measure.status === "completed" ? "Erledigt" : "Offen"}</em>{measure.submissionMonth === "" ? <em>ohne Abgabemonat</em> : null}</span>
+                {measure.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
               </div>
               <div className="trip-actions">
                 <button className="icon-button trip-action-button" type="button" title={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleOtherMeasure(measure)}>
