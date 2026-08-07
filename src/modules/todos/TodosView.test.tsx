@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Todo, TodoProject } from "../../db/schema";
 import { TodosView } from "./TodosView";
 
@@ -32,6 +32,10 @@ function todoData(todos: Todo[] = [baseTodo]) {
 }
 
 describe("TodosView", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("creates a task on Enter, resets every field and keeps the quick form focused", async () => {
     const data = todoData([]);
     data.todoProjects = [{ id: "project-1", name: "Außenprüfung", sortOrder: 0, createdAt: "2026-07-29T08:00:00.000Z", updatedAt: "2026-07-29T08:00:00.000Z" }];
@@ -135,6 +139,81 @@ describe("TodosView", () => {
     fireEvent.change(title, { target: { value: "Prüfung abschließen" } });
     fireEvent.blur(title);
     await waitFor(() => expect(data.saveTodo).toHaveBeenCalledWith(expect.objectContaining({ id: "todo-1", title: "Prüfung abschließen" })));
+  });
+
+  it("persists completion immediately while retaining the completed row for three seconds", async () => {
+    vi.useFakeTimers();
+    const data = todoData();
+    render(<MemoryRouter initialEntries={["/aufgaben/heute"]}><TodosView data={data as never} showToast={vi.fn()} /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Prüfung vorbereiten erledigen" }));
+    await act(async () => {});
+
+    expect(data.completeTodo).toHaveBeenCalledWith("todo-1", true);
+    expect(screen.getByText("Prüfung vorbereiten").closest("article")).toHaveClass("completed", "todo-completing");
+    expect(screen.getByText("0 Aufgaben")).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(2999));
+    expect(screen.getByText("Prüfung vorbereiten")).toBeInTheDocument();
+  });
+
+  it("starts fading after three seconds and removes the row after the exit phase", async () => {
+    vi.useFakeTimers();
+    const data = todoData();
+    render(<MemoryRouter initialEntries={["/aufgaben/heute"]}><TodosView data={data as never} showToast={vi.fn()} /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Prüfung vorbereiten erledigen" }));
+    await act(async () => {});
+    act(() => vi.advanceTimersByTime(3000));
+    expect(screen.getByText("Prüfung vorbereiten").closest("article")).toHaveClass("todo-exiting");
+
+    act(() => vi.advanceTimersByTime(249));
+    expect(screen.getByText("Prüfung vorbereiten")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByText("Prüfung vorbereiten")).not.toBeInTheDocument();
+  });
+
+  it("keeps the completed task as a regular row when the current filter includes it", async () => {
+    vi.useFakeTimers();
+    const data = todoData();
+    render(<MemoryRouter initialEntries={["/aufgaben/filter"]}><TodosView data={data as never} showToast={vi.fn()} /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "all" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Prüfung vorbereiten erledigen" }));
+    await act(async () => {});
+    act(() => vi.advanceTimersByTime(3250));
+
+    expect(screen.getByText("Prüfung vorbereiten").closest("article")).toHaveClass("completed");
+    expect(screen.getByText("Prüfung vorbereiten").closest("article")).not.toHaveClass("todo-exiting");
+  });
+
+  it("queues undo after completion and cancels the pending removal", async () => {
+    vi.useFakeTimers();
+    const data = todoData();
+    render(<MemoryRouter initialEntries={["/aufgaben/heute"]}><TodosView data={data as never} showToast={vi.fn()} /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Prüfung vorbereiten erledigen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Prüfung vorbereiten reaktivieren" }));
+    await act(async () => {});
+    await act(async () => {});
+
+    expect(data.completeTodo.mock.calls).toEqual([["todo-1", true], ["todo-1", false]]);
+    act(() => vi.advanceTimersByTime(4000));
+    expect(screen.getByText("Prüfung vorbereiten").closest("article")).not.toHaveClass("completed", "todo-exiting");
+    expect(screen.getByText("1 Aufgaben")).toBeInTheDocument();
+  });
+
+  it("rolls back the visual state and reports a failed completion", async () => {
+    const data = todoData();
+    const showToast = vi.fn();
+    data.completeTodo.mockRejectedValueOnce(new Error("Speichern fehlgeschlagen"));
+    render(<MemoryRouter initialEntries={["/aufgaben/heute"]}><TodosView data={data as never} showToast={showToast} /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Prüfung vorbereiten erledigen" }));
+
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith("Aufgabe konnte nicht erledigt werden."));
+    expect(screen.getByText("Prüfung vorbereiten").closest("article")).not.toHaveClass("completed");
+    expect(screen.getByRole("button", { name: "Prüfung vorbereiten erledigen" })).toBeInTheDocument();
   });
 
   it("rejects duplicate project names inline and creates a unique project", async () => {

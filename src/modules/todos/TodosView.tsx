@@ -19,7 +19,7 @@ import {
   Trash,
   X
 } from "@phosphor-icons/react";
-import { type FormEvent, type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { Todo, TodoPriority, TodoProject } from "../../db/schema";
 import { todayKey } from "../../lib/dates";
@@ -37,6 +37,22 @@ type TodoDraft = {
 };
 
 const emptyFilter: TodoFilter = { projectId: "", priority: "", label: "", status: "active" };
+const TODO_COMPLETION_HOLD_MS = 3000;
+const TODO_COMPLETION_EXIT_MS = 250;
+
+type TodoTransitionPhase = "completing" | "exiting" | "undoing" | "settled";
+type TodoTransition = {
+  todo: Todo;
+  phase: TodoTransitionPhase;
+  originViewKey: string;
+  remainsVisible: boolean;
+};
+
+function completionViewKey(pathname: string, searchQuery: string, filter: TodoFilter): string {
+  if (pathname.endsWith("/suche")) return `${pathname}:${searchQuery}`;
+  if (pathname.endsWith("/filter")) return `${pathname}:${JSON.stringify(filter)}`;
+  return pathname;
+}
 
 export function TodosView({ data, showToast }: { data: TodoData; showToast: (message: string) => void }) {
   const location = useLocation();
@@ -50,20 +66,181 @@ export function TodosView({ data, showToast }: { data: TodoData; showToast: (mes
   const [filter, setFilter] = useState<TodoFilter>(emptyFilter);
   const [projectEditor, setProjectEditor] = useState<{ id?: string; name: string } | null>(null);
   const [projectError, setProjectError] = useState("");
+  const [todoTransitions, setTodoTransitions] = useState<Map<string, TodoTransition>>(() => new Map());
   const addButtonRef = useRef<HTMLButtonElement>(null);
+  const transitionTimers = useRef(new Map<string, { hold?: number; exit?: number }>());
+  const completionQueues = useRef(new Map<string, Promise<void>>());
+  const latestTodos = useRef(data.todos);
+  const latestTransitions = useRef(todoTransitions);
+  latestTodos.current = data.todos;
+  latestTransitions.current = todoTransitions;
   const projectNames = useMemo(() => new Map(data.todoProjects.map((project) => [project.id, project.name])), [data.todoProjects]);
   const labels = useMemo(() => [...new Set(data.todos.flatMap((todo) => todo.labels))].sort((a, b) => a.localeCompare(b, "de-AT")), [data.todos]);
   const selectedTaskId = new URLSearchParams(location.search).get("task");
   const selectedTask = data.todos.find((todo) => todo.id === selectedTaskId);
+  const currentViewKey = completionViewKey(location.pathname, searchQuery, filter);
+
+  const clearTransitionTimers = useCallback((id: string) => {
+    const timers = transitionTimers.current.get(id);
+    if (timers?.hold !== undefined) window.clearTimeout(timers.hold);
+    if (timers?.exit !== undefined) window.clearTimeout(timers.exit);
+    transitionTimers.current.delete(id);
+  }, []);
+
+  const updateTransition = useCallback((id: string, update: (current: TodoTransition) => TodoTransition) => {
+    setTodoTransitions((current) => {
+      const transition = current.get(id);
+      if (!transition) return current;
+      const next = new Map(current);
+      next.set(id, update(transition));
+      return next;
+    });
+  }, []);
+
+  const removeTransition = useCallback((id: string) => {
+    setTodoTransitions((current) => {
+      if (!current.has(id)) return current;
+      const next = new Map(current);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const queueCompletion = useCallback((id: string, completed: boolean) => {
+    const previous = completionQueues.current.get(id);
+    const queued = previous
+      ? previous.catch(() => undefined).then(() => data.completeTodo(id, completed))
+      : Promise.resolve(data.completeTodo(id, completed));
+    completionQueues.current.set(id, queued);
+    void queued.finally(() => {
+      if (completionQueues.current.get(id) === queued) completionQueues.current.delete(id);
+    }).catch(() => undefined);
+    return queued;
+  }, [data]);
+
+  const finishCompletionTransition = useCallback((id: string) => {
+    const currentTransition = latestTransitions.current.get(id);
+    if (currentTransition?.remainsVisible) {
+      transitionTimers.current.delete(id);
+      const persistedTodo = latestTodos.current.find((todo) => todo.id === id);
+      if (persistedTodo?.completedAt) removeTransition(id);
+      else updateTransition(id, (transition) => ({ ...transition, phase: "settled" }));
+      return;
+    }
+    updateTransition(id, (transition) => ({ ...transition, phase: "exiting" }));
+    const exit = window.setTimeout(() => {
+      transitionTimers.current.delete(id);
+      const persistedTodo = latestTodos.current.find((todo) => todo.id === id);
+      if (persistedTodo?.completedAt) removeTransition(id);
+      else updateTransition(id, (transition) => ({ ...transition, phase: "settled" }));
+    }, TODO_COMPLETION_EXIT_MS);
+    transitionTimers.current.set(id, { exit });
+  }, [removeTransition, updateTransition]);
+
+  const completeTodo = useCallback((todo: Todo) => {
+    const existingTransition = todoTransitions.get(todo.id);
+    if (existingTransition && existingTransition.phase !== "undoing") {
+      clearTransitionTimers(todo.id);
+      updateTransition(todo.id, (transition) => ({ ...transition, phase: "undoing" }));
+      void queueCompletion(todo.id, false).then(() => {
+        const persistedTodo = latestTodos.current.find((item) => item.id === todo.id);
+        if (!persistedTodo?.completedAt) removeTransition(todo.id);
+      }).catch(() => {
+        const persistedTodo = latestTodos.current.find((item) => item.id === todo.id);
+        if (persistedTodo?.completedAt) removeTransition(todo.id);
+        else updateTransition(todo.id, (transition) => ({ ...transition, phase: "settled" }));
+        showToast("Aufgabe konnte nicht reaktiviert werden.");
+      });
+      return;
+    }
+
+    if (todo.completedAt) {
+      void queueCompletion(todo.id, false).catch(() => showToast("Aufgabe konnte nicht reaktiviert werden."));
+      return;
+    }
+
+    setTodoTransitions((current) => {
+      const next = new Map(current);
+      const completedTodo = { ...todo, completedAt: new Date().toISOString() };
+      const remainsVisible = location.pathname.endsWith("/suche")
+        ? searchTodos([completedTodo], searchQuery, projectNames).length > 0
+        : location.pathname.endsWith("/filter") && filterTodos([completedTodo], filter).length > 0;
+      next.set(todo.id, { todo: completedTodo, phase: "completing", originViewKey: currentViewKey, remainsVisible });
+      return next;
+    });
+    const hold = window.setTimeout(() => finishCompletionTransition(todo.id), TODO_COMPLETION_HOLD_MS);
+    transitionTimers.current.set(todo.id, { hold });
+    void queueCompletion(todo.id, true).catch(() => {
+      clearTransitionTimers(todo.id);
+      removeTransition(todo.id);
+      showToast("Aufgabe konnte nicht erledigt werden.");
+    });
+  }, [clearTransitionTimers, currentViewKey, filter, finishCompletionTransition, location.pathname, projectNames, queueCompletion, removeTransition, searchQuery, showToast, todoTransitions, updateTransition]);
+
+  useEffect(() => () => {
+    transitionTimers.current.forEach((timers) => {
+      if (timers.hold !== undefined) window.clearTimeout(timers.hold);
+      if (timers.exit !== undefined) window.clearTimeout(timers.exit);
+    });
+    transitionTimers.current.clear();
+  }, []);
+
+  useEffect(() => {
+    setTodoTransitions((current) => {
+      let next: Map<string, TodoTransition> | null = null;
+      current.forEach((transition, id) => {
+        const persistedTodo = data.todos.find((todo) => todo.id === id);
+        const synchronized = transition.phase === "settled" && Boolean(persistedTodo?.completedAt)
+          || transition.phase === "undoing" && !persistedTodo?.completedAt;
+        if (synchronized) {
+          next ??= new Map(current);
+          next.delete(id);
+        }
+      });
+      return next ?? current;
+    });
+  }, [data.todos]);
+
+  const effectiveTodos = useMemo(() => data.todos.map((todo) => {
+    const transition = todoTransitions.get(todo.id);
+    if (!transition) return todo;
+    return transition.phase === "undoing"
+      ? { ...todo, completedAt: null }
+      : { ...todo, completedAt: transition.todo.completedAt };
+  }), [data.todos, todoTransitions]);
 
   const view = useMemo(() => {
-    if (location.pathname.endsWith("/eingang")) return { title: "Eingang", todos: inboxTodos(data.todos), groups: null };
-    if (location.pathname.endsWith("/demnaechst")) return { title: "Demnächst", todos: [], groups: upcomingTodoGroups(data.todos, today) };
-    if (location.pathname.endsWith("/suche")) return { title: "Suchen", todos: searchTodos(data.todos, searchQuery, projectNames), groups: null };
-    if (location.pathname.endsWith("/filter")) return { title: "Filter und Etiketten", todos: filterTodos(data.todos, filter), groups: null };
-    if (currentProject) return { title: currentProject.name, todos: projectTodos(data.todos, currentProject.id), groups: null };
-    return { title: "Heute", todos: activeTodosForToday(data.todos, today), groups: null };
-  }, [currentProject, data.todos, filter, location.pathname, projectNames, searchQuery, today]);
+    if (location.pathname.endsWith("/eingang")) return { title: "Eingang", todos: inboxTodos(effectiveTodos), groups: null };
+    if (location.pathname.endsWith("/demnaechst")) return { title: "Demnächst", todos: [], groups: upcomingTodoGroups(effectiveTodos, today) };
+    if (location.pathname.endsWith("/suche")) return { title: "Suchen", todos: searchTodos(effectiveTodos, searchQuery, projectNames), groups: null };
+    if (location.pathname.endsWith("/filter")) return { title: "Filter und Etiketten", todos: filterTodos(effectiveTodos, filter), groups: null };
+    if (currentProject) return { title: currentProject.name, todos: projectTodos(effectiveTodos, currentProject.id), groups: null };
+    return { title: "Heute", todos: activeTodosForToday(effectiveTodos, today), groups: null };
+  }, [currentProject, effectiveTodos, filter, location.pathname, projectNames, searchQuery, today]);
+
+  const displayedView = useMemo(() => {
+    const retained = [...todoTransitions.values()].filter((transition) => (
+      (transition.phase === "completing" || transition.phase === "exiting")
+      && transition.originViewKey === currentViewKey
+    ));
+    if (view.groups) {
+      const groups = view.groups.map((group) => ({ ...group, todos: [...group.todos] }));
+      retained.forEach((transition) => {
+        if (groups.some((group) => group.todos.some((todo) => todo.id === transition.todo.id))) return;
+        const date = transition.todo.dueDate;
+        if (!date) return;
+        const group = groups.find((item) => item.date === date);
+        if (group) group.todos = sortTodos([...group.todos, transition.todo]);
+        else groups.push({ date, todos: [transition.todo] });
+      });
+      groups.sort((left, right) => left.date.localeCompare(right.date));
+      return { ...view, groups };
+    }
+    const retainedTodos = retained
+      .map((transition) => transition.todo)
+      .filter((todo) => !view.todos.some((item) => item.id === todo.id));
+    return { ...view, todos: sortTodos([...view.todos, ...retainedTodos]) };
+  }, [currentViewKey, todoTransitions, view]);
 
   const defaultDraft = (): TodoDraft => ({
     title: "",
@@ -114,8 +291,8 @@ export function TodosView({ data, showToast }: { data: TodoData; showToast: (mes
         <button ref={addButtonRef} className="todos-add-top" type="button" onClick={() => setAdding(true)}><Plus size={21} weight="fill" /> Aufgabe hinzufügen</button>
         <nav>
           <TodoNavLink to="/aufgaben/suche" icon={<MagnifyingGlass />} label="Suchen" />
-          <TodoNavLink to="/aufgaben/eingang" icon={<Tray />} label="Eingang" count={inboxTodos(data.todos).length} />
-          <TodoNavLink to="/aufgaben/heute" icon={<CalendarBlank />} label="Heute" count={activeTodosForToday(data.todos, today).length} />
+          <TodoNavLink to="/aufgaben/eingang" icon={<Tray />} label="Eingang" count={inboxTodos(effectiveTodos).length} />
+          <TodoNavLink to="/aufgaben/heute" icon={<CalendarBlank />} label="Heute" count={activeTodosForToday(effectiveTodos, today).length} />
           <TodoNavLink to="/aufgaben/demnaechst" icon={<CalendarDots />} label="Demnächst" />
           <TodoNavLink to="/aufgaben/filter" icon={<SlidersHorizontal />} label="Filter und Etiketten" />
           <span className="todos-nav-disabled" aria-disabled="true" title="Diese Funktion ist noch nicht verfügbar"><ListChecks /> Reporting</span>
@@ -135,13 +312,13 @@ export function TodosView({ data, showToast }: { data: TodoData; showToast: (mes
       </aside>
       <main className="todos-main">
         <div className="todos-content">
-          <h1>{view.title}</h1>
+          <h1>{displayedView.title}</h1>
           <p className="todos-count"><CheckCircle /> {view.groups ? view.groups.reduce((sum, group) => sum + group.todos.length, 0) : view.todos.length} Aufgaben</p>
           {location.pathname.endsWith("/suche") ? <label className="todo-search"><MagnifyingGlass /><span className="sr-only">Aufgaben durchsuchen</span><input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Aufgaben durchsuchen" /></label> : null}
           {location.pathname.endsWith("/filter") ? <TodoFilters filter={filter} projects={data.todoProjects} labels={labels} onChange={setFilter} /> : null}
-          {data.loading ? <TodoSkeleton /> : view.groups ? (
-            view.groups.length ? view.groups.map((group) => <TodoGroup key={group.date} title={formatGroupDate(group.date, today)} todos={group.todos} projects={projectNames} today={today} onOpen={openTask} onComplete={(id) => void data.completeTodo(id, true)} />) : <TodoEmpty text="Keine kommenden Aufgaben." />
-          ) : view.todos.length ? <TodoGroup title={location.pathname.endsWith("/heute") ? "Aufgaben" : undefined} todos={view.todos} projects={projectNames} today={today} onOpen={openTask} onComplete={(id, completed) => void data.completeTodo(id, completed)} /> : <TodoEmpty text={searchQuery ? "Keine passenden Aufgaben gefunden." : "Hier sind noch keine Aufgaben."} />}
+          {data.loading ? <TodoSkeleton /> : displayedView.groups ? (
+            displayedView.groups.length ? displayedView.groups.map((group) => <TodoGroup key={group.date} title={formatGroupDate(group.date, today)} todos={group.todos} projects={projectNames} today={today} transitions={todoTransitions} onOpen={openTask} onComplete={completeTodo} />) : <TodoEmpty text="Keine kommenden Aufgaben." />
+          ) : displayedView.todos.length ? <TodoGroup title={location.pathname.endsWith("/heute") ? "Aufgaben" : undefined} todos={displayedView.todos} projects={projectNames} today={today} transitions={todoTransitions} onOpen={openTask} onComplete={completeTodo} /> : <TodoEmpty text={searchQuery ? "Keine passenden Aufgaben gefunden." : "Hier sind noch keine Aufgaben."} />}
           {adding ? <QuickTodoForm initial={defaultDraft()} projects={data.todoProjects} labels={labels} onCancel={() => { setAdding(false); addButtonRef.current?.focus(); }} onSave={async (draft, keepOpen) => {
             await data.saveTodo({ ...draftToTodo(draft), completedAt: null });
             if (!keepOpen) setAdding(false);
@@ -149,7 +326,7 @@ export function TodosView({ data, showToast }: { data: TodoData; showToast: (mes
           }} /> : <button className="todo-add-inline" type="button" onClick={() => setAdding(true)}><Plus /> Aufgabe hinzufügen</button>}
         </div>
       </main>
-      {selectedTask ? <TodoDetail todo={selectedTask} projects={data.todoProjects} labels={labels} onClose={closeTask} onSave={async (draft) => { await data.saveTodo({ id: selectedTask.id, ...draftToTodo(draft), completedAt: selectedTask.completedAt }); }} onComplete={(completed) => void data.completeTodo(selectedTask.id, completed)} onDelete={async () => { await data.removeTodo(selectedTask.id); closeTask(); showToast("Aufgabe gelöscht."); }} /> : null}
+      {selectedTask ? <TodoDetail todo={selectedTask} projects={data.todoProjects} labels={labels} onClose={closeTask} onSave={async (draft) => { await data.saveTodo({ id: selectedTask.id, ...draftToTodo(draft), completedAt: selectedTask.completedAt }); }} onComplete={() => completeTodo(selectedTask)} onDelete={async () => { await data.removeTodo(selectedTask.id); closeTask(); showToast("Aufgabe gelöscht."); }} /> : null}
     </section>
   );
 }
@@ -158,15 +335,20 @@ function TodoNavLink({ to, icon, label, count }: { to: string; icon: React.React
   return <NavLink to={to} className={({ isActive }) => isActive ? "active" : ""}>{icon}<span>{label}</span>{count ? <small>{count}</small> : null}</NavLink>;
 }
 
-function TodoGroup({ title, todos, projects, today, onOpen, onComplete }: { title?: string; todos: Todo[]; projects: Map<string, string>; today: string; onOpen: (todo: Todo, trigger: HTMLElement) => void; onComplete: (id: string, completed: boolean) => void }) {
-  return <section className="todo-group">{title ? <h2>{title}</h2> : null}<div className="todo-list">{todos.map((todo) => <article className={`todo-row priority-${todo.priority.toLowerCase()}${todo.completedAt ? " completed" : ""}`} key={todo.id}>
-    <button className="todo-check" type="button" aria-label={todo.completedAt ? `${todo.title} reaktivieren` : `${todo.title} erledigen`} onClick={() => onComplete(todo.id, !todo.completedAt)}>{todo.completedAt ? <Check weight="bold" /> : null}</button>
+function TodoGroup({ title, todos, projects, today, transitions, onOpen, onComplete }: { title?: string; todos: Todo[]; projects: Map<string, string>; today: string; transitions: Map<string, TodoTransition>; onOpen: (todo: Todo, trigger: HTMLElement) => void; onComplete: (todo: Todo) => void }) {
+  return <section className="todo-group">{title ? <h2>{title}</h2> : null}<div className="todo-list">{todos.map((todo) => {
+    const transition = transitions.get(todo.id);
+    const completed = transition ? transition.phase !== "undoing" : Boolean(todo.completedAt);
+    const transitionClass = transition ? ` todo-${transition.phase}` : "";
+    return <article className={`todo-row priority-${todo.priority.toLowerCase()}${completed ? " completed" : ""}${transitionClass}`} key={todo.id}>
+    <button className="todo-check" type="button" aria-label={completed ? `${todo.title} reaktivieren` : `${todo.title} erledigen`} onClick={() => onComplete(todo)}>{completed ? <Check weight="bold" /> : null}</button>
     <button className="todo-row-body" type="button" onClick={(event) => onOpen(todo, event.currentTarget)}>
       <span className="todo-title">{todo.title}</span>
       <span className="todo-meta">{todo.dueDate ? <span className={todo.dueDate < today ? "overdue" : todo.dueDate === today ? "today" : ""}><CalendarBlank />{todo.dueDate === today ? "Heute" : formatShortDate(todo.dueDate)}</span> : null}{todo.labels.map((label) => <span key={label}><Tag />{label}</span>)}</span>
     </button>
     <span className="todo-project-name">{projects.get(todo.projectId ?? "") ?? "Eingang"} <Tray /></span>
-  </article>)}</div></section>;
+  </article>;
+  })}</div></section>;
 }
 
 function QuickTodoForm({ initial, projects, labels, onCancel, onSave }: { initial: TodoDraft; projects: TodoProject[]; labels: string[]; onCancel: () => void; onSave: (draft: TodoDraft, keepOpen: boolean) => Promise<void> }) {
@@ -201,7 +383,7 @@ function QuickTodoForm({ initial, projects, labels, onCancel, onSave }: { initia
   </div>;
 }
 
-function TodoDetail({ todo, projects, labels, onClose, onSave, onComplete, onDelete }: { todo: Todo; projects: TodoProject[]; labels: string[]; onClose: () => void; onSave: (draft: TodoDraft) => Promise<void>; onComplete: (completed: boolean) => void; onDelete: () => Promise<void> }) {
+function TodoDetail({ todo, projects, labels, onClose, onSave, onComplete, onDelete }: { todo: Todo; projects: TodoProject[]; labels: string[]; onClose: () => void; onSave: (draft: TodoDraft) => Promise<void>; onComplete: () => void; onDelete: () => Promise<void> }) {
   const [draft, setDraft] = useState(todoToDraft(todo));
   const [menuOpen, setMenuOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -224,7 +406,7 @@ function TodoDetail({ todo, projects, labels, onClose, onSave, onComplete, onDel
   return <div className="todo-modal-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="todo-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Aufgabe ${todo.title}`} tabIndex={-1}>
       <header><span><Tray /> {projects.find((project) => project.id === draft.projectId)?.name ?? "Eingang"}</span><div><button type="button" aria-label="Weitere Aktionen" onClick={() => setMenuOpen(!menuOpen)}><DotsThree /></button><button type="button" aria-label="Aufgabe schließen" onClick={onClose}><X /></button>{menuOpen ? <button className="todo-delete-menu" type="button" onClick={() => void onDelete()}><Trash /> Aufgabe löschen</button> : null}</div></header>
-      <div className="todo-modal-body"><div className="todo-modal-editor"><div className="todo-modal-title"><button className={`todo-check priority-${draft.priority.toLowerCase()}`} type="button" aria-label={todo.completedAt ? "Aufgabe reaktivieren" : "Aufgabe erledigen"} onClick={() => onComplete(!todo.completedAt)}>{todo.completedAt ? <Check /> : null}</button><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} onBlur={() => save()} aria-label="Aufgabenname" /></div><label className="todo-description"><NotePencil /><span className="sr-only">Beschreibung</span><textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} onBlur={() => save()} placeholder="Beschreibung" /></label><button className="todo-disabled-action" type="button" disabled><Plus /> Unteraufgabe hinzufügen</button><div className="todo-comment"><span aria-hidden="true">AD</span><button type="button" disabled>Kommentieren <Paperclip /></button></div></div>
+      <div className="todo-modal-body"><div className="todo-modal-editor"><div className="todo-modal-title"><button className={`todo-check priority-${draft.priority.toLowerCase()}`} type="button" aria-label={todo.completedAt ? "Aufgabe reaktivieren" : "Aufgabe erledigen"} onClick={onComplete}>{todo.completedAt ? <Check /> : null}</button><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} onBlur={() => save()} aria-label="Aufgabenname" /></div><label className="todo-description"><NotePencil /><span className="sr-only">Beschreibung</span><textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} onBlur={() => save()} placeholder="Beschreibung" /></label><button className="todo-disabled-action" type="button" disabled><Plus /> Unteraufgabe hinzufügen</button><div className="todo-comment"><span aria-hidden="true">AD</span><button type="button" disabled>Kommentieren <Paperclip /></button></div></div>
         <aside className="todo-modal-properties">
           <Property label="Projekt"><select value={draft.projectId} onChange={(event) => { const next = { ...draft, projectId: event.target.value }; setDraft(next); save(next); }}><option value="">Eingang</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></Property>
           <Property label="Datum"><input type="date" value={draft.dueDate} onChange={(event) => { const next = { ...draft, dueDate: event.target.value }; setDraft(next); save(next); }} /></Property>

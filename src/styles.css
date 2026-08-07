@@ -405,7 +405,38 @@ button:disabled {
   padding: 10px 0 7px;
   border-bottom: 1px solid var(--todo-line);
 }
-.todo-row.completed .todo-title { color: #8d8883; text-decoration: line-through; }
+.todo-row.completed .todo-title { color: #8d8883; }
+.todo-title {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+}
+.todo-title::after {
+  position: absolute;
+  top: 52%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: currentColor;
+  content: "";
+  opacity: 0.78;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.todo-row.completed .todo-title::after { transform: scaleX(1); }
+.todo-row.todo-undoing .todo-title::after { transform-origin: right center; }
+.todo-row.todo-exiting {
+  animation: todo-row-exit 250ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  will-change: opacity, transform;
+}
+
+@keyframes todo-row-exit {
+  to {
+    opacity: 0;
+    transform: translate3d(8px, 0, 0);
+  }
+}
 
 .todo-check {
   width: 18px;
@@ -420,6 +451,20 @@ button:disabled {
   background: transparent;
 }
 .todo-check svg { width: 12px; }
+.todo-row.todo-completing .todo-check svg {
+  animation: todo-check-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes todo-check-in {
+  from {
+    opacity: 0;
+    transform: scale3d(0.35, 0.35, 1);
+  }
+  to {
+    opacity: 1;
+    transform: scale3d(1, 1, 1);
+  }
+}
 .priority-p1 .todo-check,
 .todo-check.priority-p1 { border-color: #d1453b; background: #fff2f0; color: #d1453b; }
 .priority-p2 .todo-check,
@@ -1323,6 +1368,15 @@ button:disabled {
   .point-status-caret {
     transition-duration: 0s;
     transition-delay: 0s;
+  }
+
+  .todo-title::after {
+    transition: none;
+  }
+
+  .todo-row.todo-completing .todo-check svg,
+  .todo-row.todo-exiting {
+    animation: none;
   }
 }
 
