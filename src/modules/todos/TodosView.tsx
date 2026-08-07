@@ -142,9 +142,9 @@ export function TodosView({ data, showToast }: { data: TodoData; showToast: (mes
           {data.loading ? <TodoSkeleton /> : view.groups ? (
             view.groups.length ? view.groups.map((group) => <TodoGroup key={group.date} title={formatGroupDate(group.date, today)} todos={group.todos} projects={projectNames} today={today} onOpen={openTask} onComplete={(id) => void data.completeTodo(id, true)} />) : <TodoEmpty text="Keine kommenden Aufgaben." />
           ) : view.todos.length ? <TodoGroup title={location.pathname.endsWith("/heute") ? "Aufgaben" : undefined} todos={view.todos} projects={projectNames} today={today} onOpen={openTask} onComplete={(id, completed) => void data.completeTodo(id, completed)} /> : <TodoEmpty text={searchQuery ? "Keine passenden Aufgaben gefunden." : "Hier sind noch keine Aufgaben."} />}
-          {adding ? <QuickTodoForm initial={defaultDraft()} projects={data.todoProjects} labels={labels} onCancel={() => { setAdding(false); addButtonRef.current?.focus(); }} onSave={async (draft) => {
+          {adding ? <QuickTodoForm initial={defaultDraft()} projects={data.todoProjects} labels={labels} onCancel={() => { setAdding(false); addButtonRef.current?.focus(); }} onSave={async (draft, keepOpen) => {
             await data.saveTodo({ ...draftToTodo(draft), completedAt: null });
-            setAdding(false);
+            if (!keepOpen) setAdding(false);
             showToast("Aufgabe hinzugefügt.");
           }} /> : <button className="todo-add-inline" type="button" onClick={() => setAdding(true)}><Plus /> Aufgabe hinzufügen</button>}
         </div>
@@ -169,18 +169,23 @@ function TodoGroup({ title, todos, projects, today, onOpen, onComplete }: { titl
   </article>)}</div></section>;
 }
 
-function QuickTodoForm({ initial, projects, labels, onCancel, onSave }: { initial: TodoDraft; projects: TodoProject[]; labels: string[]; onCancel: () => void; onSave: (draft: TodoDraft) => Promise<void> }) {
+function QuickTodoForm({ initial, projects, labels, onCancel, onSave }: { initial: TodoDraft; projects: TodoProject[]; labels: string[]; onCancel: () => void; onSave: (draft: TodoDraft, keepOpen: boolean) => Promise<void> }) {
   const [draft, setDraft] = useState(initial);
   const [error, setError] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => titleRef.current?.focus(), []);
-  async function submit() {
+  async function submit(keepOpen: boolean) {
     if (!draft.title.trim()) return setError("Bitte einen Aufgabennamen eingeben.");
-    await onSave(draft);
+    await onSave(draft, keepOpen);
+    if (keepOpen) {
+      setDraft(initial);
+      setError("");
+      titleRef.current?.focus();
+    }
   }
   function keyDown(event: ReactKeyboardEvent) {
     if (event.key === "Escape") onCancel();
-    if (event.key === "Enter" && (event.target === titleRef.current || event.ctrlKey || event.metaKey)) { event.preventDefault(); void submit(); }
+    if (event.key === "Enter" && (event.target === titleRef.current || event.ctrlKey || event.metaKey)) { event.preventDefault(); void submit(true); }
   }
   return <div className="todo-quick-form" onKeyDown={keyDown}>
     <input ref={titleRef} className="todo-quick-title" value={draft.title} onChange={(event) => { setError(""); setDraft({ ...draft, title: event.target.value }); }} placeholder="Aufgabenname" aria-label="Aufgabenname" />
@@ -192,7 +197,7 @@ function QuickTodoForm({ initial, projects, labels, onCancel, onSave }: { initia
       <label><Tag /><span className="sr-only">Etiketten</span><input list="todo-labels" value={draft.labelsText} onChange={(event) => setDraft({ ...draft, labelsText: event.target.value })} placeholder="Etiketten" /></label>
       <datalist id="todo-labels">{labels.map((label) => <option key={label} value={label} />)}</datalist>
     </div>
-    <div className="todo-quick-footer"><label><Tray /><span className="sr-only">Projekt</span><select value={draft.projectId} onChange={(event) => setDraft({ ...draft, projectId: event.target.value })}><option value="">Eingang</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><span><button type="button" className="todo-cancel" onClick={onCancel}>Abbrechen</button><button type="button" className="todo-save" disabled={!draft.title.trim()} onClick={() => void submit()}>Aufgabe hinzufügen</button></span></div>
+    <div className="todo-quick-footer"><label><Tray /><span className="sr-only">Projekt</span><select value={draft.projectId} onChange={(event) => setDraft({ ...draft, projectId: event.target.value })}><option value="">Eingang</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><span><button type="button" className="todo-cancel" onClick={onCancel}>Abbrechen</button><button type="button" className="todo-save" disabled={!draft.title.trim()} onClick={() => void submit(false)}>Aufgabe hinzufügen</button></span></div>
   </div>;
 }
 

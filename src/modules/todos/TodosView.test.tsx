@@ -32,18 +32,39 @@ function todoData(todos: Todo[] = [baseTodo]) {
 }
 
 describe("TodosView", () => {
-  it("creates a task with the Today default when Enter is pressed in the title", async () => {
+  it("creates a task on Enter, resets every field and keeps the quick form focused", async () => {
     const data = todoData([]);
+    data.todoProjects = [{ id: "project-1", name: "Außenprüfung", sortOrder: 0, createdAt: "2026-07-29T08:00:00.000Z", updatedAt: "2026-07-29T08:00:00.000Z" }];
     render(<MemoryRouter initialEntries={["/aufgaben/heute"]}><TodosView data={data as never} showToast={vi.fn()} /></MemoryRouter>);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Aufgabe hinzufügen" })[0]);
     expect(screen.getAllByRole("button", { name: "Aufgabe hinzufügen" })[1]).toBeDisabled();
     const title = screen.getByRole("textbox", { name: "Aufgabenname" });
     fireEvent.change(title, { target: { value: "Bescheid prüfen" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Beschreibung" }), { target: { value: "Unterlagen abgleichen" } });
+    fireEvent.change(screen.getByLabelText("Datum"), { target: { value: "2026-08-01" } });
+    fireEvent.change(screen.getByLabelText("Priorität"), { target: { value: "P1" } });
+    fireEvent.change(screen.getByLabelText("Etiketten"), { target: { value: "Dringend" } });
+    fireEvent.change(screen.getByLabelText("Projekt"), { target: { value: "project-1" } });
     fireEvent.keyDown(title, { key: "Enter" });
 
-    await waitFor(() => expect(data.saveTodo).toHaveBeenCalledWith(expect.objectContaining({ title: "Bescheid prüfen", dueDate: "2026-07-30", priority: "P4" })));
+    await waitFor(() => expect(data.saveTodo).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Bescheid prüfen",
+      description: "Unterlagen abgleichen",
+      dueDate: "2026-08-01",
+      priority: "P1",
+      labels: ["Dringend"],
+      projectId: "project-1"
+    })));
     expect(data.saveTodo).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("textbox", { name: "Aufgabenname" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Beschreibung" })).toHaveValue("");
+    expect(screen.getByLabelText("Datum")).toHaveValue("2026-07-30");
+    expect(screen.getByLabelText("Priorität")).toHaveValue("P4");
+    expect(screen.getByLabelText("Etiketten")).toHaveValue("");
+    expect(screen.getByLabelText("Projekt")).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Aufgabenname" })).toHaveFocus();
+    expect(screen.getAllByRole("button", { name: "Aufgabe hinzufügen" })).toHaveLength(2);
   });
 
   it("keeps Enter as a newline in the description and supports Ctrl/Cmd+Enter", async () => {
@@ -59,11 +80,27 @@ describe("TodosView", () => {
 
     fireEvent.keyDown(description, { key: "Enter", ctrlKey: true });
     await waitFor(() => expect(data.saveTodo).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("textbox", { name: "Aufgabenname" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Aufgabenname" })).toHaveFocus();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Aufgabe hinzufügen" })[0]);
     fireEvent.change(screen.getByRole("textbox", { name: "Aufgabenname" }), { target: { value: "Zweiten Bescheid prüfen" } });
     fireEvent.keyDown(screen.getByRole("textbox", { name: "Beschreibung" }), { key: "Enter", metaKey: true });
     await waitFor(() => expect(data.saveTodo).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("textbox", { name: "Aufgabenname" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Aufgabenname" })).toHaveFocus();
+  });
+
+  it("creates a task with the button and closes the quick form", async () => {
+    const data = todoData([]);
+    render(<MemoryRouter initialEntries={["/aufgaben/heute"]}><TodosView data={data as never} showToast={vi.fn()} /></MemoryRouter>);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Aufgabe hinzufügen" })[0]);
+    fireEvent.change(screen.getByRole("textbox", { name: "Aufgabenname" }), { target: { value: "Bescheid prüfen" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Aufgabe hinzufügen" })[1]);
+
+    await waitFor(() => expect(data.saveTodo).toHaveBeenCalledWith(expect.objectContaining({ title: "Bescheid prüfen" })));
+    expect(screen.queryByRole("textbox", { name: "Aufgabenname" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Aufgabe hinzufügen" })).toHaveLength(2);
   });
 
   it("shows validation feedback instead of saving a whitespace-only title", () => {
