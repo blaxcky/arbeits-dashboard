@@ -34,7 +34,7 @@ import {
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import type { AuditPointCase, AuditPointCategory, AuditPointStatus, OtherMeasure, OtherMeasureStatus, SavedDestination, Settings, TimeEntry, UsoCase, UsoCaseStatus, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
+import type { AuditPointCase, AuditPointCategory, OtherMeasure, SavedDestination, Settings, TimeEntry, UsoCase, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isValidDateKey, isoWeekDays, parseDateKey, todayKey, weekdayName } from "../lib/dates";
@@ -90,6 +90,14 @@ import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalityS
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
 import { TodosView } from "../modules/todos/TodosView";
+import {
+  applyPointFormStatus,
+  applyPointSubmissionMonth,
+  completedCurrentMonthLabel,
+  COMPLETED_CURRENT_MONTH,
+  normalizePointFormStatus,
+  type PointFormStatus
+} from "../modules/points/formStatus";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: House },
@@ -910,8 +918,15 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
   const sortedOtherMeasures = [...data.otherMeasures].sort(compareOtherMeasures);
 
   function updateField(field: keyof AuditPointCaseForm, value: string | boolean) {
-    setForm((current) => ({ ...current, [field]: field === "taxNumber" && typeof value === "string" ? formatAuditTaxNumber(value) : value }));
+    setForm((current) => field === "submissionMonth" && typeof value === "string"
+      ? applyPointSubmissionMonth(current, value)
+      : { ...current, [field]: field === "taxNumber" && typeof value === "string" ? formatAuditTaxNumber(value) : value });
     setErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function updateStatus(status: PointFormStatus) {
+    setForm((current) => applyPointFormStatus(current, status));
+    setErrors((current) => ({ ...current, submissionMonth: undefined }));
   }
 
   async function saveCase() {
@@ -933,7 +948,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
       additionalResultCents: validation.additionalResultCents,
       section99: form.section99,
       submissionMonth: form.submissionMonth,
-      status: form.status
+      status: normalizePointFormStatus(form.status)
     });
     setEditingId(null);
     setForm(auditPointCaseToForm());
@@ -974,8 +989,15 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
   }
 
   function updateUsoField(field: keyof ReturnType<typeof usoCaseToForm>, value: string) {
-    setUsoForm((current) => ({ ...current, [field]: value }));
+    setUsoForm((current) => field === "submissionMonth"
+      ? applyPointSubmissionMonth(current, value)
+      : { ...current, [field]: value });
     setUsoErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function updateUsoStatus(status: PointFormStatus) {
+    setUsoForm((current) => applyPointFormStatus(current, status));
+    setUsoErrors((current) => ({ ...current, submissionMonth: undefined }));
   }
 
   async function saveUsoCase() {
@@ -990,7 +1012,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
       id: usoEditingId ?? undefined,
       title: usoForm.title.trim(),
       submissionMonth: usoForm.submissionMonth,
-      status: usoForm.status
+      status: normalizePointFormStatus(usoForm.status)
     });
     setUsoEditingId(null);
     setUsoForm(usoCaseToForm());
@@ -1024,8 +1046,15 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
   }
 
   function updateOtherField(field: keyof ReturnType<typeof otherMeasureToForm>, value: string) {
-    setOtherForm((current) => ({ ...current, [field]: value }));
+    setOtherForm((current) => field === "submissionMonth"
+      ? applyPointSubmissionMonth(current, value)
+      : { ...current, [field]: value });
     setOtherErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function updateOtherStatus(status: PointFormStatus) {
+    setOtherForm((current) => applyPointFormStatus(current, status));
+    setOtherErrors((current) => ({ ...current, submissionMonth: undefined }));
   }
 
   async function saveOtherMeasure() {
@@ -1041,7 +1070,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
       title: otherForm.title.trim(),
       measureType: otherForm.measureType.trim(),
       submissionMonth: otherForm.submissionMonth,
-      status: otherForm.status
+      status: normalizePointFormStatus(otherForm.status)
     });
     setOtherEditingId(null);
     setOtherForm(otherMeasureToForm());
@@ -1119,9 +1148,10 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
             </Field>
             <label className="check-row"><input type="checkbox" checked={form.section99} onChange={(event) => updateField("section99", event.target.checked)} /> §99-Zuschlag</label>
             <Field label="Status">
-              <select value={form.status} onChange={(event) => updateField("status", event.target.value as AuditPointStatus)}>
+              <select value={form.status} onChange={(event) => updateStatus(event.target.value as PointFormStatus)}>
                 <option value="in_progress">Offen</option>
                 <option value="completed">Erledigt</option>
+                <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
               </select>
             </Field>
           </div>
@@ -1148,9 +1178,10 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
                 <input type="month" value={usoForm.submissionMonth} aria-invalid={Boolean(usoErrors.submissionMonth)} onChange={(event) => updateUsoField("submissionMonth", event.target.value)} />
               </Field>
               <Field label="Status">
-                <select value={usoForm.status} onChange={(event) => updateUsoField("status", event.target.value as UsoCaseStatus)}>
+                <select value={usoForm.status} onChange={(event) => updateUsoStatus(event.target.value as PointFormStatus)}>
                   <option value="in_progress">Offen</option>
                   <option value="completed">Erledigt</option>
+                  <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
                 </select>
               </Field>
             </div>
@@ -1181,9 +1212,10 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
                 <input type="month" value={otherForm.submissionMonth} aria-invalid={Boolean(otherErrors.submissionMonth)} onChange={(event) => updateOtherField("submissionMonth", event.target.value)} />
               </Field>
               <Field label="Status">
-                <select value={otherForm.status} onChange={(event) => updateOtherField("status", event.target.value as OtherMeasureStatus)}>
+                <select value={otherForm.status} onChange={(event) => updateOtherStatus(event.target.value as PointFormStatus)}>
                   <option value="in_progress">Offen</option>
                   <option value="completed">Erledigt</option>
+                  <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
                 </select>
               </Field>
             </div>
@@ -3261,7 +3293,7 @@ function auditPointCaseToForm(pointCase?: AuditPointCase, fallbackMonth = "") {
     additionalResultEuros: pointCase ? centsToEuroInput(pointCase.additionalResultCents) : "0",
     section99: pointCase?.section99 ?? false,
     submissionMonth: pointCase?.submissionMonth ?? fallbackMonth,
-    status: pointCase?.status ?? "in_progress" as AuditPointStatus
+    status: (pointCase?.status ?? "in_progress") as PointFormStatus
   };
 }
 
@@ -3269,7 +3301,7 @@ function usoCaseToForm(usoCase?: UsoCase, fallbackMonth = "") {
   return {
     title: usoCase?.title ?? "",
     submissionMonth: usoCase?.submissionMonth ?? fallbackMonth,
-    status: usoCase?.status ?? "in_progress" as UsoCaseStatus
+    status: (usoCase?.status ?? "in_progress") as PointFormStatus
   };
 }
 
@@ -3278,7 +3310,7 @@ function otherMeasureToForm(measure?: OtherMeasure, fallbackMonth = "") {
     title: measure?.title ?? "",
     measureType: measure?.measureType ?? "",
     submissionMonth: measure?.submissionMonth ?? fallbackMonth,
-    status: measure?.status ?? "in_progress" as OtherMeasureStatus
+    status: (measure?.status ?? "in_progress") as PointFormStatus
   };
 }
 
