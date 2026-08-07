@@ -1175,6 +1175,120 @@ button:disabled {
   transform: rotate(180deg);
 }
 
+.point-status-groups {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.point-status-group {
+  min-width: 0;
+}
+
+.point-status-heading,
+.point-status-completed-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.point-status-heading {
+  padding: 0 2px 8px;
+  border-bottom: 1px solid #e5eaf0;
+}
+
+.point-status-heading h3 {
+  margin: 0;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.point-status-heading strong,
+.point-status-completed-meta strong {
+  min-width: 2ch;
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  text-align: right;
+}
+
+.point-status-completed {
+  overflow: hidden;
+  border: 1px solid #d5e6df;
+  border-left: 3px solid #75a992;
+  border-radius: 7px;
+  background: #f5faf7;
+}
+
+.point-status-completed-toggle {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  padding: 10px 12px;
+  color: #285f4a;
+  background: transparent;
+  text-align: left;
+  transition: background-color 180ms ease, transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.point-status-completed-toggle:hover {
+  background: #edf6f1;
+}
+
+.point-status-completed-toggle:active {
+  transform: translateY(1px);
+}
+
+.point-status-completed-toggle:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.24);
+  outline-offset: -3px;
+}
+
+.point-status-completed-title,
+.point-status-completed-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.point-status-completed-title {
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.point-status-caret {
+  transform: rotate(0deg);
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.point-status-completed-toggle[aria-expanded="true"] .point-status-caret {
+  transform: rotate(180deg);
+}
+
+.point-status-completed .trip-list {
+  margin: 0;
+  padding: 0 12px 8px;
+  border-top: 1px solid #dcebe4;
+}
+
+.point-status-completed .trip-row-done {
+  opacity: 1;
+}
+
+.point-status-empty {
+  margin: 12px 2px 2px;
+}
+
+.point-status-completed .point-status-empty {
+  margin: 0;
+  padding: 13px 12px 14px;
+  border-top: 1px solid #dcebe4;
+}
+
 .trip-form-stack {
   display: grid;
   gap: 16px;

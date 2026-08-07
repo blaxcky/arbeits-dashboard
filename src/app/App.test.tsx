@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
 import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, WorkTimeField, yearFromUrlParam } from "./App";
@@ -385,7 +385,131 @@ describe("point case list status presentation", () => {
     window.localStorage.clear();
   });
 
-  it("shows only missing-month warnings and dims only completed cases", () => {
+  function statusGroupData() {
+    const timestamp = "2026-05-01T08:00:00.000Z";
+    const auditCase: AuditPointCase = {
+      id: "audit-open",
+      name: "BP offen",
+      taxNumber: "",
+      firm: "",
+      category: "M1",
+      periodStartYear: 2024,
+      periodEndYear: 2025,
+      additionalResultCents: 0,
+      section99: false,
+      submissionMonth: "2026-05",
+      status: "in_progress",
+      submittedPointsTenths: null,
+      submittedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const usoCase: UsoCase = {
+      id: "uso-open",
+      title: "USO offen",
+      submissionMonth: "2026-05",
+      status: "in_progress",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const otherMeasure: OtherMeasure = {
+      id: "other-open",
+      title: "Maßnahme offen",
+      measureType: "CLO-Anfrage",
+      submissionMonth: "2026-05",
+      status: "in_progress",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    return {
+      auditPointCases: [auditCase, { ...auditCase, id: "audit-done", name: "BP erledigt", status: "completed" as const, submittedPointsTenths: 60, submittedAt: timestamp }],
+      usoCases: [usoCase, { ...usoCase, id: "uso-done", title: "USO erledigt", status: "completed" as const }],
+      otherMeasures: [otherMeasure, { ...otherMeasure, id: "other-done", title: "Maßnahme erledigt", status: "completed" as const }],
+      saveAuditPointCase: vi.fn(),
+      removeAuditPointCase: vi.fn(),
+      saveUsoCase: vi.fn(),
+      removeUsoCase: vi.fn(),
+      saveOtherMeasure: vi.fn(),
+      removeOtherMeasure: vi.fn()
+    } as unknown as Parameters<typeof AuditPointsView>[0]["data"];
+  }
+
+  it("groups every point case type into visible open and initially hidden completed cases with counts", () => {
+    render(<AuditPointsView data={statusGroupData()} showToast={vi.fn()} />);
+
+    const listNames = ["Betriebsprüfungen", "USO-Fälle", "Sonstige Maßnahmen"];
+    const openTitles = ["BP offen", "USO offen", "Maßnahme offen"];
+    const completedTitles = ["BP erledigt", "USO erledigt", "Maßnahme erledigt"];
+
+    listNames.forEach((listName, index) => {
+      const listPanel = screen.getByRole("button", { name: `${listName} einklappen` }).closest("section") as HTMLElement;
+      expect(within(listPanel).getByRole("heading", { name: "Offen" })).toBeInTheDocument();
+      expect(within(listPanel).getByLabelText("1 offener Fall")).toBeInTheDocument();
+      expect(within(listPanel).getByText(openTitles[index], { selector: "strong" })).toBeVisible();
+
+      const completedToggle = within(listPanel).getByRole("button", { name: /Erledigt/ });
+      expect(within(completedToggle).getByRole("heading", { name: "Erledigt" })).toBeInTheDocument();
+      expect(completedToggle).toHaveAttribute("aria-expanded", "false");
+      expect(completedToggle).toHaveAttribute("aria-controls", expect.stringMatching(/^points-list-.+-completed-content$/));
+      expect(within(completedToggle).getByLabelText("1 erledigter Fall")).toBeInTheDocument();
+      expect(within(listPanel).getByText(completedTitles[index], { selector: "strong" })).not.toBeVisible();
+    });
+  });
+
+  it("expands completed cases by pointer and keyboard-generated activation while updating ARIA", () => {
+    render(<AuditPointsView data={statusGroupData()} showToast={vi.fn()} />);
+    const toggles = screen.getAllByRole("button", { name: /Erledigt/ });
+
+    fireEvent.click(toggles[0]);
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("BP erledigt", { selector: "strong" })).toBeVisible();
+
+    toggles[1].focus();
+    fireEvent.keyDown(toggles[1], { key: "Enter", code: "Enter" });
+    fireEvent.click(toggles[1], { detail: 0 });
+    expect(toggles[1]).toHaveFocus();
+    expect(toggles[1]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("USO erledigt", { selector: "strong" })).toBeVisible();
+  });
+
+  it("shows explicit empty states with zero counts", () => {
+    const data = statusGroupData();
+    data.auditPointCases = [];
+    data.usoCases = [];
+    data.otherMeasures = [];
+
+    render(<AuditPointsView data={data} showToast={vi.fn()} />);
+
+    expect(screen.getAllByText("Keine offenen Fälle.")).toHaveLength(3);
+    expect(screen.getAllByLabelText("0 offene Fälle")).toHaveLength(3);
+    const completedToggles = screen.getAllByRole("button", { name: /Erledigt/ });
+    completedToggles.forEach((toggle) => fireEvent.click(toggle));
+    expect(screen.getAllByText("Keine erledigten Fälle.")).toHaveLength(3);
+    expect(screen.getAllByLabelText("0 erledigte Fälle")).toHaveLength(3);
+  });
+
+  it("moves a reset case from completed to open without closing the status group", async () => {
+    const data = statusGroupData();
+    data.auditPointCases = data.auditPointCases.filter((pointCase) => pointCase.status === "completed");
+    const { rerender } = render(<AuditPointsView data={data} showToast={vi.fn()} />);
+    const auditPanel = screen.getByRole("button", { name: "Betriebsprüfungen einklappen" }).closest("section") as HTMLElement;
+    const completedToggle = within(auditPanel).getByRole("button", { name: /Erledigt/ });
+    fireEvent.click(completedToggle);
+    fireEvent.click(within(auditPanel).getByRole("button", { name: "Auf offen setzen" }));
+
+    await waitFor(() => expect(data.saveAuditPointCase).toHaveBeenCalledWith(expect.objectContaining({ id: "audit-done", status: "in_progress" })));
+    data.auditPointCases = data.auditPointCases.map((pointCase) => ({ ...pointCase, status: "in_progress" as const }));
+    rerender(<AuditPointsView data={data} showToast={vi.fn()} />);
+
+    expect(completedToggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(auditPanel).getByLabelText("1 offener Fall")).toBeInTheDocument();
+    expect(within(auditPanel).getByLabelText("0 erledigte Fälle")).toBeInTheDocument();
+    expect(within(auditPanel).getByText("BP erledigt", { selector: "strong" })).toBeVisible();
+    expect(within(auditPanel).getByText("BP erledigt", { selector: "strong" }).closest("section")).toHaveClass("point-status-open");
+  });
+
+  it("shows only missing-month warnings and marks only completed cases", () => {
     const timestamp = "2026-05-01T08:00:00.000Z";
     const auditCase = {
       id: "audit-open-month",

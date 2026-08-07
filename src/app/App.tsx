@@ -840,6 +840,19 @@ interface CollapsiblePointListsProps {
   content: Record<PointsListKey, ReactNode>;
 }
 
+interface PointCaseStatusGroupsProps {
+  listKey: PointsListKey;
+  openCount: number;
+  completedCount: number;
+  openCases: ReactNode;
+  completedCases: ReactNode;
+}
+
+function pointCaseStatusCountLabel(count: number, status: "open" | "completed") {
+  if (count === 1) return status === "open" ? "1 offener Fall" : "1 erledigter Fall";
+  return `${count} ${status === "open" ? "offene" : "erledigte"} Fälle`;
+}
+
 const pointListLabels: Record<PointsListKey, string> = {
   audit: "Betriebsprüfungen",
   uso: "USO-Fälle",
@@ -907,6 +920,44 @@ export function CollapsiblePointLists({ counts, content }: CollapsiblePointLists
   );
 }
 
+function PointCaseStatusGroups({ listKey, openCount, completedCount, openCases, completedCases }: PointCaseStatusGroupsProps) {
+  const [completedExpanded, setCompletedExpanded] = useState(false);
+  const completedContentId = `points-list-${listKey}-completed-content`;
+
+  return (
+    <div className="point-status-groups">
+      <section className="point-status-group point-status-open" aria-labelledby={`points-list-${listKey}-open-heading`}>
+        <div className="point-status-heading">
+          <h3 id={`points-list-${listKey}-open-heading`}>Offen</h3>
+          <strong aria-label={pointCaseStatusCountLabel(openCount, "open")}>{openCount}</strong>
+        </div>
+        {openCount === 0 ? <p className="muted point-status-empty">Keine offenen Fälle.</p> : openCases}
+      </section>
+      <section className="point-status-group point-status-completed">
+        <button
+          className="point-status-completed-toggle"
+          type="button"
+          aria-expanded={completedExpanded}
+          aria-controls={completedContentId}
+          onClick={() => setCompletedExpanded((current) => !current)}
+        >
+          <span className="point-status-completed-title">
+            <CheckCircle size={18} weight="fill" aria-hidden="true" />
+            <span role="heading" aria-level={3}>Erledigt</span>
+          </span>
+          <span className="point-status-completed-meta">
+            <strong aria-label={pointCaseStatusCountLabel(completedCount, "completed")}>{completedCount}</strong>
+            <CaretDown className="point-status-caret" size={18} weight="bold" aria-hidden="true" />
+          </span>
+        </button>
+        <div id={completedContentId} hidden={!completedExpanded}>
+          {completedCount === 0 ? <p className="muted point-status-empty">Keine erledigten Fälle.</p> : completedCases}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const [activeForm, setActiveForm] = useState<PointsListKey>("audit");
   const formTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -924,6 +975,12 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
   const sortedAuditCases = [...data.auditPointCases].sort(compareAuditPointCases);
   const sortedUsoCases = [...data.usoCases].sort(compareUsoCases);
   const sortedOtherMeasures = [...data.otherMeasures].sort(compareOtherMeasures);
+  const openAuditCases = sortedAuditCases.filter((pointCase) => pointCase.status !== "completed");
+  const completedAuditCases = sortedAuditCases.filter((pointCase) => pointCase.status === "completed");
+  const openUsoCases = sortedUsoCases.filter((usoCase) => usoCase.status !== "completed");
+  const completedUsoCases = sortedUsoCases.filter((usoCase) => usoCase.status === "completed");
+  const openOtherMeasures = sortedOtherMeasures.filter((measure) => measure.status !== "completed");
+  const completedOtherMeasures = sortedOtherMeasures.filter((measure) => measure.status === "completed");
 
   function handleFormTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, tabIndex: number) {
     let nextIndex: number | null = null;
@@ -1128,6 +1185,92 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     showToast("Sonstige-Status geändert.");
   }
 
+  function renderAuditCases(cases: AuditPointCase[]) {
+    return (
+      <div className="trip-list">
+        {cases.map((pointCase) => (
+          <article key={pointCase.id} className={`trip-row audit-point-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
+            <div>
+              <strong>{pointCase.name}{pointCase.taxNumber ? ` · ${pointCase.taxNumber}` : ""}</strong>
+              <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
+              {pointCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
+            </div>
+            <div className="trip-row-metrics">
+              <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
+              <span>{formatEuroCents(pointCase.additionalResultCents)}</span>
+              <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
+            </div>
+            <div className="trip-actions">
+              <button className="icon-button trip-action-button" type="button" title={pointCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={pointCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleAuditPointCase(pointCase)}>
+                {pointCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
+              </button>
+              <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editCase(pointCase)}>
+                <PencilSimple size={17} />
+              </button>
+              <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeCase(pointCase)}>
+                <Trash size={17} />
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    );
+  }
+
+  function renderUsoCases(cases: UsoCase[]) {
+    return (
+      <div className="trip-list">
+        {cases.map((usoCase) => (
+          <article key={usoCase.id} className={`trip-row points-uso-row ${usoCase.status === "completed" ? "trip-row-done" : ""}`}>
+            <div>
+              <strong>{usoCase.title}</strong>
+              <span>{usoCase.submissionMonth || "Kein Abgabemonat"}</span>
+              {usoCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
+            </div>
+            <div className="trip-actions">
+              <button className="icon-button trip-action-button" type="button" title={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleUsoCase(usoCase)}>
+                {usoCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
+              </button>
+              <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editUsoCase(usoCase)}>
+                <PencilSimple size={17} />
+              </button>
+              <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeUsoCase(usoCase)}>
+                <Trash size={17} />
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    );
+  }
+
+  function renderOtherMeasures(measures: OtherMeasure[]) {
+    return (
+      <div className="trip-list">
+        {measures.map((measure) => (
+          <article key={measure.id} className={`trip-row points-uso-row ${measure.status === "completed" ? "trip-row-done" : ""}`}>
+            <div>
+              <strong>{measure.title}</strong>
+              <span>{measure.measureType} · {measure.submissionMonth || "Kein Abgabemonat"}</span>
+              {measure.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
+            </div>
+            <div className="trip-actions">
+              <button className="icon-button trip-action-button" type="button" title={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleOtherMeasure(measure)}>
+                {measure.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
+              </button>
+              <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editOtherMeasure(measure)}>
+                <PencilSimple size={17} />
+              </button>
+              <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeOtherMeasure(measure)}>
+                <Trash size={17} />
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <section className="page-stack">
       <Header eyebrow="Betriebsprüfungen" title="Punkte" />
@@ -1306,84 +1449,31 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
         counts={{ audit: sortedAuditCases.length, uso: sortedUsoCases.length, other: sortedOtherMeasures.length }}
         content={{
           audit: (
-        <div className="trip-list">
-          {sortedAuditCases.length === 0 ? <p className="muted">Noch keine Fälle erfasst.</p> : null}
-          {sortedAuditCases.map((pointCase) => (
-            <article key={pointCase.id} className={`trip-row audit-point-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
-              <div>
-                <strong>{pointCase.name}{pointCase.taxNumber ? ` · ${pointCase.taxNumber}` : ""}</strong>
-                <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
-                {pointCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
-              </div>
-              <div className="trip-row-metrics">
-                <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
-                <span>{formatEuroCents(pointCase.additionalResultCents)}</span>
-                <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
-              </div>
-              <div className="trip-actions">
-                <button className="icon-button trip-action-button" type="button" title={pointCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={pointCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleAuditPointCase(pointCase)}>
-                  {pointCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
-                </button>
-                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editCase(pointCase)}>
-                  <PencilSimple size={17} />
-                </button>
-                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeCase(pointCase)}>
-                  <Trash size={17} />
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+            <PointCaseStatusGroups
+              listKey="audit"
+              openCount={openAuditCases.length}
+              completedCount={completedAuditCases.length}
+              openCases={renderAuditCases(openAuditCases)}
+              completedCases={renderAuditCases(completedAuditCases)}
+            />
           ),
           uso: (
-        <div className="trip-list">
-          {sortedUsoCases.length === 0 ? <p className="muted">Noch keine USO-Fälle erfasst.</p> : null}
-          {sortedUsoCases.map((usoCase) => (
-            <article key={usoCase.id} className={`trip-row points-uso-row ${usoCase.status === "completed" ? "trip-row-done" : ""}`}>
-              <div>
-                <strong>{usoCase.title}</strong>
-                <span>{usoCase.submissionMonth || "Kein Abgabemonat"}</span>
-                {usoCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
-              </div>
-              <div className="trip-actions">
-                <button className="icon-button trip-action-button" type="button" title={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleUsoCase(usoCase)}>
-                  {usoCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
-                </button>
-                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editUsoCase(usoCase)}>
-                  <PencilSimple size={17} />
-                </button>
-                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeUsoCase(usoCase)}>
-                  <Trash size={17} />
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+            <PointCaseStatusGroups
+              listKey="uso"
+              openCount={openUsoCases.length}
+              completedCount={completedUsoCases.length}
+              openCases={renderUsoCases(openUsoCases)}
+              completedCases={renderUsoCases(completedUsoCases)}
+            />
           ),
           other: (
-        <div className="trip-list">
-          {sortedOtherMeasures.length === 0 ? <p className="muted">Noch keine sonstigen Maßnahmen erfasst.</p> : null}
-          {sortedOtherMeasures.map((measure) => (
-            <article key={measure.id} className={`trip-row points-uso-row ${measure.status === "completed" ? "trip-row-done" : ""}`}>
-              <div>
-                <strong>{measure.title}</strong>
-                <span>{measure.measureType} · {measure.submissionMonth || "Kein Abgabemonat"}</span>
-                {measure.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
-              </div>
-              <div className="trip-actions">
-                <button className="icon-button trip-action-button" type="button" title={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleOtherMeasure(measure)}>
-                  {measure.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
-                </button>
-                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editOtherMeasure(measure)}>
-                  <PencilSimple size={17} />
-                </button>
-                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeOtherMeasure(measure)}>
-                  <Trash size={17} />
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+            <PointCaseStatusGroups
+              listKey="other"
+              openCount={openOtherMeasures.length}
+              completedCount={completedOtherMeasures.length}
+              openCases={renderOtherMeasures(openOtherMeasures)}
+              completedCases={renderOtherMeasures(completedOtherMeasures)}
+            />
           )
         }}
       />
