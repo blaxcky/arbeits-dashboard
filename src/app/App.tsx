@@ -1309,7 +1309,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
         <div className="trip-list">
           {sortedAuditCases.length === 0 ? <p className="muted">Noch keine Fälle erfasst.</p> : null}
           {sortedAuditCases.map((pointCase) => (
-            <article key={pointCase.id} className={`trip-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
+            <article key={pointCase.id} className={`trip-row audit-point-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
               <div>
                 <strong>{pointCase.name}{pointCase.taxNumber ? ` · ${pointCase.taxNumber}` : ""}</strong>
                 <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>

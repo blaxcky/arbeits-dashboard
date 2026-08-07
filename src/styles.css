@@ -2163,6 +2163,12 @@ button:disabled {
   color: var(--muted);
 }
 
+.audit-point-row .trip-row-metrics small {
+  grid-column: auto;
+  align-self: center;
+  line-height: 1.2;
+}
+
 .auto-fit-input-wrap {
   position: relative;
   display: block;
