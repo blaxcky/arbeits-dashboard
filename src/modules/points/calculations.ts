@@ -69,6 +69,43 @@ export const AUDIT_POINT_CATEGORY_RULES: Record<AuditPointCategory, AuditPointCa
 
 export const AUDIT_POINT_CATEGORIES = Object.keys(AUDIT_POINT_CATEGORY_RULES) as AuditPointCategory[];
 
+function compareCompletionStatus(leftStatus: string, rightStatus: string): number {
+  return Number(leftStatus === "completed") - Number(rightStatus === "completed");
+}
+
+export function compareAuditPointCases(left: AuditPointCase, right: AuditPointCase): number {
+  const statusOrder = compareCompletionStatus(left.status, right.status);
+  if (statusOrder !== 0) return statusOrder;
+
+  const leftMonth = left.submissionMonth || "9999-99";
+  const rightMonth = right.submissionMonth || "9999-99";
+  const monthOrder = leftMonth.localeCompare(rightMonth);
+  if (monthOrder !== 0) return monthOrder;
+  return left.name.localeCompare(right.name, "de-AT");
+}
+
+export function compareUsoCases(left: UsoCase, right: UsoCase): number {
+  const statusOrder = compareCompletionStatus(left.status, right.status);
+  if (statusOrder !== 0) return statusOrder;
+
+  const leftMonth = left.submissionMonth || "9999-99";
+  const rightMonth = right.submissionMonth || "9999-99";
+  const monthOrder = leftMonth.localeCompare(rightMonth);
+  if (monthOrder !== 0) return monthOrder;
+  return left.title.localeCompare(right.title, "de-AT");
+}
+
+export function compareOtherMeasures(left: OtherMeasure, right: OtherMeasure): number {
+  const statusOrder = compareCompletionStatus(left.status, right.status);
+  if (statusOrder !== 0) return statusOrder;
+
+  const leftMonth = left.submissionMonth || "9999-99";
+  const rightMonth = right.submissionMonth || "9999-99";
+  const monthOrder = leftMonth.localeCompare(rightMonth);
+  if (monthOrder !== 0) return monthOrder;
+  return left.title.localeCompare(right.title, "de-AT");
+}
+
 export const ADDITIONAL_RESULT_BONUSES: Array<{ thresholdCents: number; pointsTenths: number }> = [
   { thresholdCents: 5_000_00, pointsTenths: 10 },
   { thresholdCents: 50_000_00, pointsTenths: 25 },

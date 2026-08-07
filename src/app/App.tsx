@@ -77,6 +77,9 @@ import {
   buildOtherMeasureTypeBreakdown,
   buildOtherMeasureYearRows,
   buildUsoYearRows,
+  compareAuditPointCases,
+  compareOtherMeasures,
+  compareUsoCases,
   formatMonthName,
   isAuditPointCategory,
   pointsForAuditCase,
@@ -902,7 +905,7 @@ function AuditPointsView({ data, showToast }: { data: WorkData; showToast: ShowT
   const [otherErrors, setOtherErrors] = useState<Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>>>({});
   const previewCase = auditPointCaseDraftForPreview(form);
   const previewBreakdown = previewCase ? calculateAuditPointBreakdown(previewCase) : null;
-  const sortedAuditCases = [...data.auditPointCases].sort(comparePointCases);
+  const sortedAuditCases = [...data.auditPointCases].sort(compareAuditPointCases);
   const sortedUsoCases = [...data.usoCases].sort(compareUsoCases);
   const sortedOtherMeasures = [...data.otherMeasures].sort(compareOtherMeasures);
 
@@ -3367,30 +3370,6 @@ function isValidAuditPointMonth(value: string): boolean {
 
 export function auditPointMonthOptions(cases: Pick<AuditPointCase, "submissionMonth">[], selectedMonth: string): string[] {
   return [...new Set([selectedMonth, todayKey().slice(0, 7), ...cases.map((pointCase) => pointCase.submissionMonth)].filter(isValidAuditPointMonth))].sort((a, b) => b.localeCompare(a));
-}
-
-function comparePointCases(left: AuditPointCase, right: AuditPointCase): number {
-  const leftMonth = left.submissionMonth || "9999-99";
-  const rightMonth = right.submissionMonth || "9999-99";
-  const monthOrder = leftMonth.localeCompare(rightMonth);
-  if (monthOrder !== 0) return monthOrder;
-  return left.name.localeCompare(right.name, "de-AT");
-}
-
-function compareUsoCases(left: UsoCase, right: UsoCase): number {
-  const leftMonth = left.submissionMonth || "9999-99";
-  const rightMonth = right.submissionMonth || "9999-99";
-  const monthOrder = leftMonth.localeCompare(rightMonth);
-  if (monthOrder !== 0) return monthOrder;
-  return left.title.localeCompare(right.title, "de-AT");
-}
-
-function compareOtherMeasures(left: OtherMeasure, right: OtherMeasure): number {
-  const leftMonth = left.submissionMonth || "9999-99";
-  const rightMonth = right.submissionMonth || "9999-99";
-  const monthOrder = leftMonth.localeCompare(rightMonth);
-  if (monthOrder !== 0) return monthOrder;
-  return left.title.localeCompare(right.title, "de-AT");
 }
 
 function formatPointTenths(tenths: number): string {

@@ -11,6 +11,9 @@ import {
   calculateAdditionalResultBonusTenths,
   calculateAuditPointBreakdown,
   cappedAuditPeriodYears,
+  compareAuditPointCases,
+  compareOtherMeasures,
+  compareUsoCases,
   formatMonthName,
   pointsForAuditCase,
   summarizeAuditPoints
@@ -54,6 +57,28 @@ const baseOtherMeasure: OtherMeasure = {
 };
 
 describe("audit point calculations", () => {
+  it("sorts completed entries behind open entries in all point lists", () => {
+    const auditCases = [
+      { ...baseCase, id: "audit-completed-early", name: "A", submissionMonth: "2026-01", status: "completed" as const },
+      { ...baseCase, id: "audit-open-late", name: "Z", submissionMonth: "2026-12", status: "in_progress" as const },
+      { ...baseCase, id: "audit-open-early", name: "A", submissionMonth: "2026-02", status: "in_progress" as const }
+    ];
+    const usoCases = [
+      { ...baseUsoCase, id: "uso-completed-early", title: "A", submissionMonth: "2026-01", status: "completed" as const },
+      { ...baseUsoCase, id: "uso-open-late", title: "Z", submissionMonth: "2026-12", status: "in_progress" as const },
+      { ...baseUsoCase, id: "uso-open-early", title: "A", submissionMonth: "2026-02", status: "in_progress" as const }
+    ];
+    const otherMeasures = [
+      { ...baseOtherMeasure, id: "other-completed-early", title: "A", submissionMonth: "2026-01", status: "completed" as const },
+      { ...baseOtherMeasure, id: "other-open-late", title: "Z", submissionMonth: "2026-12", status: "in_progress" as const },
+      { ...baseOtherMeasure, id: "other-open-early", title: "A", submissionMonth: "2026-02", status: "in_progress" as const }
+    ];
+
+    expect(auditCases.sort(compareAuditPointCases).map(({ id }) => id)).toEqual(["audit-open-early", "audit-open-late", "audit-completed-early"]);
+    expect(usoCases.sort(compareUsoCases).map(({ id }) => id)).toEqual(["uso-open-early", "uso-open-late", "uso-completed-early"]);
+    expect(otherMeasures.sort(compareOtherMeasures).map(({ id }) => id)).toEqual(["other-open-early", "other-open-late", "other-completed-early"]);
+  });
+
   it("uses all category base values and yearly supplements from the points table", () => {
     const expectedRules: typeof AUDIT_POINT_CATEGORY_RULES = {
       K3: { label: "K3", baseTenths: 30, yearlyTenths: 5 },
