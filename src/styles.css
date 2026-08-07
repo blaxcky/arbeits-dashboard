@@ -1181,7 +1181,7 @@ button:disabled {
   align-self: start;
 }
 
-.trip-form-toolbar {
+.form-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1226,7 +1226,25 @@ button:disabled {
   gap: 14px;
 }
 
-.trip-form-section {
+.points-form-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.points-form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.points-form-grid-audit {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.points-form-grid-simple {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-section {
   grid-column: 1 / -1;
   overflow: hidden;
   border: 1px solid #dce2ea;
@@ -1235,11 +1253,11 @@ button:disabled {
   box-shadow: 0 16px 34px -30px rgba(31, 41, 55, 0.42);
 }
 
-.trip-form-section-split {
+.form-section-split {
   grid-column: span 3;
 }
 
-.trip-form-section-header {
+.form-section-header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -1251,7 +1269,7 @@ button:disabled {
   color: #526171;
 }
 
-.trip-form-section-title {
+.form-section-title {
   margin: 0;
   color: #2f3d4f;
   font-size: 0.9rem;
@@ -1261,59 +1279,87 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.trip-form-section-body {
+.form-section-body {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 14px;
   padding: 18px;
 }
 
-.trip-form-section-body > .field {
+.form-section-body > .field {
   grid-column: span 2;
 }
 
-.trip-form-section .field-wide {
+.form-section .field-wide {
   grid-column: 1 / -1;
 }
 
-.trip-form-section .trip-field-half {
+.form-section .trip-field-half {
   grid-column: span 3;
 }
 
-.trip-form-section-split .trip-field-half {
+.form-section-split .trip-field-half {
   grid-column: 1 / -1;
 }
 
-.trip-form-section .field {
+.form-section .field {
   gap: 6px;
   color: #334155;
   font-size: 0.9rem;
 }
 
-.trip-form-section .field input,
-.trip-form-section .field select,
-.trip-form-section .field textarea {
+.form-section .field input,
+.form-section .field select,
+.form-section .field textarea {
   min-height: 46px;
   border-color: #d9e0e8;
   background: #fcfdff;
   box-sizing: border-box;
 }
 
-.trip-form-section .field input::placeholder,
-.trip-form-section .field textarea::placeholder {
+.form-section .field input::placeholder,
+.form-section .field textarea::placeholder {
   color: #cbd4df;
 }
 
-.trip-form-section .field input:focus,
-.trip-form-section .field select:focus,
-.trip-form-section .field textarea:focus {
+.form-section .field input:focus,
+.form-section .field select:focus,
+.form-section .field textarea:focus {
   border-color: #8aa4c4;
   background: #fff;
 }
 
-.trip-form-section .check-row {
+.form-section .check-row {
   min-height: 46px;
   padding-top: 8px;
+}
+
+.points-form-card .form-section-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.points-form-card .form-section-body > .field {
+  grid-column: auto;
+}
+
+.points-form-card .field-wide {
+  grid-column: 1 / -1;
+}
+
+.points-form-card-details {
+  grid-column: 1 / -1;
+}
+
+.points-form-card-scope {
+  grid-column: span 3;
+}
+
+.points-form-card-submission {
+  grid-column: span 2;
+}
+
+.points-form-grid-simple .points-form-card {
+  grid-column: auto;
 }
 
 .day-entry-grid {
@@ -2364,12 +2410,12 @@ button:disabled {
   box-shadow: none;
 }
 
-.open-trip-section .trip-form-section-header {
+.open-trip-section .form-section-header {
   min-height: 42px;
   padding: 10px 12px;
 }
 
-.open-trip-section .trip-form-section-body {
+.open-trip-section .form-section-body {
   grid-template-columns: 1fr;
   gap: 10px;
   padding: 12px;
@@ -2405,7 +2451,7 @@ button:disabled {
   display: block;
 }
 
-.open-trip-evidence .trip-form-section-body {
+.open-trip-evidence .form-section-body {
   gap: 10px;
 }
 
@@ -2857,10 +2903,12 @@ button:disabled {
   .settings-grid,
   .trip-side-layout-map-open,
   .year-limit-control,
-  .trip-form-section-body,
+  .form-section-body,
+  .points-form-card .form-section-body,
   .trip-form-grid,
   .trip-payment-form,
   .points-year-summary,
+  .points-form-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -2886,9 +2934,13 @@ button:disabled {
     padding-inline: 12px;
   }
 
-  .trip-form-section-split,
-  .trip-form-section-body > .field,
-  .trip-form-section .trip-field-half {
+  .form-section-split,
+  .form-section-body > .field,
+  .form-section .trip-field-half,
+  .points-form-card-details,
+  .points-form-card-scope,
+  .points-form-card-submission,
+  .points-form-grid-simple .points-form-card {
     grid-column: auto;
   }
 

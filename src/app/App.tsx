@@ -1155,13 +1155,13 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
           })}
         </div>
         {activeForm === "audit" ? (
-        <div
-          className="panel form-panel"
+        <section
+          className="points-form-stack"
           id="points-form-panel-audit"
           role="tabpanel"
           aria-labelledby="points-form-tab-audit"
         >
-          <div className="panel-heading">
+          <div className="form-toolbar">
             <span className="section-label">{editingId ? "Fall bearbeiten" : "Neuer Fall"}</span>
             <button className="secondary-button" type="button" onClick={() => {
               setEditingId(null);
@@ -1169,58 +1169,64 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
               setErrors({});
             }}>Neu</button>
           </div>
-          <div className="form-grid">
-            <Field label="Name" className="field-wide" error={errors.name}>
-              <input value={form.name} aria-invalid={Boolean(errors.name)} onChange={(event) => updateField("name", event.target.value)} />
-            </Field>
-            <Field label="Steuernummer" error={errors.taxNumber}>
-              <input value={form.taxNumber} aria-invalid={Boolean(errors.taxNumber)} onChange={(event) => updateField("taxNumber", event.target.value)} />
-            </Field>
-            <Field label="Kanzlei">
-              <input value={form.firm} onChange={(event) => updateField("firm", event.target.value)} />
-            </Field>
-            <Field label="Betriebskategorie" error={errors.category}>
-              <select value={form.category} aria-invalid={Boolean(errors.category)} onChange={(event) => updateField("category", event.target.value)}>
-                {AUDIT_POINT_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>{AUDIT_POINT_CATEGORY_RULES[category].label}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Abgabemonat" error={errors.submissionMonth}>
-              <input type="month" value={form.submissionMonth} aria-invalid={Boolean(errors.submissionMonth)} onChange={(event) => updateField("submissionMonth", event.target.value)} />
-            </Field>
-            <Field label="Zeitraum von" error={errors.periodStartYear}>
-              <input inputMode="numeric" value={form.periodStartYear} aria-invalid={Boolean(errors.periodStartYear)} onChange={(event) => updateField("periodStartYear", event.target.value)} />
-            </Field>
-            <Field label="Zeitraum bis" error={errors.periodEndYear}>
-              <input inputMode="numeric" value={form.periodEndYear} aria-invalid={Boolean(errors.periodEndYear)} onChange={(event) => updateField("periodEndYear", event.target.value)} />
-            </Field>
-            <Field label="Mehrergebnis (EUR)" className="field-wide" error={errors.additionalResultEuros}>
-              <input inputMode="decimal" placeholder="0,00" value={form.additionalResultEuros} aria-invalid={Boolean(errors.additionalResultEuros)} onChange={(event) => updateField("additionalResultEuros", event.target.value)} />
-            </Field>
-            <label className="check-row"><input type="checkbox" checked={form.section99} onChange={(event) => updateField("section99", event.target.checked)} /> §99-Zuschlag</label>
-            <Field label="Status">
-              <select value={form.status} onChange={(event) => updateStatus(event.target.value as PointFormStatus)}>
-                <option value="in_progress">Offen</option>
-                <option value="completed">Erledigt</option>
-                <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
-              </select>
-            </Field>
+          <div className="points-form-grid points-form-grid-audit">
+            <FormSection id="audit-section-details" title="Falldaten" icon={ClipboardText} className="points-form-card points-form-card-details">
+              <Field label="Name" className="field-wide" error={errors.name}>
+                <input value={form.name} aria-invalid={Boolean(errors.name)} onChange={(event) => updateField("name", event.target.value)} />
+              </Field>
+              <Field label="Steuernummer" error={errors.taxNumber}>
+                <input value={form.taxNumber} aria-invalid={Boolean(errors.taxNumber)} onChange={(event) => updateField("taxNumber", event.target.value)} />
+              </Field>
+              <Field label="Kanzlei">
+                <input value={form.firm} onChange={(event) => updateField("firm", event.target.value)} />
+              </Field>
+              <Field label="Betriebskategorie" error={errors.category}>
+                <select value={form.category} aria-invalid={Boolean(errors.category)} onChange={(event) => updateField("category", event.target.value)}>
+                  {AUDIT_POINT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>{AUDIT_POINT_CATEGORY_RULES[category].label}</option>
+                  ))}
+                </select>
+              </Field>
+            </FormSection>
+            <FormSection id="audit-section-scope" title="Prüfungsumfang" icon={ChartBar} className="points-form-card points-form-card-scope">
+              <Field label="Zeitraum von" error={errors.periodStartYear}>
+                <input inputMode="numeric" value={form.periodStartYear} aria-invalid={Boolean(errors.periodStartYear)} onChange={(event) => updateField("periodStartYear", event.target.value)} />
+              </Field>
+              <Field label="Zeitraum bis" error={errors.periodEndYear}>
+                <input inputMode="numeric" value={form.periodEndYear} aria-invalid={Boolean(errors.periodEndYear)} onChange={(event) => updateField("periodEndYear", event.target.value)} />
+              </Field>
+              <Field label="Mehrergebnis (EUR)" className="field-wide" error={errors.additionalResultEuros}>
+                <input inputMode="decimal" placeholder="0,00" value={form.additionalResultEuros} aria-invalid={Boolean(errors.additionalResultEuros)} onChange={(event) => updateField("additionalResultEuros", event.target.value)} />
+              </Field>
+              <label className="check-row field-wide"><input type="checkbox" checked={form.section99} onChange={(event) => updateField("section99", event.target.checked)} /> §99-Zuschlag</label>
+            </FormSection>
+            <FormSection id="audit-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card points-form-card-submission">
+              <Field label="Abgabemonat" error={errors.submissionMonth}>
+                <input type="month" value={form.submissionMonth} aria-invalid={Boolean(errors.submissionMonth)} onChange={(event) => updateField("submissionMonth", event.target.value)} />
+              </Field>
+              <Field label="Status">
+                <select value={form.status} onChange={(event) => updateStatus(event.target.value as PointFormStatus)}>
+                  <option value="in_progress">Offen</option>
+                  <option value="completed">Erledigt</option>
+                  <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
+                </select>
+              </Field>
+            </FormSection>
           </div>
           <AuditPointBreakdownPreview breakdown={previewBreakdown} />
           <div className="button-row trip-save-actions">
             <button className="primary-button" type="button" onClick={() => void saveCase()}>{editingId ? "Änderungen speichern" : "Fall speichern"}</button>
           </div>
-        </div>
+        </section>
         ) : null}
         {activeForm === "uso" ? (
           <section
-            className="panel form-panel"
+            className="points-form-stack"
             id="points-form-panel-uso"
             role="tabpanel"
             aria-labelledby="points-form-tab-uso"
           >
-            <div className="panel-heading">
+            <div className="form-toolbar">
               <span className="section-label">{usoEditingId ? "USO-Fall bearbeiten" : "Neuer USO-Fall"}</span>
               <button className="secondary-button" type="button" onClick={() => {
                 setUsoEditingId(null);
@@ -1228,32 +1234,36 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                 setUsoErrors({});
               }}>Neu</button>
             </div>
-            <div className="form-grid">
-              <Field label="Titel" className="field-wide" error={usoErrors.title}>
-                <input value={usoForm.title} aria-invalid={Boolean(usoErrors.title)} onChange={(event) => updateUsoField("title", event.target.value)} />
-              </Field>
-              <Field label="Abgabemonat" error={usoErrors.submissionMonth}>
-                <input type="month" value={usoForm.submissionMonth} aria-invalid={Boolean(usoErrors.submissionMonth)} onChange={(event) => updateUsoField("submissionMonth", event.target.value)} />
-              </Field>
-              <Field label="Status">
-                <select value={usoForm.status} onChange={(event) => updateUsoStatus(event.target.value as PointFormStatus)}>
-                  <option value="in_progress">Offen</option>
-                  <option value="completed">Erledigt</option>
-                  <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
-                </select>
-              </Field>
+            <div className="points-form-grid points-form-grid-simple">
+              <FormSection id="uso-section-details" title="Falldaten" icon={ClipboardText} className="points-form-card">
+                <Field label="Titel" className="field-wide" error={usoErrors.title}>
+                  <input value={usoForm.title} aria-invalid={Boolean(usoErrors.title)} onChange={(event) => updateUsoField("title", event.target.value)} />
+                </Field>
+              </FormSection>
+              <FormSection id="uso-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card">
+                <Field label="Abgabemonat" error={usoErrors.submissionMonth}>
+                  <input type="month" value={usoForm.submissionMonth} aria-invalid={Boolean(usoErrors.submissionMonth)} onChange={(event) => updateUsoField("submissionMonth", event.target.value)} />
+                </Field>
+                <Field label="Status">
+                  <select value={usoForm.status} onChange={(event) => updateUsoStatus(event.target.value as PointFormStatus)}>
+                    <option value="in_progress">Offen</option>
+                    <option value="completed">Erledigt</option>
+                    <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
+                  </select>
+                </Field>
+              </FormSection>
             </div>
             <button className="primary-button trip-payment-save" type="button" onClick={() => void saveUsoCase()}>{usoEditingId ? "Änderungen speichern" : "USO-Fall speichern"}</button>
           </section>
         ) : null}
         {activeForm === "other" ? (
           <section
-            className="panel form-panel"
+            className="points-form-stack"
             id="points-form-panel-other"
             role="tabpanel"
             aria-labelledby="points-form-tab-other"
           >
-            <div className="panel-heading">
+            <div className="form-toolbar">
               <span className="section-label">{otherEditingId ? "Sonstige Maßnahme bearbeiten" : "Neue sonstige Maßnahme"}</span>
               <button className="secondary-button" type="button" onClick={() => {
                 setOtherEditingId(null);
@@ -1261,28 +1271,32 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                 setOtherErrors({});
               }}>Neu</button>
             </div>
-            <div className="form-grid">
-              <Field label="Titel" className="field-wide" error={otherErrors.title}>
-                <input value={otherForm.title} aria-invalid={Boolean(otherErrors.title)} onChange={(event) => updateOtherField("title", event.target.value)} />
-              </Field>
-              <Field label="Art" className="field-wide" error={otherErrors.measureType}>
-                <input list="other-measure-types" value={otherForm.measureType} aria-invalid={Boolean(otherErrors.measureType)} onChange={(event) => updateOtherField("measureType", event.target.value)} />
-                <datalist id="other-measure-types">
-                  <option value="Registrierkassennachschau" />
-                  <option value="CLO-Anfrage" />
-                  <option value="Sonstige" />
-                </datalist>
-              </Field>
-              <Field label="Abgabemonat" error={otherErrors.submissionMonth}>
-                <input type="month" value={otherForm.submissionMonth} aria-invalid={Boolean(otherErrors.submissionMonth)} onChange={(event) => updateOtherField("submissionMonth", event.target.value)} />
-              </Field>
-              <Field label="Status">
-                <select value={otherForm.status} onChange={(event) => updateOtherStatus(event.target.value as PointFormStatus)}>
-                  <option value="in_progress">Offen</option>
-                  <option value="completed">Erledigt</option>
-                  <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
-                </select>
-              </Field>
+            <div className="points-form-grid points-form-grid-simple">
+              <FormSection id="other-section-details" title="Falldaten" icon={ClipboardText} className="points-form-card">
+                <Field label="Titel" className="field-wide" error={otherErrors.title}>
+                  <input value={otherForm.title} aria-invalid={Boolean(otherErrors.title)} onChange={(event) => updateOtherField("title", event.target.value)} />
+                </Field>
+                <Field label="Art" className="field-wide" error={otherErrors.measureType}>
+                  <input list="other-measure-types" value={otherForm.measureType} aria-invalid={Boolean(otherErrors.measureType)} onChange={(event) => updateOtherField("measureType", event.target.value)} />
+                  <datalist id="other-measure-types">
+                    <option value="Registrierkassennachschau" />
+                    <option value="CLO-Anfrage" />
+                    <option value="Sonstige" />
+                  </datalist>
+                </Field>
+              </FormSection>
+              <FormSection id="other-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card">
+                <Field label="Abgabemonat" error={otherErrors.submissionMonth}>
+                  <input type="month" value={otherForm.submissionMonth} aria-invalid={Boolean(otherErrors.submissionMonth)} onChange={(event) => updateOtherField("submissionMonth", event.target.value)} />
+                </Field>
+                <Field label="Status">
+                  <select value={otherForm.status} onChange={(event) => updateOtherStatus(event.target.value as PointFormStatus)}>
+                    <option value="in_progress">Offen</option>
+                    <option value="completed">Erledigt</option>
+                    <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
+                  </select>
+                </Field>
+              </FormSection>
             </div>
             <button className="primary-button trip-payment-save" type="button" onClick={() => void saveOtherMeasure()}>{otherEditingId ? "Änderungen speichern" : "Maßnahme speichern"}</button>
           </section>
@@ -1986,12 +2000,12 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
       </div>
       <div className={`split-grid trips-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trips-layout-map-open" : ""}`}>
         <div className="trip-form-stack">
-          <div className="trip-form-toolbar">
+          <div className="form-toolbar">
             <span className="section-label">{editingId ? "Reise bearbeiten" : "Neue Reise"}</span>
             <button className="secondary-button" onClick={() => void startNewTrip()}>Neu</button>
           </div>
           <div className="trip-form-grid">
-            <TripFormSection id="trip-section-dates" title="Reisedaten" icon={CalendarBlank}>
+            <FormSection id="trip-section-dates" title="Reisedaten" icon={CalendarBlank}>
               <Field label="Grund" className="field-wide"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
               <Field label="Datum" error={tripDateError}>
                 <input type="date" value={form.date} aria-invalid={Boolean(tripDateError)} onChange={(event) => updateTripField("date", event.target.value)} />
@@ -2018,8 +2032,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                   onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
                 />
               </Field>
-            </TripFormSection>
-            <TripFormSection id="trip-section-route" title="Route" icon={MapTrifold}>
+            </FormSection>
+            <FormSection id="trip-section-route" title="Route" icon={MapTrifold}>
               <Field label="Startort" className="trip-field-half"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
               <Field label="Zieladresse" className="trip-field-half">
                 <div className="input-with-button">
@@ -2038,8 +2052,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 </div>
               </Field>
               <Field label="Einfache Strecke (km)" className="trip-field-half"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
-            </TripFormSection>
-            <TripFormSection id="trip-section-costs" title="Fahrtkosten" icon={Car} className="trip-form-section-split">
+            </FormSection>
+            <FormSection id="trip-section-costs" title="Fahrtkosten" icon={Car} className="form-section-split">
               <Field label="Fahrtkostenart" className="trip-field-half">
                 <select value={form.transportType} onChange={(event) => updateTripField("transportType", event.target.value as TripTransportType)}>
                   {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
@@ -2052,15 +2066,15 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <Field label="ÖBB-Abfrage am" className="trip-field-half">
                 <input type="date" value={form.publicTransportTicketQueryDate} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("publicTransportTicketQueryDate", event.target.value)} />
               </Field>
-            </TripFormSection>
-            <TripFormSection id="trip-section-other" title="Sonstiges" icon={Receipt} className="trip-form-section-split">
+            </FormSection>
+            <FormSection id="trip-section-other" title="Sonstiges" icon={Receipt} className="form-section-split">
               <Field label="Sonstige Kosten (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
               <Field label="Beschreibung sonstige Kosten" className="trip-field-half"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
               <label className="check-row field-wide"><input type="checkbox" checked={form.employerDoesNotReimburseCosts} onChange={(event) => updateTripField("employerDoesNotReimburseCosts", event.target.checked)} /> Arbeitgeber ersetzt keine Kosten</label>
-            </TripFormSection>
-            <TripFormSection id="trip-section-notes" title="Zusätzliche Notizen" icon={NotePencil}>
+            </FormSection>
+            <FormSection id="trip-section-notes" title="Zusätzliche Notizen" icon={NotePencil}>
               <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
-            </TripFormSection>
+            </FormSection>
           </div>
           <section className="trip-preview trip-form-preview" aria-label="Kennzahlen-Vorschau">
             <div className="trip-preview-group trip-preview-group-primary">
@@ -2725,7 +2739,7 @@ function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, on
               const groupFields = copyFields.filter((field) => field.group === group.key);
               if (groupFields.length === 0 && group.key !== "costs") return null;
               return (
-                <TripFormSection key={group.key} id={`open-trip-section-${group.key}`} title={group.title} icon={group.icon} className="open-trip-section">
+                <FormSection key={group.key} id={`open-trip-section-${group.key}`} title={group.title} icon={group.icon} className="open-trip-section">
                   {group.key === "costs" ? (
                     <dl className="detail-list open-trip-cost-details">
                       <div><dt>Fahrtkostenart</dt><dd>{TRANSPORT_LABELS[activeTrip.transportType]}</dd></div>
@@ -2749,11 +2763,11 @@ function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, on
                       );
                     })}
                   </div>
-                </TripFormSection>
+                </FormSection>
               );
             })}
           </div>
-          <TripFormSection id="open-trip-section-evidence" title="Nachweise" icon={Receipt} className="open-trip-section open-trip-evidence">
+          <FormSection id="open-trip-section-evidence" title="Nachweise" icon={Receipt} className="open-trip-section open-trip-evidence">
             <div className="open-trip-evidence-count">
               <span>Screenshots / Nachweise</span>
               <strong>{activeTripFiles.length}</strong>
@@ -2779,7 +2793,7 @@ function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, on
                 </div>
               </div>
             ))}
-          </TripFormSection>
+          </FormSection>
           <button className="secondary-button" type="button" onClick={() => void onDone(activeTrip)}>
             <CheckCircle size={17} /> Als erledigt markieren
           </button>
@@ -3248,14 +3262,14 @@ export function WorkTimeField({
   );
 }
 
-function TripFormSection({ id, title, icon: IconComponent, className = "", children }: { id: string; title: string; icon: Icon; className?: string; children: React.ReactNode }) {
+function FormSection({ id, title, icon: IconComponent, className = "", children }: { id: string; title: string; icon: Icon; className?: string; children: React.ReactNode }) {
   return (
-    <section className={`trip-form-section ${className}`.trim()} aria-labelledby={id}>
-      <div className="trip-form-section-header">
+    <section className={`form-section ${className}`.trim()} aria-labelledby={id}>
+      <div className="form-section-header">
         <IconComponent size={20} weight="duotone" aria-hidden="true" />
-        <h3 id={id} className="trip-form-section-title">{title}</h3>
+        <h3 id={id} className="form-section-title">{title}</h3>
       </div>
-      <div className="trip-form-section-body">
+      <div className="form-section-body">
         {children}
       </div>
     </section>

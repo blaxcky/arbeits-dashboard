@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
 import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, WorkTimeField, yearFromUrlParam } from "./App";
@@ -274,6 +274,34 @@ describe("AuditPointsView form tabs", () => {
     expect(screen.getByText("Neuer Fall")).toBeInTheDocument();
     expect(screen.queryByText("Neuer USO-Fall")).not.toBeInTheDocument();
     expect(screen.queryByText("Neue sonstige Maßnahme")).not.toBeInTheDocument();
+  });
+
+  it("groups every point form into its intended semantic sections", () => {
+    renderView();
+
+    const auditDetails = screen.getByRole("heading", { name: "Falldaten" }).closest("section") as HTMLElement;
+    const auditScope = screen.getByRole("heading", { name: "Prüfungsumfang" }).closest("section") as HTMLElement;
+    const auditSubmission = screen.getByRole("heading", { name: "Abgabe & Status" }).closest("section") as HTMLElement;
+    expect(within(auditDetails).getByLabelText("Name")).toBeInTheDocument();
+    expect(within(auditDetails).getByLabelText("Betriebskategorie")).toBeInTheDocument();
+    expect(within(auditScope).getByLabelText("Zeitraum von")).toBeInTheDocument();
+    expect(within(auditScope).getByLabelText("§99-Zuschlag")).toBeInTheDocument();
+    expect(within(auditSubmission).getByLabelText("Abgabemonat")).toBeInTheDocument();
+    expect(within(auditSubmission).getByLabelText("Status")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "USO-Fall" }));
+    const usoDetails = screen.getByRole("heading", { name: "Falldaten" }).closest("section") as HTMLElement;
+    const usoSubmission = screen.getByRole("heading", { name: "Abgabe & Status" }).closest("section") as HTMLElement;
+    expect(within(usoDetails).getByLabelText("Titel")).toBeInTheDocument();
+    expect(within(usoSubmission).getByLabelText("Abgabemonat")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Prüfungsumfang" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sonstige Maßnahme" }));
+    const otherDetails = screen.getByRole("heading", { name: "Falldaten" }).closest("section") as HTMLElement;
+    const otherSubmission = screen.getByRole("heading", { name: "Abgabe & Status" }).closest("section") as HTMLElement;
+    expect(within(otherDetails).getByLabelText("Titel")).toBeInTheDocument();
+    expect(within(otherDetails).getByLabelText("Art")).toBeInTheDocument();
+    expect(within(otherSubmission).getByLabelText("Status")).toBeInTheDocument();
   });
 
   it("keeps drafts per form and resets only the active form with Neu", () => {
