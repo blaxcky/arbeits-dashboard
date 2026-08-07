@@ -148,10 +148,12 @@ describe("CollapsiblePointLists", () => {
     expect(screen.getByRole("button", { name: "USO-Fälle einklappen" })).toHaveTextContent("2");
     expect(screen.getByRole("button", { name: "Sonstige Maßnahmen einklappen" })).toHaveTextContent("1");
     expect(screen.getByText("Inhalt Betriebsprüfungen")).toBeVisible();
+    expect(document.getElementById("points-list-audit-content")).toHaveAttribute("aria-hidden", "false");
+    expect(document.getElementById("points-list-audit-content")).not.toHaveAttribute("inert");
     expect(screen.getByRole("button", { name: "Alle einklappen" })).toBeInTheDocument();
   });
 
-  it("collapses one list while its accessible heading and count remain visible", () => {
+  it("toggles one list by pointer and keyboard-generated activation while its heading remains visible", () => {
     renderLists();
     const toggle = screen.getByRole("button", { name: "Betriebsprüfungen einklappen" });
 
@@ -165,8 +167,18 @@ describe("CollapsiblePointLists", () => {
     expect(collapsedToggle).toHaveAttribute("aria-expanded", "false");
     expect(collapsedToggle).toHaveTextContent("Betriebsprüfungen");
     expect(collapsedToggle).toHaveTextContent("3");
-    expect(screen.getByText("Inhalt Betriebsprüfungen").parentElement).toHaveAttribute("hidden");
+    const collapsedContent = document.getElementById("points-list-audit-content");
+    expect(collapsedContent).toHaveAttribute("aria-hidden", "true");
+    expect(collapsedContent).toHaveAttribute("inert");
+    expect(collapsedContent).toHaveAttribute("data-expanded", "false");
     expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}")).toEqual({ audit: false, uso: true, other: true });
+
+    collapsedToggle.focus();
+    fireEvent.click(collapsedToggle, { detail: 0 });
+    expect(collapsedToggle).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Betriebsprüfungen einklappen" })).toHaveAttribute("aria-expanded", "true");
+    expect(collapsedContent).toHaveAttribute("aria-hidden", "false");
+    expect(collapsedContent).not.toHaveAttribute("inert");
   });
 
   it("collapses all lists and expands all lists from closed and mixed states", () => {
@@ -453,7 +465,10 @@ describe("point case list status presentation", () => {
       expect(completedToggle).toHaveAttribute("aria-expanded", "false");
       expect(completedToggle).toHaveAttribute("aria-controls", expect.stringMatching(/^points-list-.+-completed-content$/));
       expect(within(completedToggle).getByLabelText("1 erledigter Fall")).toBeInTheDocument();
-      expect(within(listPanel).getByText(completedTitles[index], { selector: "strong" })).not.toBeVisible();
+      const completedContent = document.getElementById(completedToggle.getAttribute("aria-controls") ?? "");
+      expect(completedContent).toHaveAttribute("aria-hidden", "true");
+      expect(completedContent).toHaveAttribute("inert");
+      expect(completedContent).toContainElement(within(listPanel).getByText(completedTitles[index], { selector: "strong" }));
     });
   });
 
@@ -463,6 +478,9 @@ describe("point case list status presentation", () => {
 
     fireEvent.click(toggles[0]);
     expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
+    const auditCompletedContent = document.getElementById(toggles[0].getAttribute("aria-controls") ?? "");
+    expect(auditCompletedContent).toHaveAttribute("aria-hidden", "false");
+    expect(auditCompletedContent).not.toHaveAttribute("inert");
     expect(screen.getByText("BP erledigt", { selector: "strong" })).toBeVisible();
 
     toggles[1].focus();

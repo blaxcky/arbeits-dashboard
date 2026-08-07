@@ -13,6 +13,10 @@
   --warning: #8a6424;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1113,6 +1117,7 @@ button:disabled {
 .points-lists {
   display: grid;
   gap: 16px;
+  overflow-anchor: none;
 }
 
 .points-lists-toolbar {
@@ -1173,6 +1178,29 @@ button:disabled {
 .points-list-heading[aria-expanded="true"] .points-list-caret {
   color: var(--accent-dark);
   transform: rotate(180deg);
+}
+
+.point-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 160ms ease,
+    visibility 0s linear 220ms;
+}
+
+.point-collapse[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.point-collapse-content {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .point-status-groups {
@@ -1287,6 +1315,15 @@ button:disabled {
   margin: 0;
   padding: 13px 12px 14px;
   border-top: 1px solid #dcebe4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .point-collapse,
+  .points-list-caret,
+  .point-status-caret {
+    transition-duration: 0s;
+    transition-delay: 0s;
+  }
 }
 
 .trip-form-stack {

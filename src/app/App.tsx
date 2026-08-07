@@ -848,6 +848,26 @@ interface PointCaseStatusGroupsProps {
   completedCases: ReactNode;
 }
 
+interface PointCollapseProps {
+  id: string;
+  expanded: boolean;
+  children: ReactNode;
+}
+
+function PointCollapse({ id, expanded, children }: PointCollapseProps) {
+  return (
+    <div
+      id={id}
+      className="point-collapse"
+      data-expanded={expanded}
+      aria-hidden={!expanded}
+      inert={!expanded ? true : undefined}
+    >
+      <div className="point-collapse-content">{children}</div>
+    </div>
+  );
+}
+
 function pointCaseStatusCountLabel(count: number, status: "open" | "completed") {
   if (count === 1) return status === "open" ? "1 offener Fall" : "1 erledigter Fall";
   return `${count} ${status === "open" ? "offene" : "erledigte"} Fälle`;
@@ -910,9 +930,9 @@ export function CollapsiblePointLists({ counts, content }: CollapsiblePointLists
                 <CaretDown className="points-list-caret" size={18} weight="bold" aria-hidden="true" />
               </span>
             </button>
-            <div id={contentId} hidden={!expanded}>
+            <PointCollapse id={contentId} expanded={expanded}>
               {content[list]}
-            </div>
+            </PointCollapse>
           </section>
         );
       })}
@@ -950,9 +970,9 @@ function PointCaseStatusGroups({ listKey, openCount, completedCount, openCases, 
             <CaretDown className="point-status-caret" size={18} weight="bold" aria-hidden="true" />
           </span>
         </button>
-        <div id={completedContentId} hidden={!completedExpanded}>
+        <PointCollapse id={completedContentId} expanded={completedExpanded}>
           {completedCount === 0 ? <p className="muted point-status-empty">Keine erledigten Fälle.</p> : completedCases}
-        </div>
+        </PointCollapse>
       </section>
     </div>
   );
