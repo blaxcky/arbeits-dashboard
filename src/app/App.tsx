@@ -738,7 +738,7 @@ function CorrectionsPanel({ data }: { data: WorkData }) {
   }
 
   return (
-    <div className="panel">
+    <div className="panel corrections-panel">
       <span className="section-label">Gleitzeitkorrekturen</span>
       <div className="form-grid">
         <Field label="Datum"><input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></Field>

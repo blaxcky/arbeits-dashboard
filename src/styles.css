@@ -2201,6 +2201,23 @@ button:disabled {
   margin-top: 16px;
 }
 
+.corrections-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.corrections-panel > .secondary-button {
+  justify-self: start;
+}
+
+.corrections-panel .correction-list {
+  margin-top: 0;
+}
+
+.corrections-panel .correction-list > .muted {
+  margin: 0;
+}
+
 .correction-row {
   padding: 10px 0;
   border-top: 1px solid #eef1f5;
