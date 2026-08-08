@@ -1,6 +1,8 @@
 import {
   CalendarBlank,
   CalendarDots,
+  CaretDoubleLeft,
+  CaretDoubleRight,
   Check,
   CheckCircle,
   DotsThree,
@@ -37,6 +39,7 @@ type TodoDraft = {
 };
 
 const emptyFilter: TodoFilter = { projectId: "", priority: "", label: "", status: "active" };
+const TODO_NAV_COLLAPSED_KEY = "arbeits-dashboard.todos-nav-collapsed";
 const TODO_COMPLETION_HOLD_MS = 3000;
 const TODO_COMPLETION_EXIT_MS = 250;
 
@@ -66,8 +69,17 @@ export function TodosView({ data, showToast }: { data: TodoData; showToast: (mes
   const [filter, setFilter] = useState<TodoFilter>(emptyFilter);
   const [projectEditor, setProjectEditor] = useState<{ id?: string; name: string } | null>(null);
   const [projectError, setProjectError] = useState("");
+  const [navCollapsed, setNavCollapsed] = useState(() => {
+    try {
+      return window.localStorage.getItem(TODO_NAV_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const [todoTransitions, setTodoTransitions] = useState<Map<string, TodoTransition>>(() => new Map());
   const addButtonRef = useRef<HTMLButtonElement>(null);
+  const navToggleRef = useRef<HTMLButtonElement>(null);
+  const navRevealRef = useRef<HTMLButtonElement>(null);
   const transitionTimers = useRef(new Map<string, { hold?: number; exit?: number }>());
   const completionQueues = useRef(new Map<string, Promise<void>>());
   const latestTodos = useRef(data.todos);
@@ -285,10 +297,23 @@ export function TodosView({ data, showToast }: { data: TodoData; showToast: (mes
     window.setTimeout(() => document.querySelector<HTMLElement>(`[data-todo-trigger="${triggerId}"]`)?.focus(), 0);
   }
 
+  function setNavigationCollapsed(collapsed: boolean) {
+    setNavCollapsed(collapsed);
+    try {
+      window.localStorage.setItem(TODO_NAV_COLLAPSED_KEY, String(collapsed));
+    } catch {
+      // The navigation still works when browser storage is unavailable.
+    }
+    window.setTimeout(() => (collapsed ? navRevealRef.current : navToggleRef.current)?.focus(), 0);
+  }
+
   return (
-    <section className="todos-shell">
-      <aside className="todos-nav" aria-label="Aufgabennavigation">
-        <button ref={addButtonRef} className="todos-add-top" type="button" onClick={() => setAdding(true)}><Plus size={21} weight="fill" /> Aufgabe hinzufügen</button>
+    <section className={`todos-shell${navCollapsed ? " nav-collapsed" : ""}`}>
+      <aside id="todos-navigation" className="todos-nav" aria-label="Aufgabennavigation" hidden={navCollapsed}>
+        <div className="todos-nav-actions">
+          <button ref={addButtonRef} className="todos-add-top" type="button" onClick={() => setAdding(true)}><Plus size={21} weight="fill" /> Aufgabe hinzufügen</button>
+          <button ref={navToggleRef} className="todos-nav-toggle" type="button" aria-label="Aufgabennavigation einklappen" aria-controls="todos-navigation" aria-expanded="true" title="Menü einklappen" onClick={() => setNavigationCollapsed(true)}><CaretDoubleLeft /></button>
+        </div>
         <nav>
           <TodoNavLink to="/aufgaben/suche" icon={<MagnifyingGlass />} label="Suchen" />
           <TodoNavLink to="/aufgaben/eingang" icon={<Tray />} label="Eingang" count={inboxTodos(effectiveTodos).length} />
@@ -311,6 +336,7 @@ export function TodosView({ data, showToast }: { data: TodoData; showToast: (mes
         </div>
       </aside>
       <main className="todos-main">
+        {navCollapsed ? <button ref={navRevealRef} className="todos-nav-reveal" type="button" aria-label="Aufgabennavigation ausklappen" aria-controls="todos-navigation" aria-expanded="false" title="Menü ausklappen" onClick={() => setNavigationCollapsed(false)}><CaretDoubleRight /></button> : null}
         <div className="todos-content">
           <h1>{displayedView.title}</h1>
           <p className="todos-count"><CheckCircle /> {view.groups ? view.groups.reduce((sum, group) => sum + group.todos.length, 0) : view.todos.length} Aufgaben</p>

@@ -34,6 +34,24 @@ function todoData(todos: Todo[] = [baseTodo]) {
 describe("TodosView", () => {
   afterEach(() => {
     vi.useRealTimers();
+    window.localStorage.removeItem("arbeits-dashboard.todos-nav-collapsed");
+  });
+
+  it("collapses, restores and remembers the task navigation", () => {
+    const data = todoData([]);
+    const { unmount } = render(<MemoryRouter initialEntries={["/aufgaben/heute"]}><TodosView data={data as never} showToast={vi.fn()} /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabennavigation einklappen" }));
+    expect(document.getElementById("todos-navigation")).toHaveAttribute("hidden");
+    expect(screen.getByRole("button", { name: "Aufgabennavigation ausklappen" })).toHaveAttribute("aria-expanded", "false");
+
+    unmount();
+    render(<MemoryRouter initialEntries={["/aufgaben/heute"]}><TodosView data={data as never} showToast={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByRole("button", { name: "Aufgabennavigation ausklappen" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabennavigation ausklappen" }));
+    expect(screen.getByRole("complementary", { name: "Aufgabennavigation" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Aufgabennavigation einklappen" })).toHaveAttribute("aria-expanded", "true");
   });
 
   it("creates a task on Enter, resets every field and keeps the quick form focused", async () => {
