@@ -7,6 +7,8 @@ import {
   CalendarCheck,
   CalendarPlus,
   CaretDown,
+  CaretDoubleLeft,
+  CaretDoubleRight,
   Car,
   ChartBar,
   CheckCircle,
@@ -33,7 +35,7 @@ import {
   type Icon
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { HashRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { HashRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { AuditPointCase, AuditPointCategory, OtherMeasure, SavedDestination, Settings, TimeEntry, UsoCase, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
@@ -108,6 +110,7 @@ const navItems = [
 ];
 
 const DEFAULT_TRIP_ORIGIN = "Finanzamt Österreich - Dienststelle Bruck Eisenstadt Oberwart, Neusiedler Str. 46, 7001 Eisenstadt";
+const DASHBOARD_SIDEBAR_COLLAPSED_KEY = "arbeits-dashboard.sidebar-collapsed";
 type Toast = { id: string; text: string };
 type OpenTripField = {
   group: "travel" | "route" | "costs" | "remarks";
@@ -139,8 +142,39 @@ export function App() {
 
   return (
     <HashRouter>
-      <div className="app-shell">
-        <aside className="sidebar" aria-label="Hauptnavigation">
+      <AppShell data={data} toasts={toasts} showToast={showToast} onRemoveToast={removeToast} />
+    </HashRouter>
+  );
+}
+
+function AppShell({ data, toasts, showToast, onRemoveToast }: { data: WorkData; toasts: Toast[]; showToast: ShowToast; onRemoveToast: (id: string) => void }) {
+  const location = useLocation();
+  const isTodosView = location.pathname.startsWith("/aufgaben");
+  const [sidebarPreference, setSidebarPreference] = useState(() => {
+    try {
+      return window.localStorage.getItem(DASHBOARD_SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const sidebarCollapsed = isTodosView && sidebarPreference;
+  const sidebarCollapseRef = useRef<HTMLButtonElement>(null);
+  const sidebarRevealRef = useRef<HTMLButtonElement>(null);
+
+  function setSidebarCollapsed(collapsed: boolean) {
+    setSidebarPreference(collapsed);
+    try {
+      window.localStorage.setItem(DASHBOARD_SIDEBAR_COLLAPSED_KEY, String(collapsed));
+    } catch {
+      // The navigation still works when browser storage is unavailable.
+    }
+    window.setTimeout(() => (collapsed ? sidebarRevealRef.current : sidebarCollapseRef.current)?.focus(), 0);
+  }
+
+  return (
+    <div className={`app-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
+      <aside id="dashboard-navigation" className="sidebar" aria-label="Hauptnavigation" hidden={sidebarCollapsed}>
+        <div className="sidebar-header">
           <Link className="brand" to="/">
             <span className="brand-mark">AD</span>
             <span>
@@ -148,57 +182,59 @@ export function App() {
               <small>Lokal und offline</small>
             </span>
           </Link>
-          <nav className="nav-list">
-            {navItems.map((item) => (
-              <div key={item.to} className="nav-group">
-                <NavLink to={item.to} end={item.to === "/"} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                  <item.icon size={20} weight="duotone" />
-                  <span>{item.label}</span>
+          {isTodosView ? <button ref={sidebarCollapseRef} className="sidebar-toggle" type="button" aria-label="Dashboard-Navigation einklappen" aria-controls="dashboard-navigation" aria-expanded="true" title="Dashboard-Menü einklappen" onClick={() => setSidebarCollapsed(true)}><CaretDoubleLeft /></button> : null}
+        </div>
+        <nav className="nav-list">
+          {navItems.map((item) => (
+            <div key={item.to} className="nav-group">
+              <NavLink to={item.to} end={item.to === "/"} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+                <item.icon size={20} weight="duotone" />
+                <span>{item.label}</span>
+              </NavLink>
+              {item.to === "/reisekosten" ? (
+                <NavLink to="/reisekosten/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
+                  <CalendarCheck size={15} weight="duotone" />
+                  <span>Jahresübersicht</span>
                 </NavLink>
-                {item.to === "/reisekosten" ? (
-                  <NavLink to="/reisekosten/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
-                    <CalendarCheck size={15} weight="duotone" />
-                    <span>Jahresübersicht</span>
-                  </NavLink>
-                ) : null}
-                {item.to === "/punkte" ? (
-                  <NavLink to="/punkte/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
-                    <CalendarCheck size={15} weight="duotone" />
-                    <span>Jahresübersicht</span>
-                  </NavLink>
-                ) : null}
-              </div>
-            ))}
-          </nav>
-          <div className="privacy-note">
-            <Database size={18} />
-            <span>Arbeitsdaten bleiben in IndexedDB auf diesem Gerät.</span>
-          </div>
-        </aside>
-        <main className="workspace">
-          {data.error ? <Notice tone="danger" title="Datenfehler" text={data.error} /> : null}
-          <Routes>
-            <Route path="/" element={<Dashboard data={data} showToast={showToast} />} />
-            <Route path="/reisekosten" element={<TripsView data={data} showToast={showToast} />} />
-            <Route path="/reisekosten/jahr" element={<TripsYearView data={data} showToast={showToast} />} />
-            <Route path="/reisekosten/jahr/:year" element={<TripsYearView data={data} showToast={showToast} />} />
-            <Route path="/punkte" element={<AuditPointsView data={data} showToast={showToast} />} />
-            <Route path="/punkte/jahr" element={<PointsYearView data={data} showToast={showToast} />} />
-            <Route path="/punkte/jahr/:year" element={<PointsYearView data={data} showToast={showToast} />} />
-            <Route path="/aufgaben" element={<Navigate to="/aufgaben/heute" replace />} />
-            <Route path="/aufgaben/eingang" element={<TodosView data={data} showToast={showToast} />} />
-            <Route path="/aufgaben/heute" element={<TodosView data={data} showToast={showToast} />} />
-            <Route path="/aufgaben/demnaechst" element={<TodosView data={data} showToast={showToast} />} />
-            <Route path="/aufgaben/suche" element={<TodosView data={data} showToast={showToast} />} />
-            <Route path="/aufgaben/filter" element={<TodosView data={data} showToast={showToast} />} />
-            <Route path="/aufgaben/projekt/:projectId" element={<TodosView data={data} showToast={showToast} />} />
-            <Route path="/einstellungen" element={<SettingsView data={data} showToast={showToast} />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-          <ToastStack toasts={toasts} onRemove={removeToast} />
-        </main>
-      </div>
-    </HashRouter>
+              ) : null}
+              {item.to === "/punkte" ? (
+                <NavLink to="/punkte/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
+                  <CalendarCheck size={15} weight="duotone" />
+                  <span>Jahresübersicht</span>
+                </NavLink>
+              ) : null}
+            </div>
+          ))}
+        </nav>
+        <div className="privacy-note">
+          <Database size={18} />
+          <span>Arbeitsdaten bleiben in IndexedDB auf diesem Gerät.</span>
+        </div>
+      </aside>
+      <main className="workspace">
+        {sidebarCollapsed ? <button ref={sidebarRevealRef} className="sidebar-reveal" type="button" aria-label="Dashboard-Navigation ausklappen" aria-controls="dashboard-navigation" aria-expanded="false" title="Dashboard-Menü ausklappen" onClick={() => setSidebarCollapsed(false)}><CaretDoubleRight /></button> : null}
+        {data.error ? <Notice tone="danger" title="Datenfehler" text={data.error} /> : null}
+        <Routes>
+          <Route path="/" element={<Dashboard data={data} showToast={showToast} />} />
+          <Route path="/reisekosten" element={<TripsView data={data} showToast={showToast} />} />
+          <Route path="/reisekosten/jahr" element={<TripsYearView data={data} showToast={showToast} />} />
+          <Route path="/reisekosten/jahr/:year" element={<TripsYearView data={data} showToast={showToast} />} />
+          <Route path="/punkte" element={<AuditPointsView data={data} showToast={showToast} />} />
+          <Route path="/punkte/jahr" element={<PointsYearView data={data} showToast={showToast} />} />
+          <Route path="/punkte/jahr/:year" element={<PointsYearView data={data} showToast={showToast} />} />
+          <Route path="/aufgaben" element={<Navigate to="/aufgaben/heute" replace />} />
+          <Route path="/aufgaben/eingang" element={<TodosView data={data} showToast={showToast} />} />
+          <Route path="/aufgaben/heute" element={<TodosView data={data} showToast={showToast} />} />
+          <Route path="/aufgaben/demnaechst" element={<TodosView data={data} showToast={showToast} />} />
+          <Route path="/aufgaben/suche" element={<TodosView data={data} showToast={showToast} />} />
+          <Route path="/aufgaben/filter" element={<TodosView data={data} showToast={showToast} />} />
+          <Route path="/aufgaben/projekt/:projectId" element={<TodosView data={data} showToast={showToast} />} />
+          <Route path="/einstellungen" element={<SettingsView data={data} showToast={showToast} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <ToastStack toasts={toasts} onRemove={onRemoveToast} />
+      </main>
+    </div>
   );
 }
 

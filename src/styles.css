@@ -53,6 +53,10 @@ button:disabled {
   min-height: 100dvh;
 }
 
+.app-shell.sidebar-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -65,11 +69,54 @@ button:disabled {
   background: rgba(255, 255, 255, 0.78);
 }
 
+.sidebar-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+}
+
 .brand {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
   text-decoration: none;
+}
+
+.brand > span:last-child {
+  min-width: 0;
+}
+
+.sidebar-toggle,
+.sidebar-reveal {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #687385;
+  background: transparent;
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.sidebar-toggle:hover,
+.sidebar-reveal:hover {
+  color: var(--accent-dark);
+  background: #eef4f4;
+}
+
+.sidebar-toggle:active,
+.sidebar-reveal:active {
+  transform: scale(0.96);
+}
+
+.sidebar-toggle svg,
+.sidebar-reveal svg {
+  width: 18px;
+  height: 18px;
 }
 
 .brand-mark {
@@ -175,6 +222,15 @@ button:disabled {
   padding: 34px;
 }
 
+.sidebar-reveal {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  left: 254px;
+  border-color: #e1dedb;
+  background: rgba(250, 249, 247, 0.94);
+}
+
 .workspace:has(.todos-shell) {
   max-width: none;
   padding: 0;
@@ -208,53 +264,11 @@ button:disabled {
   font-family: "Aptos", "Segoe UI", system-ui, sans-serif;
 }
 
-.todos-shell.nav-collapsed {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .todos-nav {
   min-width: 0;
   padding: 17px 10px 30px;
   border-right: 1px solid #f1eeeb;
   background: #faf9f7;
-}
-
-.todos-nav-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
-  align-items: start;
-  gap: 4px;
-}
-
-.todos-nav-toggle,
-.todos-nav-reveal {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  color: #77736f;
-  background: transparent;
-  transition: color 180ms ease, background 180ms ease, transform 180ms ease;
-}
-
-.todos-nav-toggle:hover,
-.todos-nav-reveal:hover {
-  color: var(--todo-accent);
-  background: var(--todo-accent-soft);
-}
-
-.todos-nav-toggle:active,
-.todos-nav-reveal:active {
-  transform: scale(0.96);
-}
-
-.todos-nav-toggle svg,
-.todos-nav-reveal svg {
-  width: 18px;
-  height: 18px;
 }
 
 .todos-add-top {
@@ -401,18 +415,9 @@ button:disabled {
 .todo-project-editor button.danger { margin-right: auto; color: #b33b32; }
 
 .todos-main {
-  position: relative;
   min-width: 0;
   padding: 14px 44px 80px;
   background: #fff;
-}
-
-.todos-nav-reveal {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  border: 1px solid #e8e4e0;
-  background: #faf9f7;
 }
 
 .todos-content {
@@ -677,8 +682,6 @@ button:disabled {
   .todos-nav nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .todos-projects { margin-top: 18px; }
   .todos-main { padding: 24px 16px 60px; }
-  .todos-shell.nav-collapsed .todos-content { padding-top: 42px; }
-  .todos-nav-reveal { top: 18px; left: 16px; }
   .todo-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .todo-modal-body { grid-template-columns: 1fr; overflow: auto; }
   .todo-modal-editor { padding: 16px; }
@@ -3160,6 +3163,12 @@ button:disabled {
 
   .workspace {
     padding: 20px;
+  }
+
+  .sidebar-reveal {
+    top: 16px;
+    right: 16px;
+    left: auto;
   }
 
   .dashboard-workflow-grid,
