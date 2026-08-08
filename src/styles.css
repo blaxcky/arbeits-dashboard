@@ -69,6 +69,10 @@ button:disabled {
   background: rgba(255, 255, 255, 0.78);
 }
 
+.sidebar[hidden] {
+  display: none;
+}
+
 .sidebar-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 32px;
