@@ -602,29 +602,35 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
   return (
     <section className="page-stack">
       <Header eyebrow="Einstellungen" title="Lokale Steuerzentrale" />
-      <div className="settings-grid">
-        <div className="panel form-panel">
-          <span className="section-label">Arbeitszeit</span>
-          <div className="form-grid">
-            <Field label="Sollzeit pro Tag (Stunden)" error={settingsErrors.dailyTargetMinutes}><input type="number" step="0.25" value={form.dailyTargetMinutes} aria-invalid={Boolean(settingsErrors.dailyTargetMinutes)} onChange={(event) => updateSettingsField("dailyTargetMinutes", event.target.value)} /></Field>
-            <Field label="Wochenarbeitszeit (Stunden)" error={settingsErrors.weeklyTargetMinutes}><input type="number" step="0.25" value={form.weeklyTargetMinutes} aria-invalid={Boolean(settingsErrors.weeklyTargetMinutes)} onChange={(event) => updateSettingsField("weeklyTargetMinutes", event.target.value)} /></Field>
-            <Field label="Gleitzeitgrenze (Stunden)" error={settingsErrors.flexLimitMinutes}><input type="number" step="0.25" value={form.flexLimitMinutes} aria-invalid={Boolean(settingsErrors.flexLimitMinutes)} onChange={(event) => updateSettingsField("flexLimitMinutes", event.target.value)} /></Field>
-            <Field label="Gleitzeitstartwert (Stunden)" error={settingsErrors.flexStartMinutes}><input type="number" step="0.25" value={form.flexStartMinutes} aria-invalid={Boolean(settingsErrors.flexStartMinutes)} onChange={(event) => updateSettingsField("flexStartMinutes", event.target.value)} placeholder="leer" /></Field>
-            <Field label="Schnellwahl Dienstbeginn" error={settingsErrors.preferredWorkStartTime}>
-              <input type="text" inputMode="numeric" placeholder="optional, z.B. 07:30" value={form.preferredWorkStartTime} aria-invalid={Boolean(settingsErrors.preferredWorkStartTime)} onChange={(event) => updateSettingsField("preferredWorkStartTime", event.target.value)} onBlur={(event) => normalizeSettingsTimeField("preferredWorkStartTime", event.target.value)} />
-            </Field>
-            <Field label="Schnellwahl Dienstende" error={settingsErrors.preferredWorkEndTime}>
-              <input type="text" inputMode="numeric" placeholder="optional, z.B. 15:30" value={form.preferredWorkEndTime} aria-invalid={Boolean(settingsErrors.preferredWorkEndTime)} onChange={(event) => updateSettingsField("preferredWorkEndTime", event.target.value)} onBlur={(event) => normalizeSettingsTimeField("preferredWorkEndTime", event.target.value)} />
-            </Field>
-            <Field label="Urlaubsanspruch (Stunden)" error={settingsErrors.vacationEntitlementMinutes}><input type="number" step="0.25" value={form.vacationEntitlementMinutes} aria-invalid={Boolean(settingsErrors.vacationEntitlementMinutes)} onChange={(event) => updateSettingsField("vacationEntitlementMinutes", event.target.value)} placeholder="leer" /></Field>
-            <Field label="Verbrauchter Urlaub (Stunden)" error={settingsErrors.vacationUsedMinutes}><input type="number" step="0.25" value={form.vacationUsedMinutes} aria-invalid={Boolean(settingsErrors.vacationUsedMinutes)} onChange={(event) => updateSettingsField("vacationUsedMinutes", event.target.value)} /></Field>
+      <div className="settings-layout">
+        <section className="settings-column" aria-labelledby="settings-work-title">
+          <h2 id="settings-work-title" className="settings-group-title">Arbeitszeit &amp; Saldo</h2>
+          <div className="panel form-panel">
+            <span className="section-label">Arbeitszeit</span>
+            <div className="form-grid">
+              <Field label="Sollzeit pro Tag (Stunden)" error={settingsErrors.dailyTargetMinutes}><input type="number" step="0.25" value={form.dailyTargetMinutes} aria-invalid={Boolean(settingsErrors.dailyTargetMinutes)} onChange={(event) => updateSettingsField("dailyTargetMinutes", event.target.value)} /></Field>
+              <Field label="Wochenarbeitszeit (Stunden)" error={settingsErrors.weeklyTargetMinutes}><input type="number" step="0.25" value={form.weeklyTargetMinutes} aria-invalid={Boolean(settingsErrors.weeklyTargetMinutes)} onChange={(event) => updateSettingsField("weeklyTargetMinutes", event.target.value)} /></Field>
+              <Field label="Gleitzeitgrenze (Stunden)" error={settingsErrors.flexLimitMinutes}><input type="number" step="0.25" value={form.flexLimitMinutes} aria-invalid={Boolean(settingsErrors.flexLimitMinutes)} onChange={(event) => updateSettingsField("flexLimitMinutes", event.target.value)} /></Field>
+              <Field label="Gleitzeitstartwert (Stunden)" error={settingsErrors.flexStartMinutes}><input type="number" step="0.25" value={form.flexStartMinutes} aria-invalid={Boolean(settingsErrors.flexStartMinutes)} onChange={(event) => updateSettingsField("flexStartMinutes", event.target.value)} placeholder="leer" /></Field>
+              <Field label="Schnellwahl Dienstbeginn" error={settingsErrors.preferredWorkStartTime}>
+                <input type="text" inputMode="numeric" placeholder="optional, z.B. 07:30" value={form.preferredWorkStartTime} aria-invalid={Boolean(settingsErrors.preferredWorkStartTime)} onChange={(event) => updateSettingsField("preferredWorkStartTime", event.target.value)} onBlur={(event) => normalizeSettingsTimeField("preferredWorkStartTime", event.target.value)} />
+              </Field>
+              <Field label="Schnellwahl Dienstende" error={settingsErrors.preferredWorkEndTime}>
+                <input type="text" inputMode="numeric" placeholder="optional, z.B. 15:30" value={form.preferredWorkEndTime} aria-invalid={Boolean(settingsErrors.preferredWorkEndTime)} onChange={(event) => updateSettingsField("preferredWorkEndTime", event.target.value)} onBlur={(event) => normalizeSettingsTimeField("preferredWorkEndTime", event.target.value)} />
+              </Field>
+              <Field label="Urlaubsanspruch (Stunden)" error={settingsErrors.vacationEntitlementMinutes}><input type="number" step="0.25" value={form.vacationEntitlementMinutes} aria-invalid={Boolean(settingsErrors.vacationEntitlementMinutes)} onChange={(event) => updateSettingsField("vacationEntitlementMinutes", event.target.value)} placeholder="leer" /></Field>
+              <Field label="Verbrauchter Urlaub (Stunden)" error={settingsErrors.vacationUsedMinutes}><input type="number" step="0.25" value={form.vacationUsedMinutes} aria-invalid={Boolean(settingsErrors.vacationUsedMinutes)} onChange={(event) => updateSettingsField("vacationUsedMinutes", event.target.value)} /></Field>
+            </div>
+            <button className="primary-button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
           </div>
-          <button className="primary-button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
-        </div>
-        <BackupPanel importRef={importRef} importPreview={importPreview} onPreview={(file) => handleImport(file, false)} onReplace={(file) => handleImport(file, true)} onDone={showToast} refresh={data.refresh} />
-        <SystemStatusPanel data={data} storageEstimate={storageEstimate} />
-        <CorrectionsPanel data={data} />
-        <DangerPanel data={data} onDone={showToast} />
+          <CorrectionsPanel data={data} />
+        </section>
+        <section className="settings-column" aria-labelledby="settings-system-title">
+          <h2 id="settings-system-title" className="settings-group-title">Daten &amp; System</h2>
+          <BackupPanel importRef={importRef} importPreview={importPreview} onPreview={(file) => handleImport(file, false)} onReplace={(file) => handleImport(file, true)} onDone={showToast} refresh={data.refresh} />
+          <SystemStatusPanel data={data} storageEstimate={storageEstimate} />
+          <DangerPanel data={data} onDone={showToast} />
+        </section>
       </div>
     </section>
   );
