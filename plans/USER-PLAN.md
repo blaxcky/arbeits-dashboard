@@ -85,5 +85,5 @@ Die Punkte-Jahresübersicht wird kompakter, verständlicher und besser visuell g
 - Die "Offen"-Spalte in BP/USO wird vollständig entfernt, nicht umbenannt.
 - "OK rückwirkend" bedeutet: Bewertung gegen den aktuellen Jahres-Gesamtstand im ausgewählten Jahr.
 - Die Reise-Liste wird in getrennte Cards für offene und erledigte Reisen umgebaut.
-- Der Plan wird bei Umsetzung in `USER-PLAN.md` geschrieben.
+- Der Plan wird bei Umsetzung in `plans/USER-PLAN.md` geschrieben.
 - Nach Umsetzung wird ein fokussierter Commit erstellt und der Branch mit Remote synchronisiert.
