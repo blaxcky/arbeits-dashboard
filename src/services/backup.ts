@@ -15,6 +15,9 @@ export async function exportBackup(): Promise<Blob> {
   const filesFolder = zip.folder("files");
   const serializedData: SerializedBackupData = {
     ...data,
+    auditPointCases: data.auditPointCases.map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
+    usoCases: data.usoCases.map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
+    otherMeasures: data.otherMeasures.map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0 })),
     files: data.files.map((file, index) => {
       const path = backupFilePath(file, index);
       const bytes = dataUrlToBytes(file.dataUrl, file.mimeType);
@@ -242,6 +245,7 @@ function validateAuditPointCase(value: unknown): void {
   requireNumber(value, "periodStartYear", "Punkte-Fall-Zeitraum von fehlt.");
   requireNumber(value, "periodEndYear", "Punkte-Fall-Zeitraum bis fehlt.");
   requireNumber(value, "additionalResultCents", "Punkte-Fall-Mehrergebnis fehlt.");
+  requireOptionalManualPoints(value, "manualPointsTenths", "Punkte-Fall-Zusatzpunkte sind ungültig.");
   if (typeof value.section99 !== "boolean") throw new Error("Punkte-Fall-§99-Status fehlt.");
   requireString(value, "submissionMonth", "Punkte-Fall-Abgabemonat fehlt.");
   requireString(value, "status", "Punkte-Fall-Status fehlt.");
@@ -263,6 +267,7 @@ function validateUsoCase(value: unknown): void {
   if (!isObject(value)) throw new Error("USO-Fall ist ungültig.");
   requireString(value, "id", "USO-Fall-ID fehlt.");
   requireString(value, "title", "USO-Fall-Titel fehlt.");
+  requireOptionalManualPoints(value, "manualPointsTenths", "USO-Fall-Zusatzpunkte sind ungültig.");
   requireString(value, "submissionMonth", "USO-Fall-Abgabemonat fehlt.");
   requireString(value, "status", "USO-Fall-Status fehlt.");
   requireString(value, "createdAt", "USO-Fall-Erstellt-Zeit fehlt.");
@@ -282,6 +287,7 @@ function validateOtherMeasure(value: unknown): void {
   requireString(value, "id", "Sonstige-Maßnahme-ID fehlt.");
   requireString(value, "title", "Sonstige-Maßnahme-Titel fehlt.");
   requireString(value, "measureType", "Sonstige-Maßnahme-Art fehlt.");
+  requireOptionalManualPoints(value, "manualPointsTenths", "Sonstige-Maßnahme-Zusatzpunkte sind ungültig.");
   requireString(value, "submissionMonth", "Sonstige-Maßnahme-Abgabemonat fehlt.");
   requireString(value, "status", "Sonstige-Maßnahme-Status fehlt.");
   requireString(value, "createdAt", "Sonstige-Maßnahme-Erstellt-Zeit fehlt.");
@@ -354,11 +360,11 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
     files,
     savedDestinations: data.savedDestinations ?? [],
     tripPayments: data.tripPayments ?? [],
-    auditPointCases: data.auditPointCases ?? [],
+    auditPointCases: (data.auditPointCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
     auditPointGoals: data.auditPointGoals ?? [],
-    usoCases: data.usoCases ?? [],
+    usoCases: (data.usoCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
     usoGoals: data.usoGoals ?? [],
-    otherMeasures: data.otherMeasures ?? [],
+    otherMeasures: (data.otherMeasures ?? []).map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0 })),
     todos: data.todos ?? [],
     todoProjects: data.todoProjects ?? []
   };
@@ -439,6 +445,11 @@ function requireOptionalNumber(value: Record<string, unknown>, key: string, mess
 
 function requireOptionalNullableNumber(value: Record<string, unknown>, key: string, message: string): void {
   if (value[key] !== undefined && value[key] !== null && (typeof value[key] !== "number" || !Number.isFinite(value[key]))) throw new Error(message);
+}
+
+function requireOptionalManualPoints(value: Record<string, unknown>, key: string, message: string): void {
+  if (value[key] === undefined) return;
+  if (typeof value[key] !== "number" || !Number.isSafeInteger(value[key]) || value[key] < 0) throw new Error(message);
 }
 
 function requireOptionalNullableNumberRecord(value: Record<string, unknown>, key: string, message: string): void {

@@ -172,6 +172,34 @@ class WorkDashboardDb extends Dexie {
       todos: "id, projectId, dueDate, completedAt, updatedAt",
       todoProjects: "id, sortOrder, updatedAt"
     });
+    this.version(11).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt",
+      tripPayments: "id, year, date",
+      auditPointCases: "id, submissionMonth, status, category",
+      auditPointGoals: "id, &year",
+      usoCases: "id, submissionMonth, status",
+      usoGoals: "id, &year",
+      otherMeasures: "id, submissionMonth, status, measureType",
+      todos: "id, projectId, dueDate, completedAt, updatedAt",
+      todoProjects: "id, sortOrder, updatedAt"
+    }).upgrade(async (tx) => {
+      await tx.table<AuditPointCase, string>("auditPointCases").toCollection().modify((pointCase) => {
+        pointCase.manualPointsTenths = normalizeManualPoints(pointCase.manualPointsTenths);
+      });
+      await tx.table<UsoCase, string>("usoCases").toCollection().modify((pointCase) => {
+        pointCase.manualPointsTenths = normalizeManualPoints(pointCase.manualPointsTenths);
+      });
+      await tx.table<OtherMeasure, string>("otherMeasures").toCollection().modify((measure) => {
+        measure.manualPointsTenths = normalizeManualPoints(measure.manualPointsTenths);
+      });
+    });
   }
 }
 
@@ -370,7 +398,7 @@ export async function deleteTripPayment(id: string): Promise<void> {
 }
 
 export async function listAuditPointCases(): Promise<AuditPointCase[]> {
-  return db.auditPointCases.orderBy("submissionMonth").reverse().toArray();
+  return (await db.auditPointCases.orderBy("submissionMonth").reverse().toArray()).map(normalizeAuditPointCase);
 }
 
 export async function upsertAuditPointCase(input: Omit<AuditPointCase, "id" | "createdAt" | "updatedAt" | "submittedPointsTenths" | "submittedAt"> & { id?: string; submittedPointsTenths?: number | null; submittedAt?: string | null }): Promise<AuditPointCase> {
@@ -387,6 +415,7 @@ export async function upsertAuditPointCase(input: Omit<AuditPointCase, "id" | "c
     periodStartYear: input.periodStartYear,
     periodEndYear: input.periodEndYear,
     additionalResultCents: Math.max(Math.round(input.additionalResultCents), 0),
+    manualPointsTenths: normalizeManualPoints(input.manualPointsTenths),
     section99: input.section99,
     submissionMonth: input.submissionMonth,
     status: input.status,
@@ -394,7 +423,7 @@ export async function upsertAuditPointCase(input: Omit<AuditPointCase, "id" | "c
     updatedAt: now
   };
   const submittedPointsTenths = statusChangedToCompleted
-    ? calculateAuditPointBreakdown(draft).totalTenths
+    ? calculateAuditPointBreakdown(draft).automaticTotalTenths
     : staysCompleted
       ? existing.submittedPointsTenths
       : input.submittedPointsTenths ?? null;
@@ -427,7 +456,7 @@ export async function upsertAuditPointGoal(input: Omit<AuditPointGoal, "id" | "u
 }
 
 export async function listUsoCases(): Promise<UsoCase[]> {
-  return db.usoCases.orderBy("submissionMonth").reverse().toArray();
+  return (await db.usoCases.orderBy("submissionMonth").reverse().toArray()).map(normalizeUsoCase);
 }
 
 export async function upsertUsoCase(input: Omit<UsoCase, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<UsoCase> {
@@ -436,6 +465,7 @@ export async function upsertUsoCase(input: Omit<UsoCase, "id" | "createdAt" | "u
   const usoCase: UsoCase = {
     id: input.id ?? crypto.randomUUID(),
     title: input.title.trim(),
+    manualPointsTenths: normalizeManualPoints(input.manualPointsTenths),
     submissionMonth: input.submissionMonth,
     status: input.status,
     createdAt: existing?.createdAt ?? now,
@@ -465,7 +495,7 @@ export async function upsertUsoGoal(input: Omit<UsoGoal, "id" | "updatedAt"> & {
 }
 
 export async function listOtherMeasures(): Promise<OtherMeasure[]> {
-  return db.otherMeasures.orderBy("submissionMonth").reverse().toArray();
+  return (await db.otherMeasures.orderBy("submissionMonth").reverse().toArray()).map(normalizeOtherMeasure);
 }
 
 export async function upsertOtherMeasure(input: Omit<OtherMeasure, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<OtherMeasure> {
@@ -475,6 +505,7 @@ export async function upsertOtherMeasure(input: Omit<OtherMeasure, "id" | "creat
     id: input.id ?? crypto.randomUUID(),
     title: input.title.trim(),
     measureType: input.measureType.trim(),
+    manualPointsTenths: normalizeManualPoints(input.manualPointsTenths),
     submissionMonth: input.submissionMonth,
     status: input.status,
     createdAt: existing?.createdAt ?? now,
@@ -563,11 +594,11 @@ export async function readAllData(): Promise<BackupData> {
     trips: await db.trips.toArray(),
     tripPayments: await db.tripPayments.toArray(),
     savedDestinations: await db.savedDestinations.toArray(),
-    auditPointCases: await db.auditPointCases.toArray(),
+    auditPointCases: (await db.auditPointCases.toArray()).map(normalizeAuditPointCase),
     auditPointGoals: await db.auditPointGoals.toArray(),
-    usoCases: await db.usoCases.toArray(),
+    usoCases: (await db.usoCases.toArray()).map(normalizeUsoCase),
     usoGoals: await db.usoGoals.toArray(),
-    otherMeasures: await db.otherMeasures.toArray(),
+    otherMeasures: (await db.otherMeasures.toArray()).map(normalizeOtherMeasure),
     todos: await db.todos.toArray(),
     todoProjects: await db.todoProjects.toArray(),
     files: await db.files.toArray()
@@ -652,6 +683,7 @@ function normalizeAuditPointCase(pointCase: AuditPointCase): AuditPointCase {
     taxNumber: pointCase.taxNumber ?? "",
     firm: pointCase.firm ?? "",
     additionalResultCents: Math.max(Math.round(pointCase.additionalResultCents), 0),
+    manualPointsTenths: normalizeManualPoints(pointCase.manualPointsTenths),
     section99: Boolean(pointCase.section99),
     submittedPointsTenths: pointCase.submittedPointsTenths ?? null,
     submittedAt: pointCase.submittedAt ?? null
@@ -670,6 +702,7 @@ function normalizeUsoCase(usoCase: UsoCase): UsoCase {
   return {
     ...usoCase,
     title: usoCase.title ?? "",
+    manualPointsTenths: normalizeManualPoints(usoCase.manualPointsTenths),
     submissionMonth: usoCase.submissionMonth ?? "",
     status: usoCase.status === "completed" ? "completed" : "in_progress"
   };
@@ -688,7 +721,13 @@ function normalizeOtherMeasure(measure: OtherMeasure): OtherMeasure {
     ...measure,
     title: measure.title ?? "",
     measureType: measure.measureType ?? "",
+    manualPointsTenths: normalizeManualPoints(measure.manualPointsTenths),
     submissionMonth: measure.submissionMonth ?? "",
     status: measure.status === "completed" ? "completed" : "in_progress"
   };
+}
+
+function normalizeManualPoints(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(Math.round(value), 0);
 }

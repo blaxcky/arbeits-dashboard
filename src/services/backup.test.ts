@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BackupData, Settings } from "../db/schema";
+import type { AuditPointCase, BackupData, OtherMeasure, Settings, UsoCase } from "../db/schema";
 
 const dbMocks = vi.hoisted(() => ({
   readAllData: vi.fn(),
@@ -148,6 +148,15 @@ function backupData(): BackupData {
   };
 }
 
+function withManualPointDefaults<T extends { auditPointCases?: AuditPointCase[]; usoCases?: UsoCase[]; otherMeasures?: OtherMeasure[] }>(data: T) {
+  return {
+    ...data,
+    auditPointCases: (data.auditPointCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
+    usoCases: (data.usoCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
+    otherMeasures: (data.otherMeasures ?? []).map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0 }))
+  };
+}
+
 async function zipFileFrom(zip: JSZip, name = "backup.zip"): Promise<File> {
   const blob = await zip.generateAsync({ type: "blob" });
   return new File([blob], name, { type: "application/zip" });
@@ -187,14 +196,14 @@ describe("backup service", () => {
     expect(await zip.file("files/file-1-screenshot.png")?.async("uint8array")).toEqual(screenshotBytes);
   });
 
-  it("exports backup schema 1.10.0", async () => {
+  it("exports backup schema 1.11.0", async () => {
     dbMocks.readAllData.mockResolvedValue(backupData());
 
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { schemaVersion: string };
 
-    expect(manifest.schemaVersion).toBe("1.10.0");
+    expect(manifest.schemaVersion).toBe("1.11.0");
   });
 
   it("exports trip payments in the backup counts and data", async () => {
@@ -215,11 +224,12 @@ describe("backup service", () => {
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { auditPointCases: number; auditPointGoals: number } };
-    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { auditPointCases: unknown[]; auditPointGoals: unknown[] };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { auditPointCases: Array<{ manualPointsTenths?: number }>; auditPointGoals: unknown[] };
 
     expect(manifest.counts.auditPointCases).toBe(1);
     expect(manifest.counts.auditPointGoals).toBe(1);
     expect(data.auditPointCases).toHaveLength(1);
+    expect(data.auditPointCases[0].manualPointsTenths).toBe(0);
     expect(data.auditPointGoals).toHaveLength(1);
   });
 
@@ -229,11 +239,12 @@ describe("backup service", () => {
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { usoCases: number; usoGoals: number } };
-    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { usoCases: unknown[]; usoGoals: unknown[] };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { usoCases: Array<{ manualPointsTenths?: number }>; usoGoals: unknown[] };
 
     expect(manifest.counts.usoCases).toBe(1);
     expect(manifest.counts.usoGoals).toBe(1);
     expect(data.usoCases).toHaveLength(1);
+    expect(data.usoCases[0].manualPointsTenths).toBe(0);
     expect(data.usoGoals).toHaveLength(1);
   });
 
@@ -243,10 +254,11 @@ describe("backup service", () => {
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { otherMeasures: number } };
-    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { otherMeasures: unknown[] };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { otherMeasures: Array<{ manualPointsTenths?: number }> };
 
     expect(manifest.counts.otherMeasures).toBe(1);
     expect(data.otherMeasures).toHaveLength(1);
+    expect(data.otherMeasures[0].manualPointsTenths).toBe(0);
   });
 
   it("exports tasks and projects in the backup counts and data", async () => {
@@ -279,7 +291,7 @@ describe("backup service", () => {
 
     await importBackup(await zipFileFrom(zip));
 
-    expect(dbMocks.replaceAllData).toHaveBeenCalledWith(data);
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith(withManualPointDefaults(data));
   });
 
   it("keeps old inline dataUrl backups importable", async () => {
@@ -287,7 +299,7 @@ describe("backup service", () => {
 
     await importBackup(await makeZip(data, "1.0.0"));
 
-    expect(dbMocks.replaceAllData).toHaveBeenCalledWith(data);
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith(withManualPointDefaults(data));
   });
 
   it("normalizes missing quick-select times in old backups to null", async () => {
@@ -297,7 +309,7 @@ describe("backup service", () => {
     await importBackup(await makeZip(data, "1.8.0"));
 
     expect(dbMocks.replaceAllData).toHaveBeenCalledWith({
-      ...data,
+      ...withManualPointDefaults(data),
       settings: { ...legacySettings, preferredWorkStartTime: null, preferredWorkEndTime: null }
     });
   });
@@ -315,7 +327,7 @@ describe("backup service", () => {
 
     await importBackup(await makeZip(oldData, "1.3.0"));
 
-    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, tripPayments: [] });
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...withManualPointDefaults(oldData), tripPayments: [] });
   });
 
   it("normalizes old backups without audit points to empty lists", async () => {
@@ -323,7 +335,7 @@ describe("backup service", () => {
 
     await importBackup(await makeZip(oldData, "1.4.0"));
 
-    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, auditPointCases: [], auditPointGoals: [] });
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...withManualPointDefaults(oldData), auditPointCases: [], auditPointGoals: [] });
   });
 
   it("normalizes old backups without USO data to empty lists", async () => {
@@ -331,7 +343,7 @@ describe("backup service", () => {
 
     await importBackup(await makeZip(oldData, "1.5.0"));
 
-    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, usoCases: [], usoGoals: [] });
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...withManualPointDefaults(oldData), usoCases: [], usoGoals: [] });
   });
 
   it("normalizes old backups without other measures to an empty list", async () => {
@@ -339,7 +351,7 @@ describe("backup service", () => {
 
     await importBackup(await makeZip(oldData, "1.6.0"));
 
-    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, otherMeasures: [] });
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...withManualPointDefaults(oldData), otherMeasures: [] });
   });
 
   it("normalizes old backups without tasks and projects to empty lists", async () => {
@@ -347,7 +359,7 @@ describe("backup service", () => {
 
     await importBackup(await makeZip(oldData, "1.9.0"));
 
-    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...oldData, todos: [], todoProjects: [] });
+    expect(dbMocks.replaceAllData).toHaveBeenCalledWith({ ...withManualPointDefaults(oldData), todos: [], todoProjects: [] });
   });
 
   it("rejects malformed tasks and projects", async () => {

@@ -5,6 +5,7 @@ import {
   AUDIT_POINT_CATEGORY_RULES,
   DEFAULT_USO_TARGET_COUNT,
   buildAuditPointYearRows,
+  buildCombinedPointYearRows,
   buildOtherMeasureTypeBreakdown,
   buildOtherMeasureYearRows,
   buildUsoYearRows,
@@ -16,6 +17,8 @@ import {
   compareUsoCases,
   formatMonthName,
   pointsForAuditCase,
+  pointsForOtherMeasure,
+  pointsForUsoCase,
   summarizeAuditPoints
 } from "./calculations";
 
@@ -165,6 +168,16 @@ describe("audit point calculations", () => {
     expect(pointsForAuditCase({ ...baseCase, status: "in_progress", submittedPointsTenths: 123 })).toBe(calculateAuditPointBreakdown(baseCase).totalTenths);
   });
 
+  it("adds manual BP points without changing the automatic frozen value", () => {
+    const breakdown = calculateAuditPointBreakdown({ ...baseCase, manualPointsTenths: 15 });
+
+    expect(breakdown).toMatchObject({ automaticTotalTenths: 100, manualPointsTenths: 15, totalTenths: 115 });
+    expect(pointsForAuditCase({ ...baseCase, status: "completed", submittedPointsTenths: 60, manualPointsTenths: 15 })).toBe(75);
+    expect(pointsForAuditCase({ ...baseCase, manualPointsTenths: 15 })).toBe(115);
+    expect(pointsForUsoCase({ manualPointsTenths: 12 })).toBe(12);
+    expect(pointsForOtherMeasure({ manualPointsTenths: 7 })).toBe(7);
+  });
+
   it("summarizes cases by submission month and year", () => {
     const summary = summarizeAuditPoints([
       { ...baseCase, status: "completed", submittedPointsTenths: 80 },
@@ -195,6 +208,23 @@ describe("audit point calculations", () => {
     expect(rows[0]).toMatchObject({ submissionValue: 60, openValue: calculateAuditPointBreakdown(baseCase).totalTenths, targetValue: 10, cumulativeValue: 60, remainingValue: 0, targetReached: true });
     expect(rows[1]).toMatchObject({ submissionValue: 40, targetValue: 20, cumulativeValue: 100, remainingValue: 0, targetReached: true });
     expect(rows[11]).toMatchObject({ targetValue: 120, cumulativeValue: 100, remainingValue: 20, targetReached: false });
+  });
+
+  it("aggregates completed and open manual points from all point case types by month", () => {
+    const rows = buildCombinedPointYearRows(
+      [
+        { ...baseCase, id: "audit-done", status: "completed", submittedPointsTenths: 60, manualPointsTenths: 5, submissionMonth: "2026-01" },
+        { ...baseCase, id: "audit-open", status: "in_progress", submittedPointsTenths: null, manualPointsTenths: 2, submissionMonth: "2026-01" }
+      ],
+      [{ ...baseUsoCase, id: "uso-done", manualPointsTenths: 15, submissionMonth: "2026-01" }, { ...baseUsoCase, id: "uso-open", status: "in_progress", manualPointsTenths: 20, submissionMonth: "2026-02" }],
+      [{ ...baseOtherMeasure, id: "other-done", manualPointsTenths: 7, submissionMonth: "2026-01" }, { ...baseOtherMeasure, id: "other-no-month", manualPointsTenths: 90, submissionMonth: "", status: "completed" }],
+      2026,
+      [{ id: "goal-2026", year: 2026, targetPointsTenths: 120, updatedAt: "2026-05-01T08:00:00.000Z" }]
+    );
+
+    expect(rows[0]).toMatchObject({ submissionValue: 87, openValue: 102, cumulativeValue: 87 });
+    expect(rows[1]).toMatchObject({ submissionValue: 0, openValue: 20, cumulativeValue: 87 });
+    expect(rows[11]).toMatchObject({ cumulativeValue: 87 });
   });
 
   it("evaluates BP yearly targets against the current annual completed value", () => {

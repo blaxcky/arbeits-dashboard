@@ -2009,6 +2009,10 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.points-uso-row-with-points {
+  grid-template-columns: minmax(0, 1fr) minmax(90px, auto) auto;
+}
+
 .points-type-breakdown {
   display: grid;
   gap: 10px;

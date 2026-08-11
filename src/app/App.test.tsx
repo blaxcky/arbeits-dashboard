@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateSettingsForm, WorkTimeField, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateOtherMeasureForm, validateSettingsForm, validateUsoCaseForm, WorkTimeField, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase, Settings } from "../db/schema";
 
@@ -275,6 +275,7 @@ describe("AuditPointsView form tabs", () => {
     } as unknown as Parameters<typeof AuditPointsView>[0]["data"];
 
     render(<AuditPointsView data={data} showToast={vi.fn()} />);
+    return data;
   }
 
   it("starts on the audit form and renders exactly one form panel", () => {
@@ -389,6 +390,32 @@ describe("AuditPointsView form tabs", () => {
     expect(screen.getByRole("tab", { name: "Betriebsprüfung" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Fall bearbeiten")).toBeInTheDocument();
     expect(screen.getByLabelText("Name")).toHaveValue("BP Tab-Test");
+  });
+
+  it("validates and saves manual points for all three form types", async () => {
+    const data = renderView();
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "BP mit Zusatz" } });
+    fireEvent.change(screen.getByLabelText("Zusatzpunkte (manuell)"), { target: { value: "1,5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Fall speichern" }));
+    await waitFor(() => expect(data.saveAuditPointCase).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 15 })));
+
+    fireEvent.click(screen.getByRole("tab", { name: "USO-Fall" }));
+    fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "USO mit Zusatz" } });
+    fireEvent.change(screen.getByLabelText("Zusatzpunkte (manuell)"), { target: { value: "0.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "USO-Fall speichern" }));
+    await waitFor(() => expect(data.saveUsoCase).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 5 })));
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sonstige Maßnahme" }));
+    fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "Maßnahme mit Zusatz" } });
+    fireEvent.change(screen.getByLabelText("Art"), { target: { value: "CLO-Anfrage" } });
+    fireEvent.change(screen.getByLabelText("Zusatzpunkte (manuell)"), { target: { value: "1,25" } });
+    fireEvent.click(screen.getByRole("button", { name: "Maßnahme speichern" }));
+    expect(screen.getByRole("textbox", { name: /Zusatzpunkte \(manuell\)/ })).toHaveAttribute("aria-invalid", "true");
+    expect(data.saveOtherMeasure).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole("textbox", { name: /Zusatzpunkte \(manuell\)/ }), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Maßnahme speichern" }));
+    await waitFor(() => expect(data.saveOtherMeasure).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 20 })));
   });
 });
 
@@ -678,8 +705,18 @@ describe("audit point helpers", () => {
     expect(validateAuditPointCaseForm({ ...baseForm, periodEndYear: "2019" }).valid).toBe(false);
     expect(validateAuditPointCaseForm({ ...baseForm, category: "X1" as "M1" }).valid).toBe(false);
     expect(validateAuditPointCaseForm({ ...baseForm, additionalResultEuros: "12,345" }).valid).toBe(false);
+    expect(validateAuditPointCaseForm({ ...baseForm, manualPoints: "12,34" }).valid).toBe(false);
+    expect(validateAuditPointCaseForm({ ...baseForm, manualPoints: "-1" }).valid).toBe(false);
     expect(validateAuditPointCaseForm({ ...baseForm, submissionMonth: "2026-13" }).valid).toBe(false);
     expect(validateAuditPointCaseForm({ ...baseForm, submissionMonth: "Mai 2026" }).valid).toBe(false);
+  });
+
+  it("accepts empty and zero manual points for USO and other measures", () => {
+    expect(validateUsoCaseForm({ title: "USO", submissionMonth: "", status: "in_progress", manualPoints: "" })).toMatchObject({ valid: true, manualPointsTenths: 0 });
+    expect(validateUsoCaseForm({ title: "USO", submissionMonth: "", status: "in_progress", manualPoints: "0" })).toMatchObject({ valid: true, manualPointsTenths: 0 });
+    expect(validateUsoCaseForm({ title: "USO", submissionMonth: "", status: "in_progress", manualPoints: "1,5" })).toMatchObject({ valid: true, manualPointsTenths: 15 });
+    expect(validateOtherMeasureForm({ title: "Maßnahme", measureType: "Sonstige", submissionMonth: "", status: "in_progress", manualPoints: "1.5" })).toMatchObject({ valid: true, manualPointsTenths: 15 });
+    expect(validateOtherMeasureForm({ title: "Maßnahme", measureType: "Sonstige", submissionMonth: "", status: "in_progress", manualPoints: "1,25" }).valid).toBe(false);
   });
 
   it("summarizes audit points by submission month", () => {

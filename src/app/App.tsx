@@ -76,6 +76,7 @@ import {
   AUDIT_POINT_CATEGORY_RULES,
   calculateAuditPointBreakdown,
   buildAuditPointYearRows,
+  buildCombinedPointYearRows,
   buildOtherMeasureTypeBreakdown,
   buildOtherMeasureYearRows,
   buildUsoYearRows,
@@ -1086,6 +1087,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
       periodStartYear: validation.periodStartYear,
       periodEndYear: validation.periodEndYear,
       additionalResultCents: validation.additionalResultCents,
+      manualPointsTenths: validation.manualPointsTenths,
       section99: form.section99,
       submissionMonth: form.submissionMonth,
       status: normalizePointFormStatus(form.status)
@@ -1122,6 +1124,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
       periodStartYear: pointCase.periodStartYear,
       periodEndYear: pointCase.periodEndYear,
       additionalResultCents: pointCase.additionalResultCents,
+      manualPointsTenths: pointCase.manualPointsTenths ?? 0,
       section99: pointCase.section99,
       submissionMonth: pointCase.submissionMonth,
       status: pointCase.status === "completed" ? "in_progress" : "completed"
@@ -1152,6 +1155,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     await data.saveUsoCase({
       id: usoEditingId ?? undefined,
       title: usoForm.title.trim(),
+      manualPointsTenths: validation.manualPointsTenths,
       submissionMonth: usoForm.submissionMonth,
       status: normalizePointFormStatus(usoForm.status)
     });
@@ -1181,6 +1185,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     await data.saveUsoCase({
       id: usoCase.id,
       title: usoCase.title,
+      manualPointsTenths: usoCase.manualPointsTenths ?? 0,
       submissionMonth: usoCase.submissionMonth,
       status: usoCase.status === "completed" ? "in_progress" : "completed"
     });
@@ -1211,6 +1216,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
       id: otherEditingId ?? undefined,
       title: otherForm.title.trim(),
       measureType: otherForm.measureType.trim(),
+      manualPointsTenths: validation.manualPointsTenths,
       submissionMonth: otherForm.submissionMonth,
       status: normalizePointFormStatus(otherForm.status)
     });
@@ -1241,6 +1247,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
       id: measure.id,
       title: measure.title,
       measureType: measure.measureType,
+      manualPointsTenths: measure.manualPointsTenths ?? 0,
       submissionMonth: measure.submissionMonth,
       status: measure.status === "completed" ? "in_progress" : "completed"
     });
@@ -1260,6 +1267,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             <div className="trip-row-metrics">
               <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
               <span>{formatEuroCents(pointCase.additionalResultCents)}</span>
+              {pointCase.manualPointsTenths ? <small>davon manuell {formatPointTenths(pointCase.manualPointsTenths)}</small> : null}
               <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
             </div>
             <div className="trip-actions">
@@ -1283,12 +1291,13 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     return (
       <div className="trip-list">
         {cases.map((usoCase) => (
-          <article key={usoCase.id} className={`trip-row points-uso-row ${usoCase.status === "completed" ? "trip-row-done" : ""}`}>
+          <article key={usoCase.id} className={`trip-row points-uso-row ${usoCase.manualPointsTenths ? "points-uso-row-with-points" : ""} ${usoCase.status === "completed" ? "trip-row-done" : ""}`}>
             <div>
               <strong>{usoCase.title}</strong>
               <span>{usoCase.submissionMonth || "Kein Abgabemonat"}</span>
               {usoCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
             </div>
+            {usoCase.manualPointsTenths ? <div className="trip-row-metrics"><strong>{formatPointTenths(usoCase.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
             <div className="trip-actions">
               <button className="icon-button trip-action-button" type="button" title={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleUsoCase(usoCase)}>
                 {usoCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
@@ -1310,12 +1319,13 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     return (
       <div className="trip-list">
         {measures.map((measure) => (
-          <article key={measure.id} className={`trip-row points-uso-row ${measure.status === "completed" ? "trip-row-done" : ""}`}>
+          <article key={measure.id} className={`trip-row points-uso-row ${measure.manualPointsTenths ? "points-uso-row-with-points" : ""} ${measure.status === "completed" ? "trip-row-done" : ""}`}>
             <div>
               <strong>{measure.title}</strong>
               <span>{measure.measureType} · {measure.submissionMonth || "Kein Abgabemonat"}</span>
               {measure.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
             </div>
+            {measure.manualPointsTenths ? <div className="trip-row-metrics"><strong>{formatPointTenths(measure.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
             <div className="trip-actions">
               <button className="icon-button trip-action-button" type="button" title={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleOtherMeasure(measure)}>
                 {measure.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
@@ -1403,6 +1413,9 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
               <Field label="Mehrergebnis (EUR)" className="field-wide" error={errors.additionalResultEuros}>
                 <input inputMode="decimal" placeholder="0,00" value={form.additionalResultEuros} aria-invalid={Boolean(errors.additionalResultEuros)} onChange={(event) => updateField("additionalResultEuros", event.target.value)} />
               </Field>
+              <Field label="Zusatzpunkte (manuell)" className="field-wide" error={errors.manualPoints}>
+                <input inputMode="decimal" placeholder="0,0" value={form.manualPoints} aria-invalid={Boolean(errors.manualPoints)} onChange={(event) => updateField("manualPoints", event.target.value)} />
+              </Field>
               <label className="check-row field-wide"><input type="checkbox" checked={form.section99} onChange={(event) => updateField("section99", event.target.checked)} /> §99-Zuschlag</label>
             </FormSection>
             <FormSection id="audit-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card points-form-card-submission">
@@ -1443,6 +1456,9 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
               <FormSection id="uso-section-details" title="Falldaten" icon={ClipboardText} className="points-form-card">
                 <Field label="Titel" className="field-wide" error={usoErrors.title}>
                   <input value={usoForm.title} aria-invalid={Boolean(usoErrors.title)} onChange={(event) => updateUsoField("title", event.target.value)} />
+                </Field>
+                <Field label="Zusatzpunkte (manuell)" className="field-wide" error={usoErrors.manualPoints}>
+                  <input inputMode="decimal" placeholder="0,0" value={usoForm.manualPoints} aria-invalid={Boolean(usoErrors.manualPoints)} onChange={(event) => updateUsoField("manualPoints", event.target.value)} />
                 </Field>
               </FormSection>
               <FormSection id="uso-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card">
@@ -1488,6 +1504,9 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                     <option value="CLO-Anfrage" />
                     <option value="Sonstige" />
                   </datalist>
+                </Field>
+                <Field label="Zusatzpunkte (manuell)" className="field-wide" error={otherErrors.manualPoints}>
+                  <input inputMode="decimal" placeholder="0,0" value={otherForm.manualPoints} aria-invalid={Boolean(otherErrors.manualPoints)} onChange={(event) => updateOtherField("manualPoints", event.target.value)} />
                 </Field>
               </FormSection>
               <FormSection id="other-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card">
@@ -1550,6 +1569,7 @@ function AuditPointBreakdownPreview({ breakdown }: { breakdown: ReturnType<typeo
         <span className="trip-preview-title">Punkte</span>
         <dl className="trip-preview-list">
           <div><dt>Gesamt</dt><dd>{breakdown ? formatPointTenths(breakdown.totalTenths) : "-"}</dd></div>
+          {breakdown && breakdown.manualPointsTenths > 0 ? <div><dt>Zusatzpunkte (manuell)</dt><dd>{formatPointTenths(breakdown.manualPointsTenths)}</dd></div> : null}
           <div><dt>Jahre</dt><dd>{breakdown ? breakdown.cappedYears : "-"}</dd></div>
         </dl>
       </div>
@@ -1576,7 +1596,7 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
   const params = useParams();
   const year = yearFromUrlParam(params.year);
   const yearOptions = pointYearOptions(data.auditPointCases, data.usoCases, data.otherMeasures, currentYear(), year);
-  const auditRows = buildAuditPointYearRows(data.auditPointCases, year, data.auditPointGoals);
+  const auditRows = buildCombinedPointYearRows(data.auditPointCases, data.usoCases, data.otherMeasures, year, data.auditPointGoals);
   const usoRows = buildUsoYearRows(data.usoCases, year, data.usoGoals);
   const otherRows = buildOtherMeasureYearRows(data.otherMeasures, year);
   const otherTypeBreakdown = buildOtherMeasureTypeBreakdown(data.otherMeasures, year);
@@ -3522,6 +3542,7 @@ function auditPointCaseToForm(pointCase?: AuditPointCase, fallbackMonth = "") {
     periodStartYear: pointCase ? String(pointCase.periodStartYear) : String(currentYear()),
     periodEndYear: pointCase ? String(pointCase.periodEndYear) : String(currentYear()),
     additionalResultEuros: pointCase ? centsToEuroInput(pointCase.additionalResultCents) : "0",
+    manualPoints: pointCase ? formatPointInput(pointCase.manualPointsTenths ?? 0) : "",
     section99: pointCase?.section99 ?? false,
     submissionMonth: pointCase?.submissionMonth ?? fallbackMonth,
     status: (pointCase?.status ?? "in_progress") as PointFormStatus
@@ -3531,6 +3552,7 @@ function auditPointCaseToForm(pointCase?: AuditPointCase, fallbackMonth = "") {
 function usoCaseToForm(usoCase?: UsoCase, fallbackMonth = "") {
   return {
     title: usoCase?.title ?? "",
+    manualPoints: usoCase ? formatPointInput(usoCase.manualPointsTenths ?? 0) : "",
     submissionMonth: usoCase?.submissionMonth ?? fallbackMonth,
     status: (usoCase?.status ?? "in_progress") as PointFormStatus
   };
@@ -3540,6 +3562,7 @@ function otherMeasureToForm(measure?: OtherMeasure, fallbackMonth = "") {
   return {
     title: measure?.title ?? "",
     measureType: measure?.measureType ?? "",
+    manualPoints: measure ? formatPointInput(measure.manualPointsTenths ?? 0) : "",
     submissionMonth: measure?.submissionMonth ?? fallbackMonth,
     status: (measure?.status ?? "in_progress") as PointFormStatus
   };
@@ -3570,14 +3593,16 @@ function parseUsoTargetInput(value: string): number | null {
   return numeric;
 }
 
-export function validateAuditPointCaseForm(form: AuditPointCaseForm):
-  | { valid: true; errors: Partial<Record<keyof AuditPointCaseForm, string>>; category: AuditPointCategory; periodStartYear: number; periodEndYear: number; additionalResultCents: number }
+export function validateAuditPointCaseForm(form: Omit<AuditPointCaseForm, "manualPoints"> & { manualPoints?: string }):
+  | { valid: true; errors: Partial<Record<keyof AuditPointCaseForm, string>>; category: AuditPointCategory; periodStartYear: number; periodEndYear: number; additionalResultCents: number; manualPointsTenths: number }
   | { valid: false; errors: Partial<Record<keyof AuditPointCaseForm, string>> } {
   const errors: Partial<Record<keyof AuditPointCaseForm, string>> = {};
   const category = form.category;
   const periodStartYear = Number(form.periodStartYear);
   const periodEndYear = Number(form.periodEndYear);
   const additionalResultCents = form.additionalResultEuros.trim() === "" ? 0 : parseEuroCentsInput(form.additionalResultEuros);
+  const manualPointsInput = form.manualPoints ?? "";
+  const manualPointsTenths = manualPointsInput.trim() === "" ? 0 : parsePointTenthsInput(manualPointsInput);
 
   if (!form.name.trim()) errors.name = "Bitte einen Namen eingeben.";
   if (!isAuditPointCategory(category)) errors.category = "Bitte eine gültige Betriebskategorie wählen.";
@@ -3585,37 +3610,44 @@ export function validateAuditPointCaseForm(form: AuditPointCaseForm):
   if (!Number.isInteger(periodEndYear) || periodEndYear < 1900 || periodEndYear > 2200) errors.periodEndYear = "Bitte ein gültiges Jahr eingeben.";
   if (Number.isInteger(periodStartYear) && Number.isInteger(periodEndYear) && periodEndYear < periodStartYear) errors.periodEndYear = "Bis-Jahr darf nicht vor Von-Jahr liegen.";
   if (additionalResultCents === null) errors.additionalResultEuros = "Bitte einen Betrag mit maximal zwei Dezimalstellen eingeben.";
+  if (manualPointsTenths === null) errors.manualPoints = "Bitte Zusatzpunkte mit maximal einer Nachkommastelle eingeben.";
   if (form.submissionMonth !== "" && !isValidAuditPointMonth(form.submissionMonth)) errors.submissionMonth = "Bitte einen gültigen Abgabemonat wählen.";
 
-  if (Object.keys(errors).length > 0 || !isAuditPointCategory(category) || additionalResultCents === null) {
+  if (Object.keys(errors).length > 0 || !isAuditPointCategory(category) || additionalResultCents === null || manualPointsTenths === null) {
     return { valid: false, errors };
   }
 
-  return { valid: true, errors, category, periodStartYear, periodEndYear, additionalResultCents };
+  return { valid: true, errors, category, periodStartYear, periodEndYear, additionalResultCents, manualPointsTenths };
 }
 
-function validateUsoCaseForm(form: ReturnType<typeof usoCaseToForm>):
-  | { valid: true; errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>> }
+export function validateUsoCaseForm(form: Omit<ReturnType<typeof usoCaseToForm>, "manualPoints"> & { manualPoints?: string }):
+  | { valid: true; errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>>; manualPointsTenths: number }
   | { valid: false; errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>> } {
   const errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>> = {};
+  const manualPointsInput = form.manualPoints ?? "";
+  const manualPointsTenths = manualPointsInput.trim() === "" ? 0 : parsePointTenthsInput(manualPointsInput);
   if (!form.title.trim()) errors.title = "Bitte einen Titel eingeben.";
+  if (manualPointsTenths === null) errors.manualPoints = "Bitte Zusatzpunkte mit maximal einer Nachkommastelle eingeben.";
   if (form.submissionMonth !== "" && !isValidAuditPointMonth(form.submissionMonth)) errors.submissionMonth = "Bitte einen gültigen Abgabemonat wählen.";
-  if (Object.keys(errors).length > 0) return { valid: false, errors };
-  return { valid: true, errors };
+  if (Object.keys(errors).length > 0 || manualPointsTenths === null) return { valid: false, errors };
+  return { valid: true, errors, manualPointsTenths };
 }
 
-function validateOtherMeasureForm(form: ReturnType<typeof otherMeasureToForm>):
-  | { valid: true; errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>> }
+export function validateOtherMeasureForm(form: Omit<ReturnType<typeof otherMeasureToForm>, "manualPoints"> & { manualPoints?: string }):
+  | { valid: true; errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>>; manualPointsTenths: number }
   | { valid: false; errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>> } {
   const errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>> = {};
+  const manualPointsInput = form.manualPoints ?? "";
+  const manualPointsTenths = manualPointsInput.trim() === "" ? 0 : parsePointTenthsInput(manualPointsInput);
   if (!form.title.trim()) errors.title = "Bitte einen Titel eingeben.";
   if (!form.measureType.trim()) errors.measureType = "Bitte eine Art eingeben.";
+  if (manualPointsTenths === null) errors.manualPoints = "Bitte Zusatzpunkte mit maximal einer Nachkommastelle eingeben.";
   if (form.submissionMonth !== "" && !isValidAuditPointMonth(form.submissionMonth)) errors.submissionMonth = "Bitte einen gültigen Abgabemonat wählen.";
-  if (Object.keys(errors).length > 0) return { valid: false, errors };
-  return { valid: true, errors };
+  if (Object.keys(errors).length > 0 || manualPointsTenths === null) return { valid: false, errors };
+  return { valid: true, errors, manualPointsTenths };
 }
 
-function auditPointCaseDraftForPreview(form: AuditPointCaseForm): Pick<AuditPointCase, "category" | "periodStartYear" | "periodEndYear" | "additionalResultCents" | "section99"> | null {
+function auditPointCaseDraftForPreview(form: AuditPointCaseForm): Pick<AuditPointCase, "category" | "periodStartYear" | "periodEndYear" | "additionalResultCents" | "section99" | "manualPointsTenths"> | null {
   const validation = validateAuditPointCaseForm({ ...form, name: form.name || "x" });
   if (!validation.valid) return null;
   return {
@@ -3623,7 +3655,8 @@ function auditPointCaseDraftForPreview(form: AuditPointCaseForm): Pick<AuditPoin
     periodStartYear: validation.periodStartYear,
     periodEndYear: validation.periodEndYear,
     additionalResultCents: validation.additionalResultCents,
-    section99: form.section99
+    section99: form.section99,
+    manualPointsTenths: validation.manualPointsTenths
   };
 }
 

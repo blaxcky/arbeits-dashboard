@@ -11,6 +11,8 @@ export interface AuditPointBreakdown {
   periodTenths: number;
   section99Tenths: number;
   additionalResultTenths: number;
+  manualPointsTenths: number;
+  automaticTotalTenths: number;
   totalTenths: number;
   cappedYears: number;
 }
@@ -131,7 +133,7 @@ export function calculateAdditionalResultBonusTenths(additionalResultCents: numb
   return ADDITIONAL_RESULT_BONUSES.reduce((sum, bonus) => sum + (cents > bonus.thresholdCents ? bonus.pointsTenths : 0), 0);
 }
 
-export function calculateAuditPointBreakdown(input: Pick<AuditPointCase, "category" | "periodStartYear" | "periodEndYear" | "additionalResultCents" | "section99">): AuditPointBreakdown {
+export function calculateAuditPointBreakdown(input: Pick<AuditPointCase, "category" | "periodStartYear" | "periodEndYear" | "additionalResultCents" | "section99" | "manualPointsTenths">): AuditPointBreakdown {
   const rule = AUDIT_POINT_CATEGORY_RULES[input.category];
   if (!rule) throw new Error("Betriebskategorie ist ungültig.");
   const cappedYears = cappedAuditPeriodYears(input.periodStartYear, input.periodEndYear);
@@ -139,21 +141,34 @@ export function calculateAuditPointBreakdown(input: Pick<AuditPointCase, "catego
   const periodTenths = cappedYears * rule.yearlyTenths;
   const section99Tenths = input.section99 ? categoryTenths + periodTenths : 0;
   const additionalResultTenths = calculateAdditionalResultBonusTenths(input.additionalResultCents);
+  const automaticTotalTenths = categoryTenths + periodTenths + section99Tenths + additionalResultTenths;
+  const manualPointsTenths = normalizeManualPoints(input.manualPointsTenths);
   return {
     categoryTenths,
     periodTenths,
     section99Tenths,
     additionalResultTenths,
+    manualPointsTenths,
+    automaticTotalTenths,
     cappedYears,
-    totalTenths: categoryTenths + periodTenths + section99Tenths + additionalResultTenths
+    totalTenths: automaticTotalTenths + manualPointsTenths
   };
 }
 
 export function pointsForAuditCase(pointCase: AuditPointCase): number {
-  if (pointCase.status === "completed" && pointCase.submittedPointsTenths !== null) {
-    return pointCase.submittedPointsTenths;
+  const manualPointsTenths = normalizeManualPoints(pointCase.manualPointsTenths);
+  if (pointCase.status === "completed" && typeof pointCase.submittedPointsTenths === "number") {
+    return pointCase.submittedPointsTenths + manualPointsTenths;
   }
   return calculateAuditPointBreakdown(pointCase).totalTenths;
+}
+
+export function pointsForUsoCase(pointCase: Pick<UsoCase, "manualPointsTenths">): number {
+  return normalizeManualPoints(pointCase.manualPointsTenths);
+}
+
+export function pointsForOtherMeasure(measure: Pick<OtherMeasure, "manualPointsTenths">): number {
+  return normalizeManualPoints(measure.manualPointsTenths);
 }
 
 export function summarizeAuditPoints(cases: AuditPointCase[], year: number, month: string | null = null, goals: AuditPointGoal[] = []): AuditPointSummary {
@@ -191,18 +206,43 @@ export function summarizeAuditPoints(cases: AuditPointCase[], year: number, mont
   };
 }
 
-export function buildAuditPointYearRows(cases: AuditPointCase[], year: number, goals: AuditPointGoal[] = []): YearlyMonthlyRow[] {
+export function buildAuditPointYearRows(
+  cases: AuditPointCase[],
+  year: number,
+  goals: AuditPointGoal[] = [],
+  usoCases: UsoCase[] = [],
+  otherMeasures: OtherMeasure[] = []
+): YearlyMonthlyRow[] {
   const targetPointsTenths = goals.find((goal) => goal.year === year)?.targetPointsTenths ?? null;
   return buildYearRows(year, targetPointsTenths, (month) => {
     const monthlyCases = cases.filter((pointCase) => pointCase.submissionMonth === month);
-    return monthlyCases.reduce((current, pointCase) => {
+    const monthlyUsoCases = usoCases.filter((pointCase) => pointCase.submissionMonth === month);
+    const monthlyOtherMeasures = otherMeasures.filter((measure) => measure.submissionMonth === month);
+    const values = monthlyCases.reduce((current, pointCase) => {
       const pointsTenths = pointsForAuditCase(pointCase);
       if (pointCase.status === "completed") {
         return { ...current, submissionValue: current.submissionValue + pointsTenths };
       }
       return { ...current, openValue: current.openValue + pointsTenths };
     }, { submissionValue: 0, openValue: 0 });
+    return [...monthlyUsoCases, ...monthlyOtherMeasures].reduce((current, pointCase) => {
+      const pointsTenths = "measureType" in pointCase ? pointsForOtherMeasure(pointCase) : pointsForUsoCase(pointCase);
+      if (pointCase.status === "completed") {
+        return { ...current, submissionValue: current.submissionValue + pointsTenths };
+      }
+      return { ...current, openValue: current.openValue + pointsTenths };
+    }, values);
   });
+}
+
+export function buildCombinedPointYearRows(
+  cases: AuditPointCase[],
+  usoCases: UsoCase[],
+  otherMeasures: OtherMeasure[],
+  year: number,
+  goals: AuditPointGoal[] = []
+): YearlyMonthlyRow[] {
+  return buildAuditPointYearRows(cases, year, goals, usoCases, otherMeasures);
 }
 
 export function usoTargetForYear(goals: UsoGoal[], year: number): number {
@@ -286,4 +326,9 @@ function buildYearRows(year: number, targetValue: number | null, monthValue: (mo
       targetReached: monthlyTarget === null ? null : currentYearValue >= monthlyTarget
     };
   });
+}
+
+function normalizeManualPoints(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(Math.round(value), 0);
 }
