@@ -2205,7 +2205,14 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                   </button>
                 </div>
               </Field>
-              <Field label="Einfache Strecke (km)" className="trip-field-half"><input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} /></Field>
+              <Field label="Einfache Strecke (km)" className="trip-field-half">
+                <div className="input-with-button">
+                  <input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} />
+                  <button className="icon-button" type="button" title="Google Maps öffnen" aria-label="Google Maps öffnen" disabled={!mapsUrl} onClick={openGoogleMaps}>
+                    <MapTrifold size={18} />
+                  </button>
+                </div>
+              </Field>
             </FormSection>
             <FormSection id="trip-section-costs" title="Fahrtkosten" icon={Car} className="form-section-split">
               <Field label="Fahrtkostenart" className="trip-field-half">
@@ -2263,15 +2270,13 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             </div>
           </section>
           {publicTicketAboveSubsidy ? <Notice tone="warning" title="Ticketpreise liegen über dem Öffi-BEZU" text="Es wird der Ticketpreis für Hin- und Rückreise ersetzt; dadurch entsteht kein steuerpflichtiger Öffi-BEZU." /> : null}
-          <div className="trip-helper-grid">
-            {mapsUrl ? (
-              <div className="button-row trip-map-actions">
-                <button className="secondary-button" type="button" onClick={openGoogleMaps}>Google Maps öffnen</button>
-              </div>
-            ) : <span className="muted">Google-Maps-Link erscheint nach Startort und Zieladresse.</span>}
-            {needsKilometerEvidence ? <span className="inline-warning">Nachweis: Screenshot, dass kein Dienstauto frei war.</span> : null}
-            {needsPublicTransportEvidence ? <span className="inline-warning">Nachweis: ÖBB-Verbindungskosten zeitnah sichern.</span> : null}
-          </div>
+          {!mapsUrl || needsKilometerEvidence || needsPublicTransportEvidence ? (
+            <div className="trip-helper-grid">
+              {!mapsUrl ? <span className="muted">Google-Maps-Link erscheint nach Startort und Zieladresse.</span> : null}
+              {needsKilometerEvidence ? <span className="inline-warning">Nachweis: Screenshot, dass kein Dienstauto frei war.</span> : null}
+              {needsPublicTransportEvidence ? <span className="inline-warning">Nachweis: ÖBB-Verbindungskosten zeitnah sichern.</span> : null}
+            </div>
+          ) : null}
           <section
             className={`trip-form-evidence ${editingTrip ? "" : "trip-form-evidence-disabled"}`.trim()}
             aria-labelledby="trip-form-evidence-title"

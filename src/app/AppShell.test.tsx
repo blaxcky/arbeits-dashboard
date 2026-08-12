@@ -207,13 +207,17 @@ describe("Google Maps route action", () => {
 
     fireEvent.change(screen.getByLabelText("Startort"), { target: { value: "Eisenstadt Finanzamt" } });
     fireEvent.change(screen.getByLabelText("Zieladresse"), { target: { value: "Stephansplatz 1, 1010 Wien" } });
+    fireEvent.change(screen.getByLabelText("Fahrtkostenart"), { target: { value: "dienstauto" } });
 
     const mapsButton = screen.getByRole("button", { name: "Google Maps öffnen" });
     expect(mapsButton).toBeInTheDocument();
+    expect(mapsButton).toBeEnabled();
+    expect(screen.getByLabelText("Einfache Strecke (km)").parentElement).toContainElement(mapsButton);
     expect(screen.getAllByRole("button", { name: "Google Maps öffnen" })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Vorschau öffnen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Große Vorschau" })).not.toBeInTheDocument();
     expect(document.querySelector("iframe")).not.toBeInTheDocument();
+    expect(document.querySelector(".trip-helper-grid")).not.toBeInTheDocument();
 
     fireEvent.click(mapsButton);
 
@@ -230,6 +234,12 @@ describe("Google Maps route action", () => {
     fireEvent.change(screen.getByLabelText("Startort"), { target: { value: "Eisenstadt Finanzamt" } });
 
     expect(screen.getByText("Google-Maps-Link erscheint nach Startort und Zieladresse.")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Google Maps öffnen" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Google Maps öffnen" })).toBeDisabled();
+    expect(screen.getByLabelText("Einfache Strecke (km)").parentElement).toContainElement(
+      screen.getByRole("button", { name: "Google Maps öffnen" })
+    );
+    expect(screen.queryByRole("button", { name: "Vorschau öffnen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Große Vorschau" })).not.toBeInTheDocument();
+    expect(document.querySelector("iframe")).not.toBeInTheDocument();
   });
 });
