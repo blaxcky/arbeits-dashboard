@@ -61,12 +61,19 @@ const workData = vi.hoisted(() => ({
   removeTodo: vi.fn(),
   saveTodoProject: vi.fn(),
   removeTodoProject: vi.fn(),
-  saveTrip: vi.fn()
+  saveTrip: vi.fn(),
+  saveTripFile: vi.fn(),
+  removeTripFile: vi.fn(),
+  saveDestination: vi.fn(),
+  removeDestination: vi.fn(),
+  removeTrip: vi.fn(),
+  saveTripPayment: vi.fn(),
+  removeTripPayment: vi.fn()
 }));
 
 vi.mock("./useWorkData", () => ({ useWorkData: () => workData }));
 
-import { App, openTripFields } from "./App";
+import { App, openTripFields, tripEvidenceFileName } from "./App";
 
 describe("task workspace dashboard navigation", () => {
   beforeEach(() => {
@@ -308,6 +315,10 @@ describe("travel expense view", () => {
     workData.files = [];
     workData.saveTrip.mockReset();
     workData.saveTrip.mockResolvedValue(undefined);
+    workData.saveTripFile.mockReset();
+    workData.saveTripFile.mockResolvedValue(undefined);
+    workData.removeTripFile.mockReset();
+    workData.removeTripFile.mockResolvedValue(undefined);
     window.location.hash = "#/reisekosten";
   });
 
@@ -325,6 +336,122 @@ describe("travel expense view", () => {
     expect(screen.getAllByText("Aktuelle Kostenauswertung")).toHaveLength(1);
     expect(screen.queryByRole("region", { name: "Kennzahlen-Vorschau" })).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Erledigt" })).toBeInTheDocument();
+  });
+
+  it.each(["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"])(
+    "shows all three screenshot areas for transport type %s",
+    (transportType) => {
+      render(<App />);
+      fireEvent.change(screen.getByLabelText("Fahrtkostenart"), { target: { value: transportType } });
+
+      for (const name of ["Google Maps", "Ticketpreis", "Sonstige Screenshots"]) {
+        expect(screen.getByRole("region", { name })).toBeInTheDocument();
+      }
+    }
+  );
+
+  it("assigns pasted images by hover first and keyboard focus second", async () => {
+    const { unmount } = render(<App />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Bearbeiten" })[0]);
+    const mapsZone = screen.getByRole("region", { name: "Google Maps" });
+    const ticketZone = screen.getByRole("region", { name: "Ticketpreis" });
+    const screenshot = new File(["image-content"], "route.webp", { type: "image/webp" });
+    const clipboardData = { items: [{ type: "image/webp", getAsFile: () => screenshot }] };
+
+    fireEvent.focus(mapsZone);
+    fireEvent.mouseEnter(ticketZone);
+    fireEvent.paste(window, { clipboardData });
+
+    await waitFor(() => expect(workData.saveTripFile).toHaveBeenCalledWith(expect.objectContaining({
+      tripId: baseTrip.id,
+      type: "oebb-verbindungskosten",
+      fileName: "route.webp",
+      mimeType: "image/webp",
+      description: "Screenshot des Ticketpreises.",
+      dataUrl: expect.stringMatching(/^data:image\/webp;base64,/)
+    })));
+
+    fireEvent.mouseLeave(ticketZone);
+    fireEvent.paste(window, { clipboardData });
+    await waitFor(() => expect(workData.saveTripFile).toHaveBeenLastCalledWith(expect.objectContaining({
+      type: "google-maps-nachweis",
+      description: "Screenshot der Route in Google Maps."
+    })));
+    unmount();
+  });
+
+  it("does not save a paste without an active screenshot area", async () => {
+    render(<App />);
+    const screenshot = new File(["image"], "unassigned.png", { type: "image/png" });
+
+    fireEvent.paste(window, { clipboardData: { items: [{ type: "image/png", getAsFile: () => screenshot }] } });
+
+    expect(await screen.findByText(
+      "Zum Einfügen zuerst den gewünschten Screenshot-Bereich fokussieren oder mit der Maus darauf zeigen.",
+      { selector: ".toast span" }
+    )).toBeInTheDocument();
+    expect(workData.saveTripFile).not.toHaveBeenCalled();
+  });
+
+  it("supports image selection and blocks invalid files, invalid dates, and unsaved trips", async () => {
+    const { unmount } = render(<App />);
+    const disabledMapsInput = screen.getByLabelText("Google Maps: Datei auswählen");
+    expect(disabledMapsInput).toBeDisabled();
+
+    const disabledMapsZone = screen.getByRole("region", { name: "Google Maps" });
+    fireEvent.mouseEnter(disabledMapsZone);
+    fireEvent.paste(window, { clipboardData: { items: [] } });
+    expect(await screen.findByText("Reise zuerst speichern, dann Screenshots hinzufügen.", { selector: ".toast span" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Bearbeiten" })[0]);
+    const mapsInput = screen.getByLabelText("Google Maps: Datei auswählen");
+    const invalidFile = new File(["plain"], "not-image.txt", { type: "text/plain" });
+    fireEvent.change(mapsInput, { target: { files: [invalidFile] } });
+    expect(await screen.findByText("Bitte ein Bild als Screenshot einfügen oder auswählen.", { selector: ".toast span" })).toBeInTheDocument();
+    expect(workData.saveTripFile).not.toHaveBeenCalled();
+
+    const image = new File(["image"], "map.jpg", { type: "image/jpeg" });
+    fireEvent.change(mapsInput, { target: { files: [image] } });
+    await waitFor(() => expect(workData.saveTripFile).toHaveBeenCalledWith(expect.objectContaining({ type: "google-maps-nachweis", fileName: "map.jpg" })));
+
+    fireEvent.change(screen.getByLabelText("Datum"), { target: { value: "" } });
+    expect(screen.getByLabelText("Google Maps: Datei auswählen")).toBeDisabled();
+    const mapsZone = screen.getByRole("region", { name: "Google Maps" });
+    fireEvent.mouseEnter(mapsZone);
+    fireEvent.paste(window, { clipboardData: { items: [{ type: "image/jpeg", getAsFile: () => image }] } });
+    expect(await screen.findByText("Bitte zuerst ein gültiges Reisedatum eingeben und speichern.", { selector: ".toast span" })).toBeInTheDocument();
+    unmount();
+  });
+
+  it("groups existing evidence and keeps preview, download, and deletion actions", async () => {
+    const files: TripFile[] = [
+      { id: "maps", tripId: baseTrip.id, type: "google-maps-nachweis", fileName: "route.jpg", mimeType: "image/jpeg", size: 100, dataUrl: "data:image/jpeg;base64,AA==", description: "", createdAt: "2026-08-08T06:01:00.000Z" },
+      { id: "ticket", tripId: baseTrip.id, type: "oebb-verbindungskosten", fileName: "ticket.png", mimeType: "image/png", size: 200, dataUrl: "data:image/png;base64,AA==", description: "", createdAt: "2026-08-08T06:02:00.000Z" },
+      { id: "car", tripId: baseTrip.id, type: "dienstauto-nachweis", fileName: "dienstauto.png", mimeType: "image/png", size: 300, dataUrl: "data:image/png;base64,AA==", description: "", createdAt: "2026-08-08T06:03:00.000Z" },
+      { id: "other", tripId: baseTrip.id, type: "sonstiger-beleg", fileName: "parkplatz.webp", mimeType: "image/webp", size: 400, dataUrl: "data:image/webp;base64,AA==", description: "", createdAt: "2026-08-08T06:04:00.000Z" }
+    ];
+    workData.files = files;
+    const downloads: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      downloads.push(this.download);
+    });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { unmount } = render(<App />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Bearbeiten" })[0]);
+
+    expect(within(screen.getByRole("region", { name: "Google Maps" })).getByText("google_maps_08.08.26.jpg")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Ticketpreis" })).getByText("ticketpreis_08.08.26.png")).toBeInTheDocument();
+    const otherZone = screen.getByRole("region", { name: "Sonstige Screenshots" });
+    expect(within(otherZone).getByText("dienstauto.png")).toBeInTheDocument();
+    expect(within(otherZone).getByText("parkplatz.webp")).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByRole("region", { name: "Google Maps" })).getByText("google_maps_08.08.26.jpg"));
+    const previewDialog = screen.getByRole("dialog", { name: "Screenshot-Vorschau" });
+    fireEvent.click(within(previewDialog).getByRole("button", { name: "Herunterladen" }));
+    expect(downloads).toEqual(["google_maps_08.08.26.jpg"]);
+    fireEvent.click(within(previewDialog).getByRole("button", { name: "Löschen" }));
+    await waitFor(() => expect(workData.removeTripFile).toHaveBeenCalledWith("maps"));
+    unmount();
   });
 
   it("places the accessible worklist icon action in the open-trips heading", () => {
@@ -392,7 +519,7 @@ describe("travel expense view", () => {
     for (const label of ["Zeit von", "Zeit bis", "Grund", "Gemeindekennzahl", "Zieladresse", "Fahrtkostenart", "Ticketpreis je Richtung · EUR", "Ticketnachweis", "Beschreibung", "Anzahl · km", "Bemerkungen", "Screenshots / Nachweise"]) {
       expect(within(dialog).getByText(label, { selector: "span" })).toBeInTheDocument();
     }
-    expect(within(dialog).getByText("oebb-ticket-nachweis.png")).toBeInTheDocument();
+    expect(within(dialog).getByText("ticketpreis_08.08.26.png")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Anzeigen" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Herunterladen" })).toBeInTheDocument();
     expect(within(dialog).getByText("Gesamtbetrag")).toBeInTheDocument();
@@ -454,5 +581,40 @@ describe("travel expense view", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Als erledigt markieren" }));
     await waitFor(() => expect(workData.saveTrip).toHaveBeenCalledWith(expect.objectContaining({ id: incompleteTrip.id, done: true })));
+  });
+});
+
+describe("trip evidence file names", () => {
+  const file = (id: string, type: TripFile["type"], fileName: string, mimeType: string, createdAt: string): TripFile => ({
+    id,
+    tripId: "trip-1",
+    type,
+    fileName,
+    mimeType,
+    size: 1,
+    dataUrl: "data:image/png;base64,AA==",
+    description: "",
+    createdAt
+  });
+
+  it("uses the current date, preserves image formats, and numbers later files chronologically", () => {
+    const first = file("maps-1", "google-maps-nachweis", "route.PNG", "image/png", "2026-05-23T08:00:00.000Z");
+    const second = file("maps-2", "google-maps-nachweis", "route.jpg", "image/jpeg", "2026-05-23T09:00:00.000Z");
+    const third = file("maps-3", "google-maps-nachweis", "clipboard", "image/webp", "2026-05-23T10:00:00.000Z");
+    const ticket = file("ticket-1", "oebb-verbindungskosten", "oebb.jpeg", "image/jpeg", "2026-05-23T11:00:00.000Z");
+    const files = [third, ticket, second, first];
+
+    expect(tripEvidenceFileName(first, "2026-05-23", files)).toBe("google_maps_23.05.26.png");
+    expect(tripEvidenceFileName(second, "2026-05-23", files)).toBe("google_maps_23.05.26_2.jpg");
+    expect(tripEvidenceFileName(third, "2026-05-23", files)).toBe("google_maps_23.05.26_3.webp");
+    expect(tripEvidenceFileName(ticket, "2026-05-23", files)).toBe("ticketpreis_23.05.26.jpeg");
+    expect(tripEvidenceFileName(ticket, "2026-06-01", files)).toBe("ticketpreis_01.06.26.jpeg");
+  });
+
+  it("keeps original names for legacy and other evidence", () => {
+    const legacy = file("legacy", "dienstauto-nachweis", "dienstauto-alt.png", "image/png", "2026-05-23T08:00:00.000Z");
+    const other = file("other", "sonstiger-beleg", "Parkbeleg 7.webp", "image/webp", "2026-05-23T09:00:00.000Z");
+    expect(tripEvidenceFileName(legacy, "2026-05-23", [legacy, other])).toBe("dienstauto-alt.png");
+    expect(tripEvidenceFileName(other, "2026-05-23", [legacy, other])).toBe("Parkbeleg 7.webp");
   });
 });

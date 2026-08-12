@@ -115,7 +115,7 @@ export interface SavedDestination {
   updatedAt: string;
 }
 
-export type TripFileType = "dienstauto-nachweis" | "oebb-verbindungskosten" | "sonstiger-beleg";
+export type TripFileType = "google-maps-nachweis" | "dienstauto-nachweis" | "oebb-verbindungskosten" | "sonstiger-beleg";
 
 export interface TripFile {
   id: string;
