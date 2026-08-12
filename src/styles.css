@@ -1609,6 +1609,12 @@ button:disabled {
   color: var(--accent-dark);
 }
 
+.form-section-header-button svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+
 .form-section-title {
   margin: 0;
   color: #2f3d4f;

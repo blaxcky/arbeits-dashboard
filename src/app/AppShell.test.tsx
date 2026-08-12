@@ -256,6 +256,8 @@ describe("Google Maps route action", () => {
     expect(newTripButton).toHaveAttribute("title", "Neue Reise");
     expect(newTripButton).toHaveClass("icon-button");
     expect(newTripButton).toHaveTextContent("");
+    expect(newTripButton.querySelector("svg")).toHaveAttribute("width", "18");
+    expect(newTripButton.querySelector("svg")).toHaveAttribute("height", "18");
     expect(newTripButton.closest(".form-section-header")).toContainElement(
       screen.getByRole("heading", { name: "Reisedaten" })
     );

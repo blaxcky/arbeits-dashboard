@@ -2157,7 +2157,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                   aria-label="Neue Reise"
                   onClick={() => void startNewTrip()}
                 >
-                  <Plus size={18} aria-hidden="true" />
+                  <Plus size={18} weight="bold" aria-hidden="true" />
                 </button>
               )}
             >
