@@ -2635,6 +2635,13 @@ button:disabled {
   text-align: right;
 }
 
+@media (min-width: 720px) {
+  .trip-list-header span:nth-child(5),
+  .trip-list[role="table"] .trip-list-value[data-label="Differenz"] {
+    padding-right: 12px;
+  }
+}
+
 .trip-list[role="table"] > .trip-row {
   min-height: 64px;
   padding: 7px 8px;
