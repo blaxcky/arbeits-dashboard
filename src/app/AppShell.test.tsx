@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Trip } from "../db/schema";
 
 const pwaRegistration = vi.hoisted(() => ({
   options: undefined as { onNeedRefresh?: () => void } | undefined,
@@ -37,7 +38,7 @@ const workData = vi.hoisted(() => ({
   timeEntries: [],
   entriesByDate: new Map(),
   flexCorrections: [],
-  trips: [],
+  trips: [] as Trip[],
   tripPayments: [],
   auditPointCases: [],
   auditPointGoals: [],
@@ -243,5 +244,70 @@ describe("Google Maps route action", () => {
     expect(screen.queryByRole("button", { name: "Vorschau öffnen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Große Vorschau" })).not.toBeInTheDocument();
     expect(document.querySelector("iframe")).not.toBeInTheDocument();
+  });
+});
+
+describe("travel expense view", () => {
+  const baseTrip: Trip = {
+    id: "trip-open",
+    date: "2026-08-08",
+    startTime: "07:30",
+    endTime: "15:30",
+    durationMinutes: 480,
+    reason: "Besprechung",
+    origin: "Eisenstadt",
+    destination: "Wien",
+    transportType: "dienstauto",
+    oneWayKilometers: 50,
+    perDiemCents: 0,
+    otherCostsCents: 0,
+    otherCostsDescription: "",
+    employerReimbursedCosts: true,
+    taxableTransportSubsidyCents: 0,
+    transportSubsidyTaxCents: 0,
+    note: "",
+    done: false,
+    createdAt: "2026-08-08T06:00:00.000Z",
+    updatedAt: "2026-08-08T06:00:00.000Z"
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    workData.trips = [baseTrip, { ...baseTrip, id: "trip-done", reason: "Nachbesprechung", done: true }];
+    window.location.hash = "#/reisekosten";
+  });
+
+  afterEach(() => {
+    workData.trips = [];
+    window.location.hash = "";
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("renders only the current cost analysis and keeps the completed checkbox", () => {
+    render(<App />);
+
+    expect(screen.getAllByText("Aktuelle Kostenauswertung")).toHaveLength(1);
+    expect(screen.queryByRole("region", { name: "Kennzahlen-Vorschau" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Erledigt" })).toBeInTheDocument();
+  });
+
+  it("removes direct status actions from both trip lists but keeps the worklist action", () => {
+    render(<App />);
+
+    expect(screen.queryByRole("button", { name: "Als erledigt markieren" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Auf offen setzen" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Duplizieren" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Offene abarbeiten" }));
+
+    expect(screen.getByRole("button", { name: "Als erledigt markieren" })).toBeInTheDocument();
   });
 });

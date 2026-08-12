@@ -2061,10 +2061,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     showToast("Reise gelöscht.");
   }
 
-  async function toggleDone(trip: Trip) {
-    await data.saveTrip({ ...stripTripMeta(trip), id: trip.id, done: !trip.done });
-  }
-
   function openGoogleMaps() {
     if (!mapsUrl) return;
     window.open(mapsUrl, "_blank", "noopener,noreferrer");
@@ -2235,38 +2231,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
               <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
             </FormSection>
           </div>
-          <section className="trip-preview trip-form-preview" aria-label="Kennzahlen-Vorschau">
-            <div className="trip-preview-group trip-preview-group-primary">
-              <span className="trip-preview-title">Reise</span>
-              <dl className="trip-preview-list">
-                <div><dt>Dauer</dt><dd>{formatMinutes(previewDurationMinutes)}</dd></div>
-                {previewTripCosts.oneWayKilometers > 0 ? (
-                  <div><dt>Kilometer gesamt</dt><dd>{(previewTripCosts.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
-                ) : null}
-                <div className="trip-preview-total"><dt>Gesamt</dt><dd>{formatEuroCents(calculateTripTotalCents(previewTripCosts))}</dd></div>
-              </dl>
-            </div>
-            <div className="trip-preview-group">
-              <span className="trip-preview-title">Kosten</span>
-              <dl className="trip-preview-list">
-                <div><dt>Diäten Arbeitgeber</dt><dd>{formatEuroCents(previewTripCosts.perDiemCents)}</dd></div>
-                <div><dt>Fahrtkosten</dt><dd>{formatEuroCents(previewPayoutCents)}</dd></div>
-                <div><dt>Sonstige Kosten</dt><dd>{formatEuroCents(previewTripCosts.otherCostsCents)}</dd></div>
-              </dl>
-            </div>
-            <div className="trip-preview-group trip-preview-group-tax">
-              <span className="trip-preview-title">Steuer & Differenz</span>
-              <dl className="trip-preview-list">
-                <div><dt>Diäten steuerlich</dt><dd>{formatEuroCents(previewTaxPerDiemCents)}</dd></div>
-                <div><dt>Steuerpfl. Öffi-BEZU</dt><dd>{formatEuroCents(previewTaxableTransportSubsidyCents)}</dd></div>
-                <div className="trip-preview-separator" aria-hidden="true" />
-                <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(previewPerDiemDifferentialCents)}</dd></div>
-                <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(previewTransportDifferentialCents)}</dd></div>
-                <div><dt>Werbungskosten Sonstiges</dt><dd>{formatEuroCents(previewOtherCostsDifferentialCents)}</dd></div>
-                <div className="trip-preview-grand-total"><dt>Differenz gesamt</dt><dd>{formatEuroCents(previewDifferentialCents)}</dd></div>
-              </dl>
-            </div>
-          </section>
           {publicTicketAboveSubsidy ? <Notice tone="warning" title="Ticketpreise liegen über dem Öffi-BEZU" text="Es wird der Ticketpreis für Hin- und Rückreise ersetzt; dadurch entsteht kein steuerpflichtiger Öffi-BEZU." /> : null}
           <section
             className={`trip-form-evidence ${editingTrip ? "" : "trip-form-evidence-disabled"}`.trim()}
@@ -2359,9 +2323,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 <small>Diff. {formatEuroCents(calculateTripDifferentialCents(trip))}</small>
               </div>
               <div className="trip-actions">
-                <button className="icon-button trip-action-button" type="button" title={trip.done ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={trip.done ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleDone(trip)}>
-                  {trip.done ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
-                </button>
                 <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editTrip(trip)}>
                   <PencilSimple size={17} />
                 </button>
@@ -2398,9 +2359,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                 <small>Diff. {formatEuroCents(calculateTripDifferentialCents(trip))}</small>
               </div>
               <div className="trip-actions">
-                <button className="icon-button trip-action-button" type="button" title="Auf offen setzen" aria-label="Auf offen setzen" onClick={() => void toggleDone(trip)}>
-                  <ArrowClockwise size={17} />
-                </button>
                 <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editTrip(trip)}>
                   <PencilSimple size={17} />
                 </button>
