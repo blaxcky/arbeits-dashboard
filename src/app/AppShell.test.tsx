@@ -261,13 +261,14 @@ describe("Google Maps route action", () => {
     expect(newTripButton.closest(".form-section-header")).toContainElement(
       screen.getByRole("heading", { name: "Reisedaten" })
     );
+    expect(screen.queryByText("Neue Reise", { selector: ".section-label" })).not.toBeInTheDocument();
     expect(screen.queryByText("Neu", { exact: true })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Zeit von"), { target: { value: "08:15" } });
     fireEvent.click(newTripButton);
 
     expect(screen.getByLabelText("Zeit von")).toHaveValue("");
-    expect(screen.getByText("Neue Reise", { selector: ".section-label" })).toBeInTheDocument();
+    expect(screen.queryByText("Neue Reise", { selector: ".section-label" })).not.toBeInTheDocument();
   });
 });
 
