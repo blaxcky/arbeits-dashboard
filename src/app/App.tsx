@@ -2744,26 +2744,20 @@ function OpenTripsDialog({ trips, filesByTripId, municipalities, showToast, onPr
   return (
     <ModalOverlay labelledBy="open-trips-dialog-title" onClose={onClose}>
       <div className="trip-file-modal-card open-trips-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="panel-heading">
-          <div>
-            <span id="open-trips-dialog-title" className="section-label">Offene Reisekosten abarbeiten</span>
-            <strong>{trips.length} offen</strong>
-          </div>
-          <button className="icon-button" type="button" title="Abarbeitung schließen" aria-label="Abarbeitung schließen" onClick={onClose}>
-            <X size={18} />
-          </button>
-        </div>
-        <OpenTripsWorklist trips={trips} filesByTripId={filesByTripId} municipalities={municipalities} showToast={showToast} onPreviewFile={onPreviewFile} onDownloadFile={onDownloadFile} onDone={onDone} />
+        <OpenTripsWorklist trips={trips} filesByTripId={filesByTripId} municipalities={municipalities} showToast={showToast} onPreviewFile={onPreviewFile} onDownloadFile={onDownloadFile} onClose={onClose} onDone={onDone} />
       </div>
     </ModalOverlay>
   );
 }
 
-function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, onPreviewFile, onDownloadFile, onDone }: { trips: Trip[]; filesByTripId: Map<string, TripFile[]>; municipalities: Municipality[]; showToast: ShowToast; onPreviewFile: (file: TripFile) => void; onDownloadFile: (file: TripFile) => void; onDone: (trip: Trip) => Promise<unknown> }) {
+function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, onPreviewFile, onDownloadFile, onClose, onDone }: { trips: Trip[]; filesByTripId: Map<string, TripFile[]>; municipalities: Municipality[]; showToast: ShowToast; onPreviewFile: (file: TripFile) => void; onDownloadFile: (file: TripFile) => void; onClose: () => void; onDone: (trip: Trip) => Promise<unknown> }) {
   const openTrips = sortedOpenTrips(trips);
   const activeTrip = openTrips[0];
   const activeTripFiles = activeTrip ? filesByTripId.get(activeTrip.id) ?? [] : [];
+  const initialTripCount = useRef(openTrips.length);
   const [copiedFieldKeys, setCopiedFieldKeys] = useState<Set<string>>(() => new Set());
+  const completedTripCount = Math.max(0, initialTripCount.current - openTrips.length);
+  const progressValue = activeTrip ? completedTripCount + 1 : initialTripCount.current;
 
   useEffect(() => {
     setCopiedFieldKeys(new Set());
@@ -2783,57 +2777,75 @@ function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, on
 
   return (
     <div className="open-trips-worklist">
-      {!activeTrip ? <p className="open-trip-empty muted">Keine offenen Reisekosten vorhanden.</p> : null}
+      <header className="open-trips-dialog-header">
+        <div className="open-trips-dialog-title">
+          <span id="open-trips-dialog-title" className="section-label">Offene Reisekosten abarbeiten</span>
+          <div className="open-trips-progress-line">
+            <strong>{openTrips.length} offen</strong>
+            <span>{progressValue} von {initialTripCount.current}</span>
+          </div>
+          <div className="open-trips-progress" role="progressbar" aria-label="Fortschritt" aria-valuemin={0} aria-valuemax={initialTripCount.current} aria-valuenow={completedTripCount}>
+            <span style={{ transform: `scaleX(${initialTripCount.current ? completedTripCount / initialTripCount.current : 1})` }} />
+          </div>
+        </div>
+        <button className="icon-button" type="button" title="Abarbeitung schließen" aria-label="Abarbeitung schließen" onClick={onClose}>
+          <X size={18} />
+        </button>
+      </header>
+      {!activeTrip ? <div className="open-trips-sheet-body"><p className="open-trip-empty muted">Keine offenen Reisekosten vorhanden.</p></div> : null}
       {activeTrip ? (
-        <article className={`open-trip-card ${isTripIncomplete(activeTrip) ? "trip-row-incomplete" : ""}`}>
-          <div className="panel-heading open-trip-active-heading">
+        <>
+          <article className={`open-trips-sheet-body ${isTripIncomplete(activeTrip) ? "trip-row-incomplete" : ""}`}>
+          <div className="open-trip-active-heading">
             <div>
-              <span className="section-label">1 von {openTrips.length} offen</span>
               <strong>{formatDateKey(activeTrip.date)} · {activeTrip.reason || "Ohne Grund"}</strong>
               <span className="trip-badges">{isTripIncomplete(activeTrip) ? <em>Unvollständig</em> : null}<em>Offen</em></span>
             </div>
-            <strong>{formatEuroCents(calculateTripTotalCents(activeTrip))}</strong>
           </div>
-          {activeTrip.transportType === "oeffi-zuschuss" ? (
-            <p className="open-trip-ticket-note">Ticketpreis ist der Einzelpreis je Richtung; Hin- und Rückreise werden mit diesem Preis gerechnet.</p>
-          ) : null}
-          <div className="open-trip-section-grid">
+          <div className="open-trip-sections">
             {openTripCopyGroups.map((group) => {
               const groupFields = copyFields.filter((field) => field.group === group.key);
               if (groupFields.length === 0 && group.key !== "costs") return null;
+              const GroupIcon = group.icon;
               return (
-                <FormSection key={group.key} id={`open-trip-section-${group.key}`} title={group.title} icon={group.icon} className="open-trip-section">
+                <section key={group.key} className="open-trip-data-section" aria-labelledby={`open-trip-section-${group.key}`}>
+                  <h3 id={`open-trip-section-${group.key}`}><GroupIcon size={18} weight="duotone" aria-hidden="true" />{group.title}</h3>
                   {group.key === "costs" ? (
-                    <dl className="detail-list open-trip-cost-details">
-                      <div><dt>Fahrtkostenart</dt><dd>{TRANSPORT_LABELS[activeTrip.transportType]}</dd></div>
-                    </dl>
+                    <div className="open-trip-data-row">
+                      <Car size={18} weight="duotone" aria-hidden="true" />
+                      <span>Fahrtkostenart</span>
+                      <strong>{TRANSPORT_LABELS[activeTrip.transportType]}</strong>
+                      <span className="open-trip-row-action" aria-hidden="true" />
+                    </div>
                   ) : null}
-                  <div className="copy-field-grid">
-                    {groupFields.map((field) => {
-                      const fieldKey = `${activeTrip.id}:${field.label}`;
-                      return (
-                        <div key={field.label} className={`${field.ready ? "" : "copy-field-missing"} ${copiedFieldKeys.has(fieldKey) ? "copy-field-copied" : ""} copy-field-${field.layout}`}>
-                          <span>{field.label}{field.unit ? ` · ${field.unit}` : ""}</span>
-                          {field.layout === "wide" ? (
-                            <textarea value={field.value || "Nicht kopierfertig"} readOnly rows={3} aria-label={field.label} />
-                          ) : (
-                            <strong>{field.value || "Nicht kopierfertig"}</strong>
-                          )}
-                          <button className="icon-button" type="button" title={`${field.label} kopieren`} aria-label={`${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value, fieldKey)}>
-                            <Copy size={16} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </FormSection>
+                  {group.key === "costs" && activeTrip.transportType === "oeffi-zuschuss" ? (
+                    <p className="open-trip-ticket-note">Ticketpreis ist der Einzelpreis je Richtung; Hin- und Rückreise werden mit diesem Preis gerechnet.</p>
+                  ) : null}
+                  {groupFields.map((field) => {
+                    const fieldKey = `${activeTrip.id}:${field.label}`;
+                    const copied = copiedFieldKeys.has(fieldKey);
+                    return (
+                      <div key={field.label} className={`open-trip-data-row ${field.ready ? "" : "copy-field-missing"} ${copied ? "copy-field-copied" : ""} copy-field-${field.layout}`}>
+                        <GroupIcon size={18} weight="duotone" aria-hidden="true" />
+                        <span>{field.label}{field.unit ? ` · ${field.unit}` : ""}</span>
+                        <strong className="open-trip-field-value">{field.value || "Nicht kopierfertig"}</strong>
+                        <button className="icon-button open-trip-row-action" type="button" title={copied ? `${field.label} kopiert` : `${field.label} kopieren`} aria-label={copied ? `${field.label} kopiert` : `${field.label} kopieren`} disabled={!field.ready} onClick={() => void copyValue(field.value, fieldKey)}>
+                          {copied ? <CheckCircle size={16} weight="fill" /> : <Copy size={16} />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </section>
               );
             })}
           </div>
-          <FormSection id="open-trip-section-evidence" title="Nachweise" icon={Receipt} className="open-trip-section open-trip-evidence">
-            <div className="open-trip-evidence-count">
+          <section className="open-trip-data-section open-trip-evidence" aria-labelledby="open-trip-section-evidence">
+            <h3 id="open-trip-section-evidence"><Receipt size={18} weight="duotone" aria-hidden="true" />Nachweise</h3>
+            <div className="open-trip-data-row open-trip-evidence-count">
+              <Receipt size={18} weight="duotone" aria-hidden="true" />
               <span>Screenshots / Nachweise</span>
               <strong>{activeTripFiles.length}</strong>
+              <span className="open-trip-row-action" aria-hidden="true" />
             </div>
             {activeTripFiles.length === 0 ? <p className="muted">Keine Screenshots gespeichert.</p> : null}
             {activeTripFiles.map((file) => (
@@ -2856,11 +2868,15 @@ function OpenTripsWorklist({ trips, filesByTripId, municipalities, showToast, on
                 </div>
               </div>
             ))}
-          </FormSection>
-          <button className="secondary-button" type="button" onClick={() => void onDone(activeTrip)}>
+          </section>
+          </article>
+          <footer className="open-trips-dialog-footer">
+            <div><span>Gesamtbetrag</span><strong>{formatEuroCents(calculateTripTotalCents(activeTrip))}</strong></div>
+            <button className="secondary-button" type="button" onClick={() => void onDone(activeTrip)}>
             <CheckCircle size={17} /> Als erledigt markieren
-          </button>
-        </article>
+            </button>
+          </footer>
+        </>
       ) : null}
     </div>
   );

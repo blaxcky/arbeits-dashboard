@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Trip } from "../db/schema";
+import type { Trip, TripFile } from "../db/schema";
 
 const pwaRegistration = vi.hoisted(() => ({
   options: undefined as { onNeedRefresh?: () => void } | undefined,
@@ -45,7 +45,7 @@ const workData = vi.hoisted(() => ({
   usoCases: [],
   usoGoals: [],
   otherMeasures: [],
-  files: [],
+  files: [] as TripFile[],
   savedDestinations: [],
   todos: [],
   todoProjects: [],
@@ -60,12 +60,13 @@ const workData = vi.hoisted(() => ({
   completeTodo: vi.fn(),
   removeTodo: vi.fn(),
   saveTodoProject: vi.fn(),
-  removeTodoProject: vi.fn()
+  removeTodoProject: vi.fn(),
+  saveTrip: vi.fn()
 }));
 
 vi.mock("./useWorkData", () => ({ useWorkData: () => workData }));
 
-import { App } from "./App";
+import { App, openTripFields } from "./App";
 
 describe("task workspace dashboard navigation", () => {
   beforeEach(() => {
@@ -304,11 +305,15 @@ describe("travel expense view", () => {
     });
     vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
     workData.trips = [baseTrip, { ...baseTrip, id: "trip-done", reason: "Nachbesprechung", done: true }];
+    workData.files = [];
+    workData.saveTrip.mockReset();
+    workData.saveTrip.mockResolvedValue(undefined);
     window.location.hash = "#/reisekosten";
   });
 
   afterEach(() => {
     workData.trips = [];
+    workData.files = [];
     window.location.hash = "";
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -345,5 +350,109 @@ describe("travel expense view", () => {
     fireEvent.click(worklistButton);
 
     expect(screen.getByRole("button", { name: "Als erledigt markieren" })).toBeInTheDocument();
+  });
+
+  it("shows the complete worklist as continuous data sections and copies values unchanged", async () => {
+    const publicTransportTrip: Trip = {
+      ...baseTrip,
+      reason: "Außenprüfung",
+      destination: "Hauptplatz 7, 7000 Eisenstadt",
+      municipalityCode: "10101",
+      transportType: "oeffi-zuschuss",
+      oneWayKilometers: 12.5,
+      ticketPriceCents: 1440,
+      publicTransportTicketQueryDate: "2026-08-07"
+    };
+    const evidence: TripFile = {
+      id: "file-1",
+      tripId: publicTransportTrip.id,
+      type: "oebb-verbindungskosten",
+      fileName: "oebb-ticket-nachweis.png",
+      mimeType: "image/png",
+      size: 2048,
+      dataUrl: "data:image/png;base64,AA==",
+      description: "",
+      createdAt: "2026-08-08T06:05:00.000Z"
+    };
+    const writeText = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    workData.trips = [publicTransportTrip];
+    workData.files = [evidence];
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Offene Reisen abarbeiten" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Offene Reisekosten abarbeiten" });
+    expect(within(dialog).getByRole("progressbar", { name: "Fortschritt" })).toHaveAttribute("aria-valuenow", "0");
+    expect(within(dialog).getByText("1 offen")).toBeInTheDocument();
+    expect(within(dialog).getByText("1 von 1")).toBeInTheDocument();
+    for (const sectionName of ["Reisedaten", "Route", "Fahrtkosten", "Bemerkungen", "Nachweise"]) {
+      expect(within(dialog).getByRole("heading", { name: sectionName })).toBeInTheDocument();
+    }
+    for (const label of ["Zeit von", "Zeit bis", "Grund", "Gemeindekennzahl", "Zieladresse", "Fahrtkostenart", "Ticketpreis je Richtung · EUR", "Ticketnachweis", "Beschreibung", "Anzahl · km", "Bemerkungen", "Screenshots / Nachweise"]) {
+      expect(within(dialog).getByText(label, { selector: "span" })).toBeInTheDocument();
+    }
+    expect(within(dialog).getByText("oebb-ticket-nachweis.png")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Anzeigen" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Herunterladen" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Gesamtbetrag")).toBeInTheDocument();
+
+    const expectedFields = openTripFields(publicTransportTrip);
+    const reason = expectedFields.find((field) => field.label === "Grund")?.value ?? "";
+    const remarks = expectedFields.find((field) => field.label === "Bemerkungen")?.value ?? "";
+    expect(remarks).toContain("\n\n");
+    const remarksRow = within(dialog).getByRole("button", { name: "Bemerkungen kopieren" }).closest(".open-trip-data-row") as HTMLElement;
+    expect(remarksRow.querySelector(".open-trip-field-value")).toHaveTextContent(remarks, { normalizeWhitespace: false });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Grund kopieren" }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(reason));
+    expect(within(dialog).getByRole("button", { name: "Grund kopiert" })).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Bemerkungen kopieren" }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(remarks));
+  });
+
+  it("keeps missing values disabled and exposes evidence and completion actions", async () => {
+    const incompleteTrip: Trip = {
+      ...baseTrip,
+      startTime: undefined,
+      municipalityCode: undefined,
+      reason: "",
+      destination: "",
+      transportType: "kilometergeld",
+      oneWayKilometers: 0
+    };
+    const evidence: TripFile = {
+      id: "file-2",
+      tripId: incompleteTrip.id,
+      type: "dienstauto-nachweis",
+      fileName: "dienstauto-belegt.png",
+      mimeType: "image/png",
+      size: 1024,
+      dataUrl: "data:image/png;base64,AA==",
+      description: "",
+      createdAt: "2026-08-08T06:05:00.000Z"
+    };
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    workData.trips = [incompleteTrip];
+    workData.files = [evidence];
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Offene Reisen abarbeiten" }));
+    const dialog = screen.getByRole("dialog", { name: "Offene Reisekosten abarbeiten" });
+
+    expect(within(dialog).getByRole("button", { name: "Zeit von kopieren" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Grund kopieren" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Gemeindekennzahl kopieren" })).toBeDisabled();
+    expect(within(dialog).getAllByText("Nicht kopierfertig").length).toBeGreaterThanOrEqual(3);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Herunterladen" }));
+    expect(anchorClick).toHaveBeenCalledOnce();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Anzeigen" }));
+    expect(screen.getByText("Screenshot-Vorschau")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Vorschau schließen" }));
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Als erledigt markieren" }));
+    await waitFor(() => expect(workData.saveTrip).toHaveBeenCalledWith(expect.objectContaining({ id: incompleteTrip.id, done: true })));
   });
 });
