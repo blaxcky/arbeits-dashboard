@@ -319,6 +319,8 @@ describe("travel expense view", () => {
     workData.saveTripFile.mockResolvedValue(undefined);
     workData.removeTripFile.mockReset();
     workData.removeTripFile.mockResolvedValue(undefined);
+    workData.removeTrip.mockReset();
+    workData.removeTrip.mockResolvedValue(undefined);
     window.location.hash = "#/reisekosten";
   });
 
@@ -485,14 +487,24 @@ describe("travel expense view", () => {
     unmount();
   });
 
-  it("places the accessible worklist icon action in the open-trips heading", () => {
+  it("renders aligned trip columns and keeps edit and worklist actions directly available", () => {
     render(<App />);
 
     expect(screen.queryByRole("button", { name: "Als erledigt markieren" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Auf offen setzen" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Duplizieren" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(2);
+    expect(screen.queryByRole("menuitem", { name: "Duplizieren" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Löschen" })).not.toBeInTheDocument();
+
+    const openTripsTable = screen.getByRole("table", { name: "Offene Reisen" });
+    expect(within(openTripsTable).getAllByRole("columnheader").map((heading) => heading.textContent)).toEqual([
+      "Reise", "Dauer", "Strecke", "Betrag", "Differenz", "Aktionen"
+    ]);
+    expect(within(openTripsTable).getByText("Sa., 08.08.2026 · Besprechung")).toBeInTheDocument();
+    expect(within(openTripsTable).getByText("8:00 h")).toHaveAttribute("data-label", "Dauer");
+    expect(within(openTripsTable).getByText("100 km")).toHaveAttribute("data-label", "Strecke");
+    expect(within(openTripsTable).getByText("0,00 EUR")).toHaveAttribute("data-label", "Betrag");
+    expect(within(openTripsTable).getByText("20,00 EUR")).toHaveAttribute("data-label", "Differenz");
 
     const openTripsHeading = screen.getByText("Offene Reisen", { selector: ".section-label" }).closest(".panel-heading") as HTMLElement;
     const worklistButton = within(openTripsHeading).getByRole("button", { name: "Offene Reisen abarbeiten" });
@@ -508,6 +520,58 @@ describe("travel expense view", () => {
     fireEvent.click(worklistButton);
 
     expect(screen.getByRole("button", { name: "Als erledigt markieren" })).toBeInTheDocument();
+  });
+
+  it("operates and closes the accessible trip action menu", async () => {
+    workData.saveTrip.mockResolvedValue({ ...baseTrip, id: "trip-copy" });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { unmount } = render(<App />);
+
+    const openTripsTable = screen.getByRole("table", { name: "Offene Reisen" });
+    const trigger = within(openTripsTable).getByRole("button", { name: /Weitere Aktionen für/ });
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(within(openTripsTable).getByRole("menuitem", { name: "Duplizieren" })).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    fireEvent.pointerDown(document.body);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger);
+    fireEvent.click(within(openTripsTable).getByRole("menuitem", { name: "Duplizieren" }));
+    await waitFor(() => expect(workData.saveTrip).toHaveBeenCalled());
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger);
+    fireEvent.click(within(openTripsTable).getByRole("menuitem", { name: "Löschen" }));
+    await waitFor(() => expect(workData.removeTrip).toHaveBeenCalledWith(baseTrip.id));
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    unmount();
+  });
+
+  it("keeps empty trip panels unchanged and omits column headers for empty lists", () => {
+    workData.trips = [];
+    render(<App />);
+
+    expect(screen.getByText("Keine offenen Reisen.")).toBeInTheDocument();
+    expect(screen.getByText("Keine erledigten Reisen.")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Offene Reisen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();
+  });
+
+  it("labels incomplete trips in the compact row", () => {
+    workData.trips = [{ ...baseTrip, startTime: undefined, endTime: undefined }];
+    render(<App />);
+
+    const row = within(screen.getByRole("table", { name: "Offene Reisen" })).getByRole("row", { name: /Besprechung/ });
+    expect(row).toHaveClass("trip-row-incomplete");
+    expect(within(row).getByText("Unvollständig")).toBeInTheDocument();
   });
 
   it("shows the complete worklist as continuous data sections and copies values unchanged", async () => {

@@ -2607,6 +2607,161 @@ button:disabled {
   padding: 0;
 }
 
+.trip-list[role="table"] {
+  --trip-list-columns: minmax(180px, 1fr) 70px 78px 104px 104px 78px;
+  gap: 0;
+}
+
+.trip-list-header,
+.trip-list[role="table"] > .trip-row {
+  display: grid;
+  grid-template-columns: var(--trip-list-columns);
+  column-gap: 10px;
+  align-items: center;
+}
+
+.trip-list-header {
+  min-height: 32px;
+  padding: 0 8px;
+  border-bottom: 1px solid #dce2e9;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.trip-list-header span:not(:first-child) {
+  text-align: right;
+}
+
+.trip-list[role="table"] > .trip-row {
+  min-height: 64px;
+  padding: 7px 8px;
+  border-top: 0;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.trip-list[role="table"] > .trip-row-incomplete {
+  padding-left: 8px;
+  border-left: 3px solid #ddc58d;
+}
+
+.trip-list-journey {
+  min-width: 0;
+}
+
+.trip-list-title-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.trip-list-title-line strong,
+.trip-list-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-list-title-line strong {
+  min-width: 0;
+  color: #1f2937;
+  font-size: 0.9rem;
+}
+
+.trip-row .trip-incomplete-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid #d7c28f;
+  border-radius: 999px;
+  padding: 1px 6px;
+  color: #74591b;
+  background: #fff8e8;
+  font-size: 0.65rem;
+  font-weight: 900;
+}
+
+.trip-row .trip-list-meta {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.trip-row .trip-list-value {
+  display: block;
+  min-width: 0;
+  color: #344054;
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.79rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.trip-row strong.trip-list-value {
+  color: #1f2937;
+  font-weight: 900;
+}
+
+.trip-list[role="table"] .trip-actions {
+  position: relative;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.trip-list[role="table"] .trip-action-button {
+  width: 36px;
+  min-height: 36px;
+}
+
+.trip-action-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 4;
+  width: 156px;
+  overflow: hidden;
+  border: 1px solid #d8dee7;
+  border-radius: 8px;
+  padding: 4px;
+  background: #fff;
+  box-shadow: 0 16px 36px -18px rgba(31, 41, 55, 0.48);
+}
+
+.trip-action-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 9px;
+  color: #344054;
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trip-action-menu button:hover,
+.trip-action-menu button:focus-visible {
+  outline: 0;
+  background: #f1f4f7;
+}
+
+.trip-action-menu button:active {
+  transform: translateY(1px);
+}
+
+.trip-action-menu .trip-action-menu-danger {
+  color: var(--danger);
+}
+
 .danger-icon-button {
   border-color: #d9a9a5;
   background: #fff4f2;
@@ -3418,7 +3573,7 @@ button:disabled {
     grid-row: 1;
   }
 
-  .trip-row {
+  .trip-row:not([role="row"]) {
     grid-template-columns: 1fr;
   }
 
@@ -3477,5 +3632,55 @@ button:disabled {
 
   .day-entry-panel .date-row .secondary-button {
     flex: 1 1 140px;
+  }
+}
+
+@media (max-width: 719px) {
+  .trip-list[role="table"] {
+    margin-top: 12px;
+  }
+
+  .trip-list-header {
+    display: none;
+  }
+
+  .trip-list[role="table"] > .trip-row {
+    position: relative;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px 14px;
+    min-height: 0;
+    padding: 11px 8px;
+  }
+
+  .trip-list[role="table"] > .trip-row-incomplete {
+    padding-left: 8px;
+  }
+
+  .trip-list-journey {
+    grid-column: 1 / -1;
+    padding-right: 82px;
+  }
+
+  .trip-row .trip-list-value {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+    text-align: right;
+  }
+
+  .trip-list-value::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-family: "Geist", system-ui, sans-serif;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-align: left;
+  }
+
+  .trip-list[role="table"] .trip-actions {
+    position: absolute;
+    top: 10px;
+    right: 8px;
   }
 }

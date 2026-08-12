@@ -15,6 +15,7 @@ import {
   ClipboardText,
   Copy,
   Database,
+  DotsThreeVertical,
   DownloadSimple,
   Gear,
   House,
@@ -2398,72 +2399,28 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             </button>
           </div>
         </div>
-        <div className="trip-list">
-          {openTrips.length === 0 ? <p className="muted">Keine offenen Reisen.</p> : null}
-          {openTrips.map((trip) => (
-            <article key={trip.id} className={`trip-row ${trip.done ? "trip-row-done" : ""} ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`}>
-              <div>
-                <strong>{formatDateKey(trip.date)} · {trip.reason || "Ohne Grund"}</strong>
-                <span>{formatTripOrigin(trip.origin)}{formatTripOrigin(trip.origin) ? " → " : ""}{trip.destination || "-"} · {TRANSPORT_LABELS[trip.transportType]}</span>
-                {trip.note ? <span>{trip.note}</span> : null}
-                {isTripIncomplete(trip) ? <span className="trip-badges"><em>Unvollständig</em></span> : null}
-              </div>
-              <div className="trip-row-metrics">
-                <span>{formatMinutes(trip.durationMinutes)}</span>
-                <span>{(trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</span>
-                <strong>{formatEuroCents(calculateTripTotalCents(trip))}</strong>
-                <small>Diff. {formatEuroCents(calculateTripDifferentialCents(trip))}</small>
-              </div>
-              <div className="trip-actions">
-                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editTrip(trip)}>
-                  <PencilSimple size={17} />
-                </button>
-                <button className="icon-button trip-action-button" type="button" title="Duplizieren" aria-label="Duplizieren" onClick={() => void duplicateTrip(trip)}>
-                  <Copy size={17} />
-                </button>
-                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeTrip(trip.id)}>
-                  <Trash size={17} />
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+        <TripList
+          trips={openTrips}
+          emptyText="Keine offenen Reisen."
+          label="Offene Reisen"
+          onEdit={editTrip}
+          onDuplicate={duplicateTrip}
+          onDelete={(trip) => removeTrip(trip.id)}
+        />
       </div>
       <div className="panel">
         <div className="panel-heading">
           <span className="section-label">Erledigte Reisen</span>
           <strong>{completedTrips.length}</strong>
         </div>
-        <div className="trip-list">
-          {completedTrips.length === 0 ? <p className="muted">Keine erledigten Reisen.</p> : null}
-          {completedTrips.map((trip) => (
-            <article key={trip.id} className={`trip-row trip-row-done ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`}>
-              <div>
-                <strong>{formatDateKey(trip.date)} · {trip.reason || "Ohne Grund"}</strong>
-                <span>{formatTripOrigin(trip.origin)}{formatTripOrigin(trip.origin) ? " → " : ""}{trip.destination || "-"} · {TRANSPORT_LABELS[trip.transportType]}</span>
-                {trip.note ? <span>{trip.note}</span> : null}
-                {isTripIncomplete(trip) ? <span className="trip-badges"><em>Unvollständig</em></span> : null}
-              </div>
-              <div className="trip-row-metrics">
-                <span>{formatMinutes(trip.durationMinutes)}</span>
-                <span>{(trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</span>
-                <strong>{formatEuroCents(calculateTripTotalCents(trip))}</strong>
-                <small>Diff. {formatEuroCents(calculateTripDifferentialCents(trip))}</small>
-              </div>
-              <div className="trip-actions">
-                <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editTrip(trip)}>
-                  <PencilSimple size={17} />
-                </button>
-                <button className="icon-button trip-action-button" type="button" title="Duplizieren" aria-label="Duplizieren" onClick={() => void duplicateTrip(trip)}>
-                  <Copy size={17} />
-                </button>
-                <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeTrip(trip.id)}>
-                  <Trash size={17} />
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+        <TripList
+          trips={completedTrips}
+          emptyText="Keine erledigten Reisen."
+          label="Erledigte Reisen"
+          onEdit={editTrip}
+          onDuplicate={duplicateTrip}
+          onDelete={(trip) => removeTrip(trip.id)}
+        />
       </div>
       {openTripsDialogOpen ? (
         <OpenTripsDialog
@@ -2535,6 +2492,120 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         />
       ) : null}
     </section>
+  );
+}
+
+type TripListProps = {
+  trips: Trip[];
+  emptyText: string;
+  label: string;
+  onEdit: (trip: Trip) => void;
+  onDuplicate: (trip: Trip) => void | Promise<void>;
+  onDelete: (trip: Trip) => void | Promise<void>;
+};
+
+function TripList({ trips, emptyText, label, onEdit, onDuplicate, onDelete }: TripListProps) {
+  if (trips.length === 0) return <div className="trip-list"><p className="muted">{emptyText}</p></div>;
+
+  return (
+    <div className="trip-list" role="table" aria-label={label}>
+      <div className="trip-list-header" role="row">
+        {(["Reise", "Dauer", "Strecke", "Betrag", "Differenz", "Aktionen"] as const).map((heading) => (
+          <span key={heading} role="columnheader">{heading}</span>
+        ))}
+      </div>
+      {trips.map((trip) => (
+        <TripListRow
+          key={trip.id}
+          trip={trip}
+          onEdit={onEdit}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TripListRow({ trip, onEdit, onDuplicate, onDelete }: { trip: Trip } & Pick<TripListProps, "onEdit" | "onDuplicate" | "onDelete">) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const tripName = `${formatDateKey(trip.date)} · ${trip.reason || "Ohne Grund"}`;
+  const origin = formatTripOrigin(trip.origin);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    actionsRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
+
+    const closeOnPointerDown = (event: globalThis.PointerEvent) => {
+      if (!actionsRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setMenuOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
+
+  const runMenuAction = (action: () => void | Promise<void>) => {
+    setMenuOpen(false);
+    void action();
+  };
+
+  return (
+    <article className={`trip-row ${trip.done ? "trip-row-done" : ""} ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`} role="row">
+      <div className="trip-list-journey" role="cell">
+        <div className="trip-list-title-line">
+          <strong>{tripName}</strong>
+          {isTripIncomplete(trip) ? <span className="trip-incomplete-badge">Unvollständig</span> : null}
+        </div>
+        <span className="trip-list-meta" title={trip.note || undefined}>
+          {origin}{origin ? " → " : ""}{trip.destination || "-"} · {TRANSPORT_LABELS[trip.transportType]}
+          {trip.note ? ` · ${trip.note}` : ""}
+        </span>
+      </div>
+      <span className="trip-list-value" data-label="Dauer" role="cell">{formatMinutes(trip.durationMinutes)}</span>
+      <span className="trip-list-value" data-label="Strecke" role="cell">{(trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</span>
+      <strong className="trip-list-value" data-label="Betrag" role="cell">{formatEuroCents(calculateTripTotalCents(trip))}</strong>
+      <span className="trip-list-value" data-label="Differenz" role="cell">{formatEuroCents(calculateTripDifferentialCents(trip))}</span>
+      <div className="trip-actions" role="cell" ref={actionsRef}>
+        <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => onEdit(trip)}>
+          <PencilSimple size={17} aria-hidden="true" />
+        </button>
+        <button
+          ref={triggerRef}
+          className="icon-button trip-action-button"
+          type="button"
+          title="Weitere Aktionen"
+          aria-label={`Weitere Aktionen für ${tripName}`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <DotsThreeVertical size={19} weight="bold" aria-hidden="true" />
+        </button>
+        {menuOpen ? (
+          <div className="trip-action-menu" role="menu" aria-label={`Aktionen für ${tripName}`}>
+            <button type="button" role="menuitem" onClick={() => runMenuAction(() => onDuplicate(trip))}>
+              <Copy size={17} aria-hidden="true" />
+              Duplizieren
+            </button>
+            <button className="trip-action-menu-danger" type="button" role="menuitem" onClick={() => runMenuAction(() => onDelete(trip))}>
+              <Trash size={17} aria-hidden="true" />
+              Löschen
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </article>
   );
 }
 
