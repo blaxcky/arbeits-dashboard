@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Trip } from "../db/schema";
 
@@ -244,6 +244,28 @@ describe("Google Maps route action", () => {
     expect(screen.queryByRole("button", { name: "Vorschau öffnen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Große Vorschau" })).not.toBeInTheDocument();
     expect(document.querySelector("iframe")).not.toBeInTheDocument();
+  });
+
+  it("places the new-trip action in the Reisedaten heading and resets the form", () => {
+    render(<App />);
+
+    const travelSection = screen.getByRole("heading", { name: "Reisedaten" }).closest("section") as HTMLElement;
+    const newTripButton = within(travelSection).getByRole("button", { name: "Neue Reise" });
+
+    expect(newTripButton).toHaveAttribute("type", "button");
+    expect(newTripButton).toHaveAttribute("title", "Neue Reise");
+    expect(newTripButton).toHaveClass("icon-button");
+    expect(newTripButton).toHaveTextContent("");
+    expect(newTripButton.closest(".form-section-header")).toContainElement(
+      screen.getByRole("heading", { name: "Reisedaten" })
+    );
+    expect(screen.queryByText("Neu", { exact: true })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Zeit von"), { target: { value: "08:15" } });
+    fireEvent.click(newTripButton);
+
+    expect(screen.getByLabelText("Zeit von")).toHaveValue("");
+    expect(screen.getByText("Neue Reise", { selector: ".section-label" })).toBeInTheDocument();
   });
 });
 

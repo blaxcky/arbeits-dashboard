@@ -2150,10 +2150,24 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         <div className="trip-form-stack">
           <div className="form-toolbar">
             <span className="section-label">{editingId ? "Reise bearbeiten" : "Neue Reise"}</span>
-            <button className="secondary-button" onClick={() => void startNewTrip()}>Neu</button>
           </div>
           <div className="trip-form-grid">
-            <FormSection id="trip-section-dates" title="Reisedaten" icon={CalendarBlank}>
+            <FormSection
+              id="trip-section-dates"
+              title="Reisedaten"
+              icon={CalendarBlank}
+              headerAction={(
+                <button
+                  className="icon-button form-section-header-button"
+                  type="button"
+                  title="Neue Reise"
+                  aria-label="Neue Reise"
+                  onClick={() => void startNewTrip()}
+                >
+                  <Plus size={18} aria-hidden="true" />
+                </button>
+              )}
+            >
               <Field label="Grund" className="field-wide"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
               <Field label="Datum" error={tripDateError}>
                 <input type="date" value={form.date} aria-invalid={Boolean(tripDateError)} onChange={(event) => updateTripField("date", event.target.value)} />
@@ -3305,12 +3319,13 @@ export function WorkTimeField({
   );
 }
 
-function FormSection({ id, title, icon: IconComponent, className = "", children }: { id: string; title: string; icon: Icon; className?: string; children: React.ReactNode }) {
+function FormSection({ id, title, icon: IconComponent, className = "", headerAction, children }: { id: string; title: string; icon: Icon; className?: string; headerAction?: ReactNode; children: ReactNode }) {
   return (
     <section className={`form-section ${className}`.trim()} aria-labelledby={id}>
-      <div className="form-section-header">
+      <div className={`form-section-header${headerAction ? " form-section-header-with-action" : ""}`}>
         <IconComponent size={20} weight="duotone" aria-hidden="true" />
         <h3 id={id} className="form-section-title">{title}</h3>
+        {headerAction ? <div className="form-section-header-action">{headerAction}</div> : null}
       </div>
       <div className="form-section-body">
         {children}
