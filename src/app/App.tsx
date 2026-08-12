@@ -2323,9 +2323,11 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                       </span>
                       <p className="muted">{evidenceUploadsEnabled ? "Mit Strg+V oder Cmd+V hier einfügen." : disabledText}</p>
                     </div>
-                    <label className={`secondary-button file-upload-button ${evidenceUploadsEnabled ? "" : "file-upload-button-disabled"}`.trim()}>
+                    <label
+                      className={`icon-button trip-evidence-icon-button file-upload-button ${evidenceUploadsEnabled ? "" : "file-upload-button-disabled"}`.trim()}
+                      title={`${zone.title}: Datei auswählen`}
+                    >
                       <UploadSimple size={17} aria-hidden="true" />
-                      Datei auswählen
                       <input
                         type="file"
                         accept="image/*"
@@ -2349,11 +2351,12 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
                         </span>
                       </button>
                       <div className="trip-evidence-actions">
-                        <button className="secondary-button" type="button" onClick={() => downloadTripFile(file)}>
+                        <button className="icon-button trip-evidence-icon-button" type="button" title="Herunterladen" aria-label="Herunterladen" onClick={() => downloadTripFile(file)}>
                           <DownloadSimple size={17} aria-hidden="true" />
-                          Herunterladen
                         </button>
-                        <button className="danger-button" type="button" onClick={() => void removeTripFile(file)}>Löschen</button>
+                        <button className="icon-button trip-evidence-icon-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeTripFile(file)}>
+                          <Trash size={17} aria-hidden="true" />
+                        </button>
                       </div>
                     </div>
                   ))}

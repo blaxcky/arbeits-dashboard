@@ -3084,6 +3084,12 @@ button:disabled {
   cursor: pointer;
 }
 
+.trip-evidence-icon-button {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+}
+
 .file-upload-button input {
   position: absolute;
   width: 1px;

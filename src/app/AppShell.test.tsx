@@ -444,8 +444,19 @@ describe("travel expense view", () => {
     const otherZone = screen.getByRole("region", { name: "Sonstige Screenshots" });
     expect(within(otherZone).getByText("dienstauto.png")).toBeInTheDocument();
     expect(within(otherZone).getByText("parkplatz.webp")).toBeInTheDocument();
+    const mapsZone = screen.getByRole("region", { name: "Google Maps" });
+    const uploadLabel = within(mapsZone).getByLabelText("Google Maps: Datei auswählen").closest("label") as HTMLLabelElement;
+    const downloadButton = within(mapsZone).getByRole("button", { name: "Herunterladen" });
+    const deleteButton = within(mapsZone).getByRole("button", { name: "Löschen" });
+    expect(uploadLabel).toHaveTextContent("");
+    expect(uploadLabel.querySelector("svg")).toBeInTheDocument();
+    expect(downloadButton).toHaveTextContent("");
+    expect(downloadButton.querySelector("svg")).toBeInTheDocument();
+    expect(deleteButton).toHaveTextContent("");
+    expect(deleteButton).toHaveClass("danger-icon-button");
+    expect(deleteButton.querySelector("svg")).toBeInTheDocument();
 
-    fireEvent.click(within(screen.getByRole("region", { name: "Google Maps" })).getByText("google_maps_08.08.26.jpg"));
+    fireEvent.click(within(mapsZone).getByText("google_maps_08.08.26.jpg"));
     const previewDialog = screen.getByRole("dialog", { name: "Screenshot-Vorschau" });
     fireEvent.click(within(previewDialog).getByRole("button", { name: "Herunterladen" }));
     expect(downloads).toEqual(["google_maps_08.08.26.jpg"]);
