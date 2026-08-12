@@ -228,12 +228,14 @@ describe("Google Maps route action", () => {
     );
   });
 
-  it("keeps the existing hint while the route is incomplete", () => {
+  it("keeps the Maps action disabled without rendering route helper notices", () => {
     render(<App />);
 
     fireEvent.change(screen.getByLabelText("Startort"), { target: { value: "Eisenstadt Finanzamt" } });
 
-    expect(screen.getByText("Google-Maps-Link erscheint nach Startort und Zieladresse.")).toBeVisible();
+    expect(screen.queryByText("Google-Maps-Link erscheint nach Startort und Zieladresse.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nachweis: Screenshot, dass kein Dienstauto frei war.")).not.toBeInTheDocument();
+    expect(document.querySelector(".trip-helper-grid")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Google Maps öffnen" })).toBeDisabled();
     expect(screen.getByLabelText("Einfache Strecke (km)").parentElement).toContainElement(
       screen.getByRole("button", { name: "Google Maps öffnen" })

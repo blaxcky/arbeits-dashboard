@@ -1830,8 +1830,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     && calculatePublicTransportTicketRoundTripCents(previewTripCosts) > previewTravelCostCents
     && (previewTaxBreakdown?.publicTransportTaxFreeCents ?? 0) >= previewPayoutCents;
   const mapsUrl = buildGoogleMapsUrl(form.origin, form.destination);
-  const needsKilometerEvidence = form.transportType === "kilometergeld";
-  const needsPublicTransportEvidence = form.transportType === "oeffi-zuschuss";
   const openTrips = data.trips.filter((trip) => !trip.done);
   const completedTrips = data.trips.filter((trip) => trip.done);
   const filesByTripId = useMemo(() => {
@@ -2270,13 +2268,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             </div>
           </section>
           {publicTicketAboveSubsidy ? <Notice tone="warning" title="Ticketpreise liegen über dem Öffi-BEZU" text="Es wird der Ticketpreis für Hin- und Rückreise ersetzt; dadurch entsteht kein steuerpflichtiger Öffi-BEZU." /> : null}
-          {!mapsUrl || needsKilometerEvidence || needsPublicTransportEvidence ? (
-            <div className="trip-helper-grid">
-              {!mapsUrl ? <span className="muted">Google-Maps-Link erscheint nach Startort und Zieladresse.</span> : null}
-              {needsKilometerEvidence ? <span className="inline-warning">Nachweis: Screenshot, dass kein Dienstauto frei war.</span> : null}
-              {needsPublicTransportEvidence ? <span className="inline-warning">Nachweis: ÖBB-Verbindungskosten zeitnah sichern.</span> : null}
-            </div>
-          ) : null}
           <section
             className={`trip-form-evidence ${editingTrip ? "" : "trip-form-evidence-disabled"}`.trim()}
             aria-labelledby="trip-form-evidence-title"
