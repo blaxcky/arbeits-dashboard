@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
 import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateOtherMeasureForm, validateSettingsForm, validateUsoCaseForm, WorkTimeField, yearFromUrlParam } from "./App";
@@ -534,24 +534,46 @@ describe("point case list status presentation", () => {
     expect(screen.getAllByLabelText("0 erledigte Fälle")).toHaveLength(3);
   });
 
-  it("moves a reset case from completed to open without closing the status group", async () => {
+  it("offers only edit and delete actions for open and completed cases", () => {
     const data = statusGroupData();
-    data.auditPointCases = data.auditPointCases.filter((pointCase) => pointCase.status === "completed");
-    const { rerender } = render(<AuditPointsView data={data} showToast={vi.fn()} />);
-    const auditPanel = screen.getByRole("button", { name: "Betriebsprüfungen einklappen" }).closest("section") as HTMLElement;
-    const completedToggle = within(auditPanel).getByRole("button", { name: /Erledigt/ });
-    fireEvent.click(completedToggle);
-    fireEvent.click(within(auditPanel).getByRole("button", { name: "Auf offen setzen" }));
+    render(<AuditPointsView data={data} showToast={vi.fn()} />);
 
+    screen.getAllByRole("button", { name: /Erledigt/ }).forEach((toggle) => fireEvent.click(toggle));
+
+    expect(screen.queryByRole("button", { name: "Als erledigt markieren" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Auf offen setzen" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(6);
+    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(6);
+  });
+
+  it("changes every case type between completed and open through its edit form", async () => {
+    const data = statusGroupData();
+    render(<AuditPointsView data={data} showToast={vi.fn()} />);
+    screen.getAllByRole("button", { name: /Erledigt/ }).forEach((toggle) => fireEvent.click(toggle));
+
+    const changeStatus = async (title: string, status: "completed" | "in_progress") => {
+      const row = screen.getByText(title, { selector: "strong" }).closest("article") as HTMLElement;
+      fireEvent.click(within(row).getByRole("button", { name: "Bearbeiten" }));
+      fireEvent.change(screen.getByLabelText("Status"), { target: { value: status } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
+      });
+    };
+
+    await changeStatus("BP offen", "completed");
+    await waitFor(() => expect(data.saveAuditPointCase).toHaveBeenCalledWith(expect.objectContaining({ id: "audit-open", status: "completed" })));
+    await changeStatus("BP erledigt", "in_progress");
     await waitFor(() => expect(data.saveAuditPointCase).toHaveBeenCalledWith(expect.objectContaining({ id: "audit-done", status: "in_progress" })));
-    data.auditPointCases = data.auditPointCases.map((pointCase) => ({ ...pointCase, status: "in_progress" as const }));
-    rerender(<AuditPointsView data={data} showToast={vi.fn()} />);
 
-    expect(completedToggle).toHaveAttribute("aria-expanded", "true");
-    expect(within(auditPanel).getByLabelText("1 offener Fall")).toBeInTheDocument();
-    expect(within(auditPanel).getByLabelText("0 erledigte Fälle")).toBeInTheDocument();
-    expect(within(auditPanel).getByText("BP erledigt", { selector: "strong" })).toBeVisible();
-    expect(within(auditPanel).getByText("BP erledigt", { selector: "strong" }).closest("section")).toHaveClass("point-status-open");
+    await changeStatus("USO offen", "completed");
+    await waitFor(() => expect(data.saveUsoCase).toHaveBeenCalledWith(expect.objectContaining({ id: "uso-open", status: "completed" })));
+    await changeStatus("USO erledigt", "in_progress");
+    await waitFor(() => expect(data.saveUsoCase).toHaveBeenCalledWith(expect.objectContaining({ id: "uso-done", status: "in_progress" })));
+
+    await changeStatus("Maßnahme offen", "completed");
+    await waitFor(() => expect(data.saveOtherMeasure).toHaveBeenCalledWith(expect.objectContaining({ id: "other-open", status: "completed" })));
+    await changeStatus("Maßnahme erledigt", "in_progress");
+    await waitFor(() => expect(data.saveOtherMeasure).toHaveBeenCalledWith(expect.objectContaining({ id: "other-done", status: "in_progress" })));
   });
 
   it("shows only missing-month warnings and marks only completed cases", () => {

@@ -1114,24 +1114,6 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     showToast("Punkte-Fall gelöscht.");
   }
 
-  async function toggleAuditPointCase(pointCase: AuditPointCase) {
-    await data.saveAuditPointCase({
-      id: pointCase.id,
-      name: pointCase.name,
-      taxNumber: pointCase.taxNumber,
-      firm: pointCase.firm,
-      category: pointCase.category,
-      periodStartYear: pointCase.periodStartYear,
-      periodEndYear: pointCase.periodEndYear,
-      additionalResultCents: pointCase.additionalResultCents,
-      manualPointsTenths: pointCase.manualPointsTenths ?? 0,
-      section99: pointCase.section99,
-      submissionMonth: pointCase.submissionMonth,
-      status: pointCase.status === "completed" ? "in_progress" : "completed"
-    });
-    showToast("Punkte-Status geändert.");
-  }
-
   function updateUsoField(field: keyof ReturnType<typeof usoCaseToForm>, value: string) {
     setUsoForm((current) => field === "submissionMonth"
       ? applyPointSubmissionMonth(current, value)
@@ -1179,17 +1161,6 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
       setUsoForm(usoCaseToForm());
     }
     showToast("USO-Fall gelöscht.");
-  }
-
-  async function toggleUsoCase(usoCase: UsoCase) {
-    await data.saveUsoCase({
-      id: usoCase.id,
-      title: usoCase.title,
-      manualPointsTenths: usoCase.manualPointsTenths ?? 0,
-      submissionMonth: usoCase.submissionMonth,
-      status: usoCase.status === "completed" ? "in_progress" : "completed"
-    });
-    showToast("USO-Status geändert.");
   }
 
   function updateOtherField(field: keyof ReturnType<typeof otherMeasureToForm>, value: string) {
@@ -1242,18 +1213,6 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     showToast("Sonstige Maßnahme gelöscht.");
   }
 
-  async function toggleOtherMeasure(measure: OtherMeasure) {
-    await data.saveOtherMeasure({
-      id: measure.id,
-      title: measure.title,
-      measureType: measure.measureType,
-      manualPointsTenths: measure.manualPointsTenths ?? 0,
-      submissionMonth: measure.submissionMonth,
-      status: measure.status === "completed" ? "in_progress" : "completed"
-    });
-    showToast("Sonstige-Status geändert.");
-  }
-
   function renderAuditCases(cases: AuditPointCase[]) {
     return (
       <div className="trip-list">
@@ -1271,9 +1230,6 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
               <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
             </div>
             <div className="trip-actions">
-              <button className="icon-button trip-action-button" type="button" title={pointCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={pointCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleAuditPointCase(pointCase)}>
-                {pointCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
-              </button>
               <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editCase(pointCase)}>
                 <PencilSimple size={17} />
               </button>
@@ -1299,9 +1255,6 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             </div>
             {usoCase.manualPointsTenths ? <div className="trip-row-metrics"><strong>{formatPointTenths(usoCase.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
             <div className="trip-actions">
-              <button className="icon-button trip-action-button" type="button" title={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={usoCase.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleUsoCase(usoCase)}>
-                {usoCase.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
-              </button>
               <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editUsoCase(usoCase)}>
                 <PencilSimple size={17} />
               </button>
@@ -1327,9 +1280,6 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             </div>
             {measure.manualPointsTenths ? <div className="trip-row-metrics"><strong>{formatPointTenths(measure.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
             <div className="trip-actions">
-              <button className="icon-button trip-action-button" type="button" title={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} aria-label={measure.status === "completed" ? "Auf offen setzen" : "Als erledigt markieren"} onClick={() => void toggleOtherMeasure(measure)}>
-                {measure.status === "completed" ? <ArrowClockwise size={17} /> : <CheckCircle size={17} />}
-              </button>
               <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editOtherMeasure(measure)}>
                 <PencilSimple size={17} />
               </button>
