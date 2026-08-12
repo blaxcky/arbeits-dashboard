@@ -330,6 +330,26 @@ describe("travel expense view", () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows the trip form state in the page title", async () => {
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "Reise erfassen" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Bearbeiten" })[0]);
+
+    expect(screen.getByRole("heading", { name: "Reise bearbeiten" })).toBeInTheDocument();
+    expect(screen.queryByText("Reise bearbeiten", { selector: ".section-label" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Neue Reise" }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Reise erfassen" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Bearbeiten" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Speichern und Schließen" }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Reise erfassen" })).toBeInTheDocument());
+  });
+
   it("renders only the current cost analysis and keeps the completed checkbox", () => {
     render(<App />);
 

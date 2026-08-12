@@ -2191,14 +2191,9 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
 
   return (
     <section className="page-stack">
-      <Header eyebrow="Reisekosten" title="Reisen erfassen" />
+      <Header eyebrow="Reisekosten" title={editingId ? "Reise bearbeiten" : "Reise erfassen"} />
       <div className="split-grid trips-layout">
         <div className="trip-form-stack">
-          {editingId ? (
-            <div className="form-toolbar">
-              <span className="section-label">Reise bearbeiten</span>
-            </div>
-          ) : null}
           <div className="trip-form-grid">
             <FormSection
               id="trip-section-dates"
