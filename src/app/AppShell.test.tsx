@@ -1,5 +1,21 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const pwaRegistration = vi.hoisted(() => ({
+  options: undefined as { onNeedRefresh?: () => void } | undefined,
+  updateServiceWorker: vi.fn<() => Promise<void>>()
+}));
+
+vi.mock("virtual:pwa-register/react", () => ({
+  useRegisterSW: (options: { onNeedRefresh?: () => void }) => {
+    pwaRegistration.options = options;
+    return {
+      needRefresh: [false, vi.fn()],
+      offlineReady: [false, vi.fn()],
+      updateServiceWorker: pwaRegistration.updateServiceWorker
+    };
+  }
+}));
 
 const workData = vi.hoisted(() => ({
   loading: false,
@@ -19,6 +35,7 @@ const workData = vi.hoisted(() => ({
     updatedAt: "2026-08-08T08:00:00.000Z"
   },
   timeEntries: [],
+  entriesByDate: new Map(),
   flexCorrections: [],
   trips: [],
   tripPayments: [],
@@ -32,6 +49,8 @@ const workData = vi.hoisted(() => ({
   todos: [],
   todoProjects: [],
   refresh: vi.fn(),
+  saveTimeEntry: vi.fn(),
+  removeTimeEntry: vi.fn(),
   saveSettings: vi.fn(),
   addCorrection: vi.fn(),
   removeCorrection: vi.fn(),
@@ -49,6 +68,7 @@ import { App } from "./App";
 
 describe("task workspace dashboard navigation", () => {
   beforeEach(() => {
+    pwaRegistration.updateServiceWorker.mockReset();
     window.localStorage.clear();
     window.location.hash = "#/aufgaben/heute";
   });
@@ -73,6 +93,67 @@ describe("task workspace dashboard navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dashboard-Navigation ausklappen" }));
     expect(screen.getByRole("complementary", { name: "Hauptnavigation" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Dashboard-Navigation einklappen" })).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("PWA updates", () => {
+  beforeEach(() => {
+    pwaRegistration.options = undefined;
+    pwaRegistration.updateServiceWorker.mockReset();
+    pwaRegistration.updateServiceWorker.mockResolvedValue();
+    window.location.hash = "#/";
+  });
+
+  afterEach(() => {
+    window.location.hash = "";
+  });
+
+  it("does not show an update notice before an update is detected", () => {
+    render(<App />);
+
+    expect(screen.queryByRole("region", { name: "App-Update" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Jetzt aktualisieren" })).not.toBeInTheDocument();
+  });
+
+  it.each(["#/", "#/einstellungen", "#/aufgaben/heute"])("shows a detected update globally on route %s", (route) => {
+    window.location.hash = route;
+    render(<App />);
+
+    act(() => pwaRegistration.options?.onNeedRefresh?.());
+
+    const notice = screen.getByRole("region", { name: "App-Update" });
+    expect(notice).toHaveTextContent("Update verfügbar");
+    expect(notice).toHaveTextContent("Eine neue Version ist bereit.");
+    expect(screen.getByRole("button", { name: "Jetzt aktualisieren" })).toBeEnabled();
+  });
+
+  it("applies the registered update exactly once and disables the button while it is loading", () => {
+    let finishUpdate: (() => void) | undefined;
+    pwaRegistration.updateServiceWorker.mockReturnValue(new Promise((resolve) => {
+      finishUpdate = resolve;
+    }));
+    render(<App />);
+    act(() => pwaRegistration.options?.onNeedRefresh?.());
+
+    fireEvent.click(screen.getByRole("button", { name: "Jetzt aktualisieren" }));
+
+    expect(pwaRegistration.updateServiceWorker).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Update wird geladen …" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Update wird geladen …" }));
+    expect(pwaRegistration.updateServiceWorker).toHaveBeenCalledTimes(1);
+    finishUpdate?.();
+  });
+
+  it("keeps the notice open and allows retrying when the update fails", async () => {
+    pwaRegistration.updateServiceWorker.mockRejectedValueOnce(new Error("Aktivierung fehlgeschlagen"));
+    render(<App />);
+    act(() => pwaRegistration.options?.onNeedRefresh?.());
+
+    fireEvent.click(screen.getByRole("button", { name: "Jetzt aktualisieren" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Jetzt aktualisieren" })).toBeEnabled());
+    expect(screen.getByRole("region", { name: "App-Update" })).toBeVisible();
+    expect(screen.getByText("Update konnte nicht geladen werden. Bitte erneut versuchen.")).toBeVisible();
   });
 });
 

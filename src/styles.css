@@ -241,6 +241,51 @@ button:disabled {
   background: #fff;
 }
 
+.pwa-update-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  border: 1px solid #cdbb8d;
+  border-radius: 8px;
+  padding: 13px 14px;
+  background: #fffaf0;
+  color: #594319;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.workspace:has(.todos-shell) .pwa-update-notice {
+  margin: 16px 20px;
+}
+
+.pwa-update-notice > svg {
+  color: var(--warning);
+}
+
+.pwa-update-copy {
+  min-width: 0;
+}
+
+.pwa-update-copy strong,
+.pwa-update-copy p {
+  margin: 0;
+}
+
+.pwa-update-copy p {
+  margin-top: 2px;
+  color: #776239;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.pwa-update-button {
+  min-width: 154px;
+  border-color: #cdbb8d;
+  background: #fff;
+  color: #594319;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -3211,6 +3256,15 @@ button:disabled {
 
   .workspace {
     padding: 20px;
+  }
+
+  .pwa-update-notice {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pwa-update-button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .sidebar-reveal {

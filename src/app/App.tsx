@@ -36,6 +36,7 @@ import {
 } from "@phosphor-icons/react";
 import { type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useRegisterSW } from "virtual:pwa-register/react";
 import type { AuditPointCase, AuditPointCategory, OtherMeasure, SavedDestination, Settings, TimeEntry, UsoCase, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
@@ -132,6 +133,11 @@ const openTripCopyGroups: { key: OpenTripField["group"]; title: string; icon: Ic
 export function App() {
   const data = useWorkData();
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const { updateServiceWorker } = useRegisterSW({
+    immediate: true,
+    onNeedRefresh: () => setUpdateAvailable(true)
+  });
 
   const showToast = useCallback((text: string) => {
     setToasts((current) => [...current, { id: crypto.randomUUID(), text }]);
@@ -143,12 +149,19 @@ export function App() {
 
   return (
     <HashRouter>
-      <AppShell data={data} toasts={toasts} showToast={showToast} onRemoveToast={removeToast} />
+      <AppShell
+        data={data}
+        toasts={toasts}
+        updateAvailable={updateAvailable}
+        updateServiceWorker={updateServiceWorker}
+        showToast={showToast}
+        onRemoveToast={removeToast}
+      />
     </HashRouter>
   );
 }
 
-function AppShell({ data, toasts, showToast, onRemoveToast }: { data: WorkData; toasts: Toast[]; showToast: ShowToast; onRemoveToast: (id: string) => void }) {
+function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToast, onRemoveToast }: { data: WorkData; toasts: Toast[]; updateAvailable: boolean; updateServiceWorker: () => Promise<void>; showToast: ShowToast; onRemoveToast: (id: string) => void }) {
   const location = useLocation();
   const isTodosView = location.pathname.startsWith("/aufgaben");
   const [sidebarPreference, setSidebarPreference] = useState(() => {
@@ -214,6 +227,7 @@ function AppShell({ data, toasts, showToast, onRemoveToast }: { data: WorkData; 
       </aside>
       <main className="workspace">
         {sidebarCollapsed ? <button ref={sidebarRevealRef} className="sidebar-reveal" type="button" aria-label="Dashboard-Navigation ausklappen" aria-controls="dashboard-navigation" aria-expanded="false" title="Dashboard-Menü ausklappen" onClick={() => setSidebarCollapsed(false)}><CaretDoubleRight /></button> : null}
+        {updateAvailable ? <PwaUpdateNotice updateServiceWorker={updateServiceWorker} showToast={showToast} /> : null}
         {data.error ? <Notice tone="danger" title="Datenfehler" text={data.error} /> : null}
         <Routes>
           <Route path="/" element={<Dashboard data={data} showToast={showToast} />} />
@@ -236,6 +250,35 @@ function AppShell({ data, toasts, showToast, onRemoveToast }: { data: WorkData; 
         <ToastStack toasts={toasts} onRemove={onRemoveToast} />
       </main>
     </div>
+  );
+}
+
+function PwaUpdateNotice({ updateServiceWorker, showToast }: { updateServiceWorker: () => Promise<void>; showToast: ShowToast }) {
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  async function applyUpdate() {
+    if (isUpdating) return;
+
+    setIsUpdating(true);
+    try {
+      await updateServiceWorker();
+    } catch {
+      setIsUpdating(false);
+      showToast("Update konnte nicht geladen werden. Bitte erneut versuchen.");
+    }
+  }
+
+  return (
+    <section className="pwa-update-notice" aria-label="App-Update">
+      <ArrowClockwise size={20} weight="duotone" aria-hidden="true" />
+      <div className="pwa-update-copy">
+        <strong>Update verfügbar</strong>
+        <p>Eine neue Version ist bereit.</p>
+      </div>
+      <button className="secondary-button pwa-update-button" type="button" disabled={isUpdating} onClick={() => void applyUpdate()}>
+        {isUpdating ? "Update wird geladen …" : "Jetzt aktualisieren"}
+      </button>
+    </section>
   );
 }
 
