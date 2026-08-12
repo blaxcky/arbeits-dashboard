@@ -183,3 +183,53 @@ describe("settings layout", () => {
     ]);
   });
 });
+
+describe("Google Maps route action", () => {
+  beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    window.location.hash = "#/reisekosten";
+  });
+
+  afterEach(() => {
+    window.location.hash = "";
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows only the external Maps action for a complete route and opens it in a new tab", () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("Startort"), { target: { value: "Eisenstadt Finanzamt" } });
+    fireEvent.change(screen.getByLabelText("Zieladresse"), { target: { value: "Stephansplatz 1, 1010 Wien" } });
+
+    const mapsButton = screen.getByRole("button", { name: "Google Maps öffnen" });
+    expect(mapsButton).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Google Maps öffnen" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Vorschau öffnen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Große Vorschau" })).not.toBeInTheDocument();
+    expect(document.querySelector("iframe")).not.toBeInTheDocument();
+
+    fireEvent.click(mapsButton);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://www.google.com/maps/dir/?api=1&origin=Eisenstadt+Finanzamt&destination=Stephansplatz+1%2C+1010+Wien",
+      "_blank",
+      "noopener,noreferrer"
+    );
+  });
+
+  it("keeps the existing hint while the route is incomplete", () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("Startort"), { target: { value: "Eisenstadt Finanzamt" } });
+
+    expect(screen.getByText("Google-Maps-Link erscheint nach Startort und Zieladresse.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Google Maps öffnen" })).not.toBeInTheDocument();
+  });
+});

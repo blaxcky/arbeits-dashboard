@@ -1779,8 +1779,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const [tripDateError, setTripDateError] = useState<string | undefined>();
   const [tripTimeErrors, setTripTimeErrors] = useState<Partial<Record<"startTime" | "endTime", string>>>({});
   const [openTripsDialogOpen, setOpenTripsDialogOpen] = useState(false);
-  const [mapPreviewOpen, setMapPreviewOpen] = useState(false);
-  const [largeMapPreviewOpen, setLargeMapPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<TripFile | null>(null);
   const [destinationPickerOpen, setDestinationPickerOpen] = useState(false);
   const [municipalityPickerOpen, setMunicipalityPickerOpen] = useState(false);
@@ -1832,7 +1830,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     && calculatePublicTransportTicketRoundTripCents(previewTripCosts) > previewTravelCostCents
     && (previewTaxBreakdown?.publicTransportTaxFreeCents ?? 0) >= previewPayoutCents;
   const mapsUrl = buildGoogleMapsUrl(form.origin, form.destination);
-  const mapsEmbedUrl = buildGoogleMapsEmbedUrl(form.origin, form.destination);
   const needsKilometerEvidence = form.transportType === "kilometergeld";
   const needsPublicTransportEvidence = form.transportType === "oeffi-zuschuss";
   const openTrips = data.trips.filter((trip) => !trip.done);
@@ -1928,18 +1925,10 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   }, []);
 
   useEffect(() => {
-    if (!mapsEmbedUrl) setMapPreviewOpen(false);
-  }, [mapsEmbedUrl]);
-
-  useEffect(() => {
     if (municipalities.length === 0 || form.municipalityCode.trim()) return;
     const municipality = findMunicipalityForAddress(form.destination, municipalities);
     if (municipality) setForm((current) => ({ ...current, municipalityCode: municipality.code }));
   }, [form.destination, form.municipalityCode, municipalities]);
-
-  useEffect(() => {
-    if (!mapsEmbedUrl) setLargeMapPreviewOpen(false);
-  }, [mapsEmbedUrl]);
 
   useEffect(() => {
     if (!previewFile) return;
@@ -2163,7 +2152,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
         </button>
         <span>{openTrips.length} offen</span>
       </div>
-      <div className={`split-grid trips-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trips-layout-map-open" : ""}`}>
+      <div className="split-grid trips-layout">
         <div className="trip-form-stack">
           <div className="form-toolbar">
             <span className="section-label">{editingId ? "Reise bearbeiten" : "Neue Reise"}</span>
@@ -2278,34 +2267,11 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             {mapsUrl ? (
               <div className="button-row trip-map-actions">
                 <button className="secondary-button" type="button" onClick={openGoogleMaps}>Google Maps öffnen</button>
-                <button className="secondary-button" type="button" onClick={() => setMapPreviewOpen((open) => !open)} disabled={!mapsEmbedUrl}>
-                  {mapPreviewOpen ? "Vorschau schließen" : "Vorschau öffnen"}
-                </button>
-                <button className="secondary-button" type="button" onClick={() => setLargeMapPreviewOpen((open) => !open)} disabled={!mapsEmbedUrl}>
-                  {largeMapPreviewOpen ? "Große Vorschau schließen" : "Große Vorschau"}
-                </button>
               </div>
             ) : <span className="muted">Google-Maps-Link erscheint nach Startort und Zieladresse.</span>}
             {needsKilometerEvidence ? <span className="inline-warning">Nachweis: Screenshot, dass kein Dienstauto frei war.</span> : null}
             {needsPublicTransportEvidence ? <span className="inline-warning">Nachweis: ÖBB-Verbindungskosten zeitnah sichern.</span> : null}
           </div>
-          {mapPreviewOpen && mapsEmbedUrl ? (
-            <div className="map-preview">
-              <div className="panel-heading">
-                <span className="section-label">Google-Maps-Vorschau</span>
-                <button className="icon-button" type="button" title="Vorschau schließen" aria-label="Vorschau schließen" onClick={() => setMapPreviewOpen(false)}>
-                  <X size={18} />
-                </button>
-              </div>
-              <iframe
-                title="Google-Maps-Vorschau"
-                src={mapsEmbedUrl}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                allowFullScreen
-              />
-            </div>
-          ) : null}
           <section
             className={`trip-form-evidence ${editingTrip ? "" : "trip-form-evidence-disabled"}`.trim()}
             aria-labelledby="trip-form-evidence-title"
@@ -2358,7 +2324,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             <button className="secondary-button" onClick={() => void saveTrip(true)}>Speichern und Schließen</button>
           </div>
         </div>
-        <div className={`trip-side-layout ${largeMapPreviewOpen && mapsEmbedUrl ? "trip-side-layout-map-open" : ""}`}>
+        <div className="trip-side-layout">
           <TripCostPanel
             durationMinutes={previewDurationMinutes}
             kilometers={previewTripCosts.oneWayKilometers * 2}
@@ -2373,48 +2339,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
             otherCostsDifferentialCents={previewOtherCostsDifferentialCents}
             differentialCents={previewDifferentialCents}
           />
-          {largeMapPreviewOpen && mapsEmbedUrl ? (
-            <div className="panel large-map-card">
-              <div className="large-map-preview">
-                <div className="panel-heading">
-                  <span className="section-label">Große Google-Maps-Vorschau</span>
-                  <button className="icon-button" type="button" title="Große Vorschau schließen" aria-label="Große Vorschau schließen" onClick={() => setLargeMapPreviewOpen(false)}>
-                    <X size={18} />
-                  </button>
-                </div>
-                <div className="large-map-route">
-                  <div>
-                    <span>Startort</span>
-                    <strong>{form.origin.trim()}</strong>
-                  </div>
-                  <div>
-                    <span>Zieladresse</span>
-                    <strong>{form.destination.trim()}</strong>
-                  </div>
-                {form.municipalityCode.trim() ? (
-                  <div>
-                    <span>Gemeindekennzahl</span>
-                    <strong>{form.municipalityCode.trim()}</strong>
-                  </div>
-                ) : null}
-                {form.oneWayKilometers.trim() ? (
-                    <div>
-                      <span>Einfache Strecke</span>
-                      <strong>{form.oneWayKilometers.trim()} km</strong>
-                    </div>
-                  ) : null}
-                </div>
-                <iframe
-                  title="Große Google-Maps-Vorschau"
-                  src={mapsEmbedUrl}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  allowFullScreen
-                />
-                <button className="secondary-button map-external-button" type="button" onClick={openGoogleMaps}>Extern in Google Maps öffnen</button>
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
       <div className="panel">
@@ -3950,14 +3874,6 @@ function buildGoogleMapsUrl(origin: string, destination: string): string | null 
     destination: trimmedDestination
   });
   return `https://www.google.com/maps/dir/?${params.toString()}`;
-}
-
-function buildGoogleMapsEmbedUrl(origin: string, destination: string): string | null {
-  const trimmedOrigin = origin.trim();
-  const trimmedDestination = destination.trim();
-  if (!trimmedOrigin || !trimmedDestination) return null;
-  const query = encodeURIComponent(`${trimmedOrigin} nach ${trimmedDestination}`);
-  return `https://www.google.com/maps?q=${query}&output=embed`;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
