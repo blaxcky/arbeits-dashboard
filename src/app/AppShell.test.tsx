@@ -319,7 +319,7 @@ describe("travel expense view", () => {
     expect(screen.getByRole("checkbox", { name: "Erledigt" })).toBeInTheDocument();
   });
 
-  it("removes direct status actions from both trip lists but keeps the worklist action", () => {
+  it("places the accessible worklist icon action in the open-trips heading", () => {
     render(<App />);
 
     expect(screen.queryByRole("button", { name: "Als erledigt markieren" })).not.toBeInTheDocument();
@@ -328,7 +328,18 @@ describe("travel expense view", () => {
     expect(screen.getAllByRole("button", { name: "Duplizieren" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole("button", { name: "Offene abarbeiten" }));
+    const openTripsHeading = screen.getByText("Offene Reisen", { selector: ".section-label" }).closest(".panel-heading") as HTMLElement;
+    const worklistButton = within(openTripsHeading).getByRole("button", { name: "Offene Reisen abarbeiten" });
+
+    expect(worklistButton).toHaveAttribute("type", "button");
+    expect(worklistButton).toHaveAttribute("title", "Offene Reisen abarbeiten");
+    expect(worklistButton).toHaveClass("icon-button");
+    expect(worklistButton).toHaveTextContent("");
+    expect(within(openTripsHeading).getByText("1", { selector: "strong" })).toBeInTheDocument();
+    expect(document.querySelector(".trips-overview-actions")).not.toBeInTheDocument();
+    expect(screen.queryByText("1 offen")).not.toBeInTheDocument();
+
+    fireEvent.click(worklistButton);
 
     expect(screen.getByRole("button", { name: "Als erledigt markieren" })).toBeInTheDocument();
   });

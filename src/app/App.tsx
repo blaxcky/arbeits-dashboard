@@ -2139,13 +2139,6 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   return (
     <section className="page-stack">
       <Header eyebrow="Reisekosten" title="Reisen erfassen" />
-      <div className="trips-overview-actions">
-        <button className="primary-button" type="button" onClick={() => setOpenTripsDialogOpen(true)}>
-          <ListChecks size={18} />
-          Offene abarbeiten
-        </button>
-        <span>{openTrips.length} offen</span>
-      </div>
       <div className="split-grid trips-layout">
         <div className="trip-form-stack">
           <div className="form-toolbar">
@@ -2318,7 +2311,18 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
       <div className="panel">
         <div className="panel-heading">
           <span className="section-label">Offene Reisen</span>
-          <strong>{openTrips.length}</strong>
+          <div className="open-trips-heading-actions">
+            <strong>{openTrips.length}</strong>
+            <button
+              className="icon-button"
+              type="button"
+              title="Offene Reisen abarbeiten"
+              aria-label="Offene Reisen abarbeiten"
+              onClick={() => setOpenTripsDialogOpen(true)}
+            >
+              <ListChecks size={18} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <div className="trip-list">
           {openTrips.length === 0 ? <p className="muted">Keine offenen Reisen.</p> : null}

@@ -769,25 +769,6 @@ button:disabled {
   line-height: 1.55;
 }
 
-.trips-overview-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: var(--shadow);
-}
-
-.trips-overview-actions span {
-  color: var(--muted);
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
 .dashboard-workflow-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.75fr) minmax(0, 0.8fr);
@@ -934,6 +915,18 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.open-trips-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.open-trips-heading-actions .icon-button {
+  width: 40px;
+  padding: 0;
 }
 
 .year-overview-heading {
