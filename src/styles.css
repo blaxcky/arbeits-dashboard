@@ -2760,7 +2760,7 @@ button:disabled {
   display: grid;
   grid-template-columns: 20px minmax(150px, 0.34fr) minmax(0, 1fr) 38px;
   gap: 14px;
-  align-items: start;
+  align-items: center;
   padding: 13px 20px;
   border-bottom: 1px solid #edf0f4;
   background: #fff;
@@ -2771,8 +2771,15 @@ button:disabled {
 }
 
 .open-trip-data-row > svg {
-  margin-top: 2px;
   color: #788496;
+}
+
+.open-trip-data-row.copy-field-wide {
+  align-items: start;
+}
+
+.open-trip-data-row.copy-field-wide > svg {
+  margin-top: 2px;
 }
 
 .open-trip-data-row > span:not(.open-trip-row-action) {
