@@ -81,8 +81,17 @@ describe("expense calculations", () => {
 
   it("calculates tax per diem and per diem differential", () => {
     expect(calculateTaxPerDiemCents(0)).toBe(0);
+    expect(calculateTaxPerDiemCents(180)).toBe(0);
+    expect(calculateTaxPerDiemCents(181)).toBe(1000);
+    expect(calculateTaxPerDiemCents(240)).toBe(1000);
+    expect(calculateTaxPerDiemCents(241)).toBe(1250);
     expect(calculateTaxPerDiemCents(301)).toBe(1500);
+    expect(calculateTaxPerDiemCents(660)).toBe(2750);
+    expect(calculateTaxPerDiemCents(661)).toBe(3000);
     expect(calculateTaxPerDiemCents(721)).toBe(3000);
+    expect(calculateTaxPerDiemCents(24 * 60)).toBe(3000);
+    expect(calculatePerDiemDifferentialCents(180, 1000)).toBe(0);
+    expect(calculatePerDiemDifferentialCents(181, 750)).toBe(250);
     expect(calculatePerDiemDifferentialCents(301, 1000)).toBe(500);
     expect(calculatePerDiemDifferentialCents(721, 3000)).toBe(0);
   });

@@ -100,6 +100,16 @@ describe("trip advertising costs export", () => {
     expect(row.transportAdvertisingCostsCents).toBe(5000);
   });
 
+  it("applies the three-hour tax per diem threshold in advertising costs exports", () => {
+    const rows = buildTripAdvertisingCostsExportRows([
+      { ...baseTrip, id: "trip-180", durationMinutes: 180, perDiemCents: 0 },
+      { ...baseTrip, id: "trip-181", durationMinutes: 181, perDiemCents: 750 }
+    ], 2026);
+
+    expect(rows.find((row) => row.id === "trip-180")?.perDiemAdvertisingCostsCents).toBe(0);
+    expect(rows.find((row) => row.id === "trip-181")?.perDiemAdvertisingCostsCents).toBe(250);
+  });
+
   it("summarizes advertising costs and keeps employer payments separate", () => {
     const rows = buildTripAdvertisingCostsExportRows([
       baseTrip,

@@ -74,7 +74,7 @@ export function calculateDomesticPerDiemCents(durationMinutes: number): number {
 }
 
 export function calculateTaxPerDiemCents(durationMinutes: number): number {
-  if (durationMinutes <= 0) return 0;
+  if (durationMinutes <= 3 * 60) return 0;
   return Math.min(Math.ceil(durationMinutes / 60) * TRIP_RULES.taxPerDiemHourlyCents, TRIP_RULES.taxPerDiemMaxCents);
 }
 
