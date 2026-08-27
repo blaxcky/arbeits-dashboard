@@ -108,7 +108,7 @@ import {
 const navItems = [
   { to: "/", label: "Dashboard", icon: House },
   { to: "/reisekosten", label: "Reisekosten", icon: Briefcase },
-  { to: "/punkte", label: "Punkte", icon: ChartBar },
+  { to: "/punkte", label: "Fallübersicht", icon: ChartBar },
   { to: "/aufgaben", label: "Aufgaben", icon: ListChecks },
   { to: "/einstellungen", label: "Einstellungen", icon: Gear }
 ];
@@ -216,13 +216,13 @@ function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToas
               {item.to === "/reisekosten" ? (
                 <NavLink to="/reisekosten/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
                   <CalendarCheck size={15} weight="duotone" />
-                  <span>Jahresübersicht</span>
+                  <span>Reisen - Jahresübersicht</span>
                 </NavLink>
               ) : null}
               {item.to === "/punkte" ? (
                 <NavLink to="/punkte/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
                   <CalendarCheck size={15} weight="duotone" />
-                  <span>Jahresübersicht</span>
+                  <span>Punkte - Jahresübersicht</span>
                 </NavLink>
               ) : null}
             </div>

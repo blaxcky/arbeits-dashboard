@@ -86,6 +86,14 @@ describe("task workspace dashboard navigation", () => {
     window.location.hash = "";
   });
 
+  it("labels the case and year overview navigation entries explicitly", () => {
+    render(<App />);
+
+    expect(screen.getByRole("link", { name: "Fallübersicht" })).toHaveAttribute("href", "#/punkte");
+    expect(screen.getByRole("link", { name: "Punkte - Jahresübersicht" })).toHaveAttribute("href", "#/punkte/jahr");
+    expect(screen.getByRole("link", { name: "Reisen - Jahresübersicht" })).toHaveAttribute("href", "#/reisekosten/jahr");
+  });
+
   it("hides only the outer dashboard navigation and remembers the choice", () => {
     const { unmount } = render(<App />);
 
