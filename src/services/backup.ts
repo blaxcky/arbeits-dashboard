@@ -15,9 +15,9 @@ export async function exportBackup(): Promise<Blob> {
   const filesFolder = zip.folder("files");
   const serializedData: SerializedBackupData = {
     ...data,
-    auditPointCases: data.auditPointCases.map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
-    usoCases: data.usoCases.map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
-    otherMeasures: data.otherMeasures.map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0 })),
+    auditPointCases: data.auditPointCases.map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0, manualPointsNote: pointCase.manualPointsNote ?? "" })),
+    usoCases: data.usoCases.map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0, manualPointsNote: pointCase.manualPointsNote ?? "" })),
+    otherMeasures: data.otherMeasures.map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0, manualPointsNote: measure.manualPointsNote ?? "" })),
     files: data.files.map((file, index) => {
       const path = backupFilePath(file, index);
       const bytes = dataUrlToBytes(file.dataUrl, file.mimeType);
@@ -246,6 +246,7 @@ function validateAuditPointCase(value: unknown): void {
   requireNumber(value, "periodEndYear", "Punkte-Fall-Zeitraum bis fehlt.");
   requireNumber(value, "additionalResultCents", "Punkte-Fall-Mehrergebnis fehlt.");
   requireOptionalManualPoints(value, "manualPointsTenths", "Punkte-Fall-Zusatzpunkte sind ungültig.");
+  requireOptionalString(value, "manualPointsNote", "Punkte-Fall-Zusatzpunkte-Hinweis ist ungültig.");
   if (typeof value.section99 !== "boolean") throw new Error("Punkte-Fall-§99-Status fehlt.");
   requireString(value, "submissionMonth", "Punkte-Fall-Abgabemonat fehlt.");
   requireString(value, "status", "Punkte-Fall-Status fehlt.");
@@ -268,6 +269,7 @@ function validateUsoCase(value: unknown): void {
   requireString(value, "id", "USO-Fall-ID fehlt.");
   requireString(value, "title", "USO-Fall-Titel fehlt.");
   requireOptionalManualPoints(value, "manualPointsTenths", "USO-Fall-Zusatzpunkte sind ungültig.");
+  requireOptionalString(value, "manualPointsNote", "USO-Fall-Zusatzpunkte-Hinweis ist ungültig.");
   requireString(value, "submissionMonth", "USO-Fall-Abgabemonat fehlt.");
   requireString(value, "status", "USO-Fall-Status fehlt.");
   requireString(value, "createdAt", "USO-Fall-Erstellt-Zeit fehlt.");
@@ -288,6 +290,7 @@ function validateOtherMeasure(value: unknown): void {
   requireString(value, "title", "Sonstige-Maßnahme-Titel fehlt.");
   requireString(value, "measureType", "Sonstige-Maßnahme-Art fehlt.");
   requireOptionalManualPoints(value, "manualPointsTenths", "Sonstige-Maßnahme-Zusatzpunkte sind ungültig.");
+  requireOptionalString(value, "manualPointsNote", "Sonstige-Maßnahme-Zusatzpunkte-Hinweis ist ungültig.");
   requireString(value, "submissionMonth", "Sonstige-Maßnahme-Abgabemonat fehlt.");
   requireString(value, "status", "Sonstige-Maßnahme-Status fehlt.");
   requireString(value, "createdAt", "Sonstige-Maßnahme-Erstellt-Zeit fehlt.");
@@ -360,11 +363,11 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
     files,
     savedDestinations: data.savedDestinations ?? [],
     tripPayments: data.tripPayments ?? [],
-    auditPointCases: (data.auditPointCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
+    auditPointCases: (data.auditPointCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0, manualPointsNote: pointCase.manualPointsNote ?? "" })),
     auditPointGoals: data.auditPointGoals ?? [],
-    usoCases: (data.usoCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
+    usoCases: (data.usoCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0, manualPointsNote: pointCase.manualPointsNote ?? "" })),
     usoGoals: data.usoGoals ?? [],
-    otherMeasures: (data.otherMeasures ?? []).map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0 })),
+    otherMeasures: (data.otherMeasures ?? []).map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0, manualPointsNote: measure.manualPointsNote ?? "" })),
     todos: data.todos ?? [],
     todoProjects: data.todoProjects ?? []
   };

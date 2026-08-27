@@ -151,9 +151,9 @@ function backupData(): BackupData {
 function withManualPointDefaults<T extends { auditPointCases?: AuditPointCase[]; usoCases?: UsoCase[]; otherMeasures?: OtherMeasure[] }>(data: T) {
   return {
     ...data,
-    auditPointCases: (data.auditPointCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
-    usoCases: (data.usoCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0 })),
-    otherMeasures: (data.otherMeasures ?? []).map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0 }))
+    auditPointCases: (data.auditPointCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0, manualPointsNote: pointCase.manualPointsNote ?? "" })),
+    usoCases: (data.usoCases ?? []).map((pointCase) => ({ ...pointCase, manualPointsTenths: pointCase.manualPointsTenths ?? 0, manualPointsNote: pointCase.manualPointsNote ?? "" })),
+    otherMeasures: (data.otherMeasures ?? []).map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0, manualPointsNote: measure.manualPointsNote ?? "" }))
   };
 }
 
@@ -196,14 +196,14 @@ describe("backup service", () => {
     expect(await zip.file("files/file-1-screenshot.png")?.async("uint8array")).toEqual(screenshotBytes);
   });
 
-  it("exports backup schema 1.11.0", async () => {
+  it("exports backup schema 1.12.0", async () => {
     dbMocks.readAllData.mockResolvedValue(backupData());
 
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { schemaVersion: string };
 
-    expect(manifest.schemaVersion).toBe("1.11.0");
+    expect(manifest.schemaVersion).toBe("1.12.0");
   });
 
   it("exports trip payments in the backup counts and data", async () => {
@@ -219,46 +219,55 @@ describe("backup service", () => {
   });
 
   it("exports audit point cases and goals in the backup counts and data", async () => {
-    dbMocks.readAllData.mockResolvedValue(backupData());
+    const backup = backupData();
+    backup.auditPointCases[0].manualPointsTenths = 15;
+    backup.auditPointCases[0].manualPointsNote = "COFAG";
+    dbMocks.readAllData.mockResolvedValue(backup);
 
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { auditPointCases: number; auditPointGoals: number } };
-    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { auditPointCases: Array<{ manualPointsTenths?: number }>; auditPointGoals: unknown[] };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { auditPointCases: Array<{ manualPointsTenths?: number; manualPointsNote?: string }>; auditPointGoals: unknown[] };
 
     expect(manifest.counts.auditPointCases).toBe(1);
     expect(manifest.counts.auditPointGoals).toBe(1);
     expect(data.auditPointCases).toHaveLength(1);
-    expect(data.auditPointCases[0].manualPointsTenths).toBe(0);
+    expect(data.auditPointCases[0]).toMatchObject({ manualPointsTenths: 15, manualPointsNote: "COFAG" });
     expect(data.auditPointGoals).toHaveLength(1);
   });
 
   it("exports USO cases and goals in the backup counts and data", async () => {
-    dbMocks.readAllData.mockResolvedValue(backupData());
+    const backup = backupData();
+    backup.usoCases[0].manualPointsTenths = 10;
+    backup.usoCases[0].manualPointsNote = "Amtshilfe";
+    dbMocks.readAllData.mockResolvedValue(backup);
 
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { usoCases: number; usoGoals: number } };
-    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { usoCases: Array<{ manualPointsTenths?: number }>; usoGoals: unknown[] };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { usoCases: Array<{ manualPointsTenths?: number; manualPointsNote?: string }>; usoGoals: unknown[] };
 
     expect(manifest.counts.usoCases).toBe(1);
     expect(manifest.counts.usoGoals).toBe(1);
     expect(data.usoCases).toHaveLength(1);
-    expect(data.usoCases[0].manualPointsTenths).toBe(0);
+    expect(data.usoCases[0]).toMatchObject({ manualPointsTenths: 10, manualPointsNote: "Amtshilfe" });
     expect(data.usoGoals).toHaveLength(1);
   });
 
   it("exports other measures in the backup counts and data", async () => {
-    dbMocks.readAllData.mockResolvedValue(backupData());
+    const backup = backupData();
+    backup.otherMeasures[0].manualPointsTenths = 5;
+    backup.otherMeasures[0].manualPointsNote = "Sonderauftrag";
+    dbMocks.readAllData.mockResolvedValue(backup);
 
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { otherMeasures: number } };
-    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { otherMeasures: Array<{ manualPointsTenths?: number }> };
+    const data = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { otherMeasures: Array<{ manualPointsTenths?: number; manualPointsNote?: string }> };
 
     expect(manifest.counts.otherMeasures).toBe(1);
     expect(data.otherMeasures).toHaveLength(1);
-    expect(data.otherMeasures[0].manualPointsTenths).toBe(0);
+    expect(data.otherMeasures[0]).toMatchObject({ manualPointsTenths: 5, manualPointsNote: "Sonderauftrag" });
   });
 
   it("exports tasks and projects in the backup counts and data", async () => {

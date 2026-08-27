@@ -200,6 +200,34 @@ class WorkDashboardDb extends Dexie {
         measure.manualPointsTenths = normalizeManualPoints(measure.manualPointsTenths);
       });
     });
+    this.version(12).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt",
+      tripPayments: "id, year, date",
+      auditPointCases: "id, submissionMonth, status, category",
+      auditPointGoals: "id, &year",
+      usoCases: "id, submissionMonth, status",
+      usoGoals: "id, &year",
+      otherMeasures: "id, submissionMonth, status, measureType",
+      todos: "id, projectId, dueDate, completedAt, updatedAt",
+      todoProjects: "id, sortOrder, updatedAt"
+    }).upgrade(async (tx) => {
+      await tx.table<AuditPointCase, string>("auditPointCases").toCollection().modify((pointCase) => {
+        pointCase.manualPointsNote = normalizeManualPointsNote(pointCase.manualPointsNote, pointCase.manualPointsTenths);
+      });
+      await tx.table<UsoCase, string>("usoCases").toCollection().modify((pointCase) => {
+        pointCase.manualPointsNote = normalizeManualPointsNote(pointCase.manualPointsNote, pointCase.manualPointsTenths);
+      });
+      await tx.table<OtherMeasure, string>("otherMeasures").toCollection().modify((measure) => {
+        measure.manualPointsNote = normalizeManualPointsNote(measure.manualPointsNote, measure.manualPointsTenths);
+      });
+    });
   }
 }
 
@@ -416,6 +444,7 @@ export async function upsertAuditPointCase(input: Omit<AuditPointCase, "id" | "c
     periodEndYear: input.periodEndYear,
     additionalResultCents: Math.max(Math.round(input.additionalResultCents), 0),
     manualPointsTenths: normalizeManualPoints(input.manualPointsTenths),
+    manualPointsNote: normalizeManualPointsNote(input.manualPointsNote, input.manualPointsTenths),
     section99: input.section99,
     submissionMonth: input.submissionMonth,
     status: input.status,
@@ -466,6 +495,7 @@ export async function upsertUsoCase(input: Omit<UsoCase, "id" | "createdAt" | "u
     id: input.id ?? crypto.randomUUID(),
     title: input.title.trim(),
     manualPointsTenths: normalizeManualPoints(input.manualPointsTenths),
+    manualPointsNote: normalizeManualPointsNote(input.manualPointsNote, input.manualPointsTenths),
     submissionMonth: input.submissionMonth,
     status: input.status,
     createdAt: existing?.createdAt ?? now,
@@ -506,6 +536,7 @@ export async function upsertOtherMeasure(input: Omit<OtherMeasure, "id" | "creat
     title: input.title.trim(),
     measureType: input.measureType.trim(),
     manualPointsTenths: normalizeManualPoints(input.manualPointsTenths),
+    manualPointsNote: normalizeManualPointsNote(input.manualPointsNote, input.manualPointsTenths),
     submissionMonth: input.submissionMonth,
     status: input.status,
     createdAt: existing?.createdAt ?? now,
@@ -684,6 +715,7 @@ function normalizeAuditPointCase(pointCase: AuditPointCase): AuditPointCase {
     firm: pointCase.firm ?? "",
     additionalResultCents: Math.max(Math.round(pointCase.additionalResultCents), 0),
     manualPointsTenths: normalizeManualPoints(pointCase.manualPointsTenths),
+    manualPointsNote: normalizeManualPointsNote(pointCase.manualPointsNote, pointCase.manualPointsTenths),
     section99: Boolean(pointCase.section99),
     submittedPointsTenths: pointCase.submittedPointsTenths ?? null,
     submittedAt: pointCase.submittedAt ?? null
@@ -703,6 +735,7 @@ function normalizeUsoCase(usoCase: UsoCase): UsoCase {
     ...usoCase,
     title: usoCase.title ?? "",
     manualPointsTenths: normalizeManualPoints(usoCase.manualPointsTenths),
+    manualPointsNote: normalizeManualPointsNote(usoCase.manualPointsNote, usoCase.manualPointsTenths),
     submissionMonth: usoCase.submissionMonth ?? "",
     status: usoCase.status === "completed" ? "completed" : "in_progress"
   };
@@ -722,6 +755,7 @@ function normalizeOtherMeasure(measure: OtherMeasure): OtherMeasure {
     title: measure.title ?? "",
     measureType: measure.measureType ?? "",
     manualPointsTenths: normalizeManualPoints(measure.manualPointsTenths),
+    manualPointsNote: normalizeManualPointsNote(measure.manualPointsNote, measure.manualPointsTenths),
     submissionMonth: measure.submissionMonth ?? "",
     status: measure.status === "completed" ? "completed" : "in_progress"
   };
@@ -730,4 +764,8 @@ function normalizeOtherMeasure(measure: OtherMeasure): OtherMeasure {
 function normalizeManualPoints(value: number | null | undefined): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 0;
   return Math.max(Math.round(value), 0);
+}
+
+function normalizeManualPointsNote(value: string | null | undefined, manualPointsTenths: number | null | undefined): string {
+  return normalizeManualPoints(manualPointsTenths) > 0 && typeof value === "string" ? value.trim() : "";
 }

@@ -15,6 +15,7 @@ const completedAudit: AuditPointCase = {
   periodEndYear: 2024,
   additionalResultCents: 125_000_50,
   manualPointsTenths: 15,
+  manualPointsNote: "COFAG",
   section99: true,
   submissionMonth: "2026-01",
   status: "completed",
@@ -45,6 +46,7 @@ const completedUso: UsoCase = {
   id: "uso-completed",
   title: "USO erledigt",
   manualPointsTenths: 12,
+  manualPointsNote: "Amtshilfe",
   submissionMonth: "2026-01",
   status: "completed",
   createdAt: timestamp,
@@ -56,6 +58,7 @@ const completedOther: OtherMeasure = {
   title: "CLO erledigt",
   measureType: "CLO-Anfrage",
   manualPointsTenths: 7,
+  manualPointsNote: "Sonderauftrag",
   submissionMonth: "2026-01",
   status: "completed",
   createdAt: timestamp,
@@ -143,10 +146,16 @@ describe("points year Excel export", () => {
     expect(sheet.getCell(auditFirstRow, 7).value).toBe(125000.5);
     expect(sheet.getCell(auditFirstRow, 14).value).toBe(6);
     expect(sheet.getCell(auditFirstRow, 15).value).toBe(1.5);
-    expect(sheet.getCell(auditFirstRow, 16).value).toBe(7.5);
-    expect(sheet.getCell(auditFirstRow, 17).value).toBe("Erledigt");
-    expect(sheet.getCell(auditFirstRow, 18).value).toBeInstanceOf(Date);
+    expect(sheet.getCell(auditFirstRow, 16).value).toBe("COFAG");
+    expect(sheet.getCell(auditFirstRow, 17).value).toBe(7.5);
+    expect(sheet.getCell(auditFirstRow, 18).value).toBe("Erledigt");
     expect(sheet.getCell(auditFirstRow, 19).value).toBeInstanceOf(Date);
+    expect(sheet.getCell(auditFirstRow, 20).value).toBeInstanceOf(Date);
+
+    const usoFirstRow = Number(serializedTableRef(usoTable).match(/\d+$/)?.[0]) + 1;
+    const otherFirstRow = Number(serializedTableRef(otherTable).match(/\d+$/)?.[0]) + 1;
+    expect(sheet.getCell(usoFirstRow, 3).value).toBe("Amtshilfe");
+    expect(sheet.getCell(otherFirstRow, 4).value).toBe("Sonderauftrag");
 
     const allText = Array.from({ length: sheet.rowCount }, (_, index) => sheet.getRow(index + 1).values).flat().join("|");
     expect(allText).not.toContain("Falsches Jahr");

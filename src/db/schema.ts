@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.11.0";
-export const DB_SCHEMA_VERSION = 11;
+export const BACKUP_SCHEMA_VERSION = "1.12.0";
+export const DB_SCHEMA_VERSION = 12;
 
 export type TodoPriority = "P1" | "P2" | "P3" | "P4";
 
@@ -152,6 +152,7 @@ export interface AuditPointCase {
   periodEndYear: number;
   additionalResultCents: number;
   manualPointsTenths?: number;
+  manualPointsNote?: string;
   section99: boolean;
   submissionMonth: string;
   status: AuditPointStatus;
@@ -174,6 +175,7 @@ export interface UsoCase {
   id: string;
   title: string;
   manualPointsTenths?: number;
+  manualPointsNote?: string;
   submissionMonth: string;
   status: UsoCaseStatus;
   createdAt: string;
@@ -194,6 +196,7 @@ export interface OtherMeasure {
   title: string;
   measureType: string;
   manualPointsTenths?: number;
+  manualPointsNote?: string;
   submissionMonth: string;
   status: OtherMeasureStatus;
   createdAt: string;

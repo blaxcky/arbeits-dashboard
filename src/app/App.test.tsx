@@ -287,6 +287,8 @@ describe("AuditPointsView form tabs", () => {
     periodStartYear: 2024,
     periodEndYear: 2025,
     additionalResultCents: 0,
+    manualPointsTenths: 15,
+    manualPointsNote: "COFAG",
     section99: false,
     submissionMonth: "2026-05",
     status: "in_progress",
@@ -298,6 +300,8 @@ describe("AuditPointsView form tabs", () => {
   const usoCase: UsoCase = {
     id: "uso-1",
     title: "USO Tab-Test",
+    manualPointsTenths: 10,
+    manualPointsNote: "Amtshilfe",
     submissionMonth: "2026-06",
     status: "in_progress",
     createdAt: timestamp,
@@ -307,6 +311,8 @@ describe("AuditPointsView form tabs", () => {
     id: "other-1",
     title: "Sonstige Tab-Test",
     measureType: "CLO-Anfrage",
+    manualPointsTenths: 5,
+    manualPointsNote: "Sonderauftrag",
     submissionMonth: "2026-07",
     status: "in_progress",
     createdAt: timestamp,
@@ -436,31 +442,37 @@ describe("AuditPointsView form tabs", () => {
     expect(screen.getByRole("tab", { name: "USO-Fall" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("USO-Fall bearbeiten")).toBeInTheDocument();
     expect(screen.getByLabelText("Titel")).toHaveValue("USO Tab-Test");
+    expect(screen.getByLabelText("Hinweis zu Zusatzpunkten")).toHaveValue("Amtshilfe");
 
     fireEvent.click(editButtons[2]);
     expect(screen.getByRole("tab", { name: "Sonstige Maßnahme" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Sonstige Maßnahme bearbeiten")).toBeInTheDocument();
     expect(screen.getByLabelText("Titel")).toHaveValue("Sonstige Tab-Test");
+    expect(screen.getByLabelText("Hinweis zu Zusatzpunkten")).toHaveValue("Sonderauftrag");
 
     fireEvent.click(editButtons[0]);
     expect(screen.getByRole("tab", { name: "Betriebsprüfung" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Fall bearbeiten")).toBeInTheDocument();
     expect(screen.getByLabelText("Name")).toHaveValue("BP Tab-Test");
+    expect(screen.getByLabelText("Hinweis zu Zusatzpunkten")).toHaveValue("COFAG");
   });
 
   it("validates and saves manual points for all three form types", async () => {
     const data = renderView();
 
+    expect(screen.queryByLabelText("Hinweis zu Zusatzpunkten")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "BP mit Zusatz" } });
     fireEvent.change(screen.getByLabelText("Zusatzpunkte (manuell)"), { target: { value: "1,5" } });
+    fireEvent.change(screen.getByLabelText("Hinweis zu Zusatzpunkten"), { target: { value: "  COFAG  " } });
     fireEvent.click(screen.getByRole("button", { name: "Fall speichern" }));
-    await waitFor(() => expect(data.saveAuditPointCase).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 15 })));
+    await waitFor(() => expect(data.saveAuditPointCase).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 15, manualPointsNote: "COFAG" })));
 
     fireEvent.click(screen.getByRole("tab", { name: "USO-Fall" }));
     fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "USO mit Zusatz" } });
     fireEvent.change(screen.getByLabelText("Zusatzpunkte (manuell)"), { target: { value: "0.5" } });
+    fireEvent.change(screen.getByLabelText("Hinweis zu Zusatzpunkten"), { target: { value: "Amtshilfe" } });
     fireEvent.click(screen.getByRole("button", { name: "USO-Fall speichern" }));
-    await waitFor(() => expect(data.saveUsoCase).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 5 })));
+    await waitFor(() => expect(data.saveUsoCase).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 5, manualPointsNote: "Amtshilfe" })));
 
     fireEvent.click(screen.getByRole("tab", { name: "Sonstige Maßnahme" }));
     fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "Maßnahme mit Zusatz" } });
@@ -470,8 +482,9 @@ describe("AuditPointsView form tabs", () => {
     expect(screen.getByRole("textbox", { name: /Zusatzpunkte \(manuell\)/ })).toHaveAttribute("aria-invalid", "true");
     expect(data.saveOtherMeasure).not.toHaveBeenCalled();
     fireEvent.change(screen.getByRole("textbox", { name: /Zusatzpunkte \(manuell\)/ }), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Hinweis zu Zusatzpunkten"), { target: { value: "Sonderauftrag" } });
     fireEvent.click(screen.getByRole("button", { name: "Maßnahme speichern" }));
-    await waitFor(() => expect(data.saveOtherMeasure).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 20 })));
+    await waitFor(() => expect(data.saveOtherMeasure).toHaveBeenCalledWith(expect.objectContaining({ manualPointsTenths: 20, manualPointsNote: "Sonderauftrag" })));
   });
 });
 
@@ -610,15 +623,15 @@ describe("point case list status presentation", () => {
 
     data.auditPointCases = [
       { ...auditCase, id: "audit-without-points", name: "BP ohne Zusatzpunkte", manualPointsTenths: 0 },
-      { ...auditCase, id: "audit-with-points", name: "BP mit Zusatzpunkten", manualPointsTenths: 15 }
+      { ...auditCase, id: "audit-with-points", name: "BP mit Zusatzpunkten", manualPointsTenths: 15, manualPointsNote: "COFAG" }
     ];
     data.usoCases = [
       { ...usoCase, id: "uso-without-points", title: "USO ohne Zusatzpunkte", manualPointsTenths: 0 },
-      { ...usoCase, id: "uso-with-points", title: "USO mit Zusatzpunkten", manualPointsTenths: 10 }
+      { ...usoCase, id: "uso-with-points", title: "USO mit Zusatzpunkten", manualPointsTenths: 10, manualPointsNote: "Amtshilfe" }
     ];
     data.otherMeasures = [
       { ...otherMeasure, id: "other-without-points", title: "Maßnahme ohne Zusatzpunkte", manualPointsTenths: 0 },
-      { ...otherMeasure, id: "other-with-points", title: "Maßnahme mit Zusatzpunkten", manualPointsTenths: 20 }
+      { ...otherMeasure, id: "other-with-points", title: "Maßnahme mit Zusatzpunkten", manualPointsTenths: 20, manualPointsNote: "Sonderauftrag" }
     ];
 
     render(<AuditPointsView data={data} showToast={vi.fn()} />);
@@ -642,6 +655,9 @@ describe("point case list status presentation", () => {
       expect(row.querySelectorAll(".point-case-actions .trip-action-button")).toHaveLength(2);
       expect(row.querySelector(".point-case-additional-metric") !== null).toBe(showsCompactMetric);
     });
+    expect(screen.getByText("Zusatzpunkte: COFAG")).toBeInTheDocument();
+    expect(screen.getByText("Zusatzpunkte: Amtshilfe")).toBeInTheDocument();
+    expect(screen.getByText("Zusatzpunkte: Sonderauftrag")).toBeInTheDocument();
   });
 
   it("changes every case type between completed and open through its edit form", async () => {

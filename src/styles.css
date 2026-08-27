@@ -2072,6 +2072,12 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.point-case-manual-note {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
 .trip-actions.point-case-actions {
   width: 84px;
   flex-wrap: nowrap;

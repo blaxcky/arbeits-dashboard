@@ -153,7 +153,7 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
   const otherCompleted = otherRows[otherRows.length - 1]?.cumulativeValue ?? 0;
   const otherOpen = otherRows.reduce((sum, row) => sum + row.openValue, 0);
 
-  worksheet.mergeCells("A1:S1");
+  worksheet.mergeCells("A1:T1");
   worksheet.getCell("A1").value = "Punkte-Jahresstatistik";
   worksheet.getCell("A1").font = { bold: true, color: { argb: COLORS.white }, size: 20 };
   worksheet.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.navy } };
@@ -230,13 +230,13 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
   }
 
   let nextRow = otherTypeEndRow + 2;
-  styleSectionTitle(worksheet, nextRow, "Betriebsprüfungen", 19);
+  styleSectionTitle(worksheet, nextRow, "Betriebsprüfungen", 20);
   const auditTitleRow = nextRow;
   nextRow += 1;
   const auditHeaders = [
     "Name", "Steuernummer", "Kanzlei", "Kategorie", "Zeitraum von", "Zeitraum bis", "Mehrergebnis", "§99",
     "Kategoriepunkte", "Zeitraumpunkte", "§99-Punkte", "Mehrergebnis-Punkte", "Automatik aktuell", "Abgabepunkte eingefroren",
-    "Manuelle Punkte", "Verwendete Gesamtpunkte", "Status", "Abgabemonat", "Erledigungsdatum"
+    "Manuelle Punkte", "Hinweis zu Zusatzpunkten", "Verwendete Gesamtpunkte", "Status", "Abgabemonat", "Erledigungsdatum"
   ];
   const auditRows = auditCases.map((pointCase) => {
     const breakdown = calculateAuditPointBreakdown(pointCase);
@@ -256,6 +256,7 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
       points(breakdown.automaticTotalTenths),
       pointCase.submittedPointsTenths === null ? null : points(pointCase.submittedPointsTenths),
       points(pointCase.manualPointsTenths ?? 0),
+      pointCase.manualPointsNote ?? "",
       points(pointsForAuditCase(pointCase)),
       statusLabel(pointCase.status),
       monthDate(pointCase.submissionMonth),
@@ -276,11 +277,12 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
   for (let row = auditDataStart; row <= auditDataEnd; row += 1) {
     worksheet.getCell(row, 2).numFmt = "@";
     worksheet.getCell(row, 7).numFmt = "#,##0.00 [$€-407]";
-    for (let column = 9; column <= 16; column += 1) worksheet.getCell(row, column).numFmt = "0.0";
-    worksheet.getCell(row, 18).numFmt = "mmmm yyyy";
-    worksheet.getCell(row, 19).numFmt = "dd.mm.yyyy";
+    for (let column = 9; column <= 15; column += 1) worksheet.getCell(row, column).numFmt = "0.0";
+    worksheet.getCell(row, 17).numFmt = "0.0";
+    worksheet.getCell(row, 19).numFmt = "mmmm yyyy";
+    worksheet.getCell(row, 20).numFmt = "dd.mm.yyyy";
   }
-  if (auditRows.length > 0) styleStatusCells(worksheet, 17, auditDataStart, auditDataEnd);
+  if (auditRows.length > 0) styleStatusCells(worksheet, 18, auditDataStart, auditDataEnd);
   nextRow = auditTitleRow + auditRows.length + 4;
 
   styleSectionTitle(worksheet, nextRow, "USO-Fälle", 8);
@@ -289,6 +291,7 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
   const usoDetailRows = usoCases.map((usoCase) => [
     usoCase.title,
     points(pointsForUsoCase(usoCase)),
+    usoCase.manualPointsNote ?? "",
     statusLabel(usoCase.status),
     monthDate(usoCase.submissionMonth)
   ]);
@@ -297,7 +300,7 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
     ref: `A${nextRow}`,
     headerRow: true,
     style: { theme: "TableStyleMedium2", showRowStripes: true },
-    columns: ["Titel", "Punkte", "Status", "Abgabemonat"].map((name) => ({ name, filterButton: true })),
+    columns: ["Titel", "Punkte", "Hinweis zu Zusatzpunkten", "Status", "Abgabemonat"].map((name) => ({ name, filterButton: true })),
     rows: usoDetailRows
   });
   styleTableHeader(worksheet, nextRow);
@@ -305,9 +308,9 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
   const usoDataEnd = usoDataStart + Math.max(usoDetailRows.length - 1, 0);
   for (let row = usoDataStart; row <= usoDataEnd; row += 1) {
     worksheet.getCell(row, 2).numFmt = "0.0";
-    worksheet.getCell(row, 4).numFmt = "mmmm yyyy";
+    worksheet.getCell(row, 5).numFmt = "mmmm yyyy";
   }
-  if (usoDetailRows.length > 0) styleStatusCells(worksheet, 3, usoDataStart, usoDataEnd);
+  if (usoDetailRows.length > 0) styleStatusCells(worksheet, 4, usoDataStart, usoDataEnd);
   nextRow = usoTitleRow + usoDetailRows.length + 4;
 
   styleSectionTitle(worksheet, nextRow, "Sonstige Maßnahmen", 8);
@@ -317,6 +320,7 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
     measure.title,
     measure.measureType,
     points(pointsForOtherMeasure(measure)),
+    measure.manualPointsNote ?? "",
     statusLabel(measure.status),
     monthDate(measure.submissionMonth)
   ]);
@@ -325,7 +329,7 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
     ref: `A${nextRow}`,
     headerRow: true,
     style: { theme: "TableStyleMedium2", showRowStripes: true },
-    columns: ["Titel", "Art", "Punkte", "Status", "Abgabemonat"].map((name) => ({ name, filterButton: true })),
+    columns: ["Titel", "Art", "Punkte", "Hinweis zu Zusatzpunkten", "Status", "Abgabemonat"].map((name) => ({ name, filterButton: true })),
     rows: otherDetailRows
   });
   styleTableHeader(worksheet, nextRow);
@@ -333,12 +337,12 @@ export async function createPointsYearWorkbook(input: PointsYearExportInput): Pr
   const otherDataEnd = otherDataStart + Math.max(otherDetailRows.length - 1, 0);
   for (let row = otherDataStart; row <= otherDataEnd; row += 1) {
     worksheet.getCell(row, 3).numFmt = "0.0";
-    worksheet.getCell(row, 5).numFmt = "mmmm yyyy";
+    worksheet.getCell(row, 6).numFmt = "mmmm yyyy";
   }
-  if (otherDetailRows.length > 0) styleStatusCells(worksheet, 4, otherDataStart, otherDataEnd);
+  if (otherDetailRows.length > 0) styleStatusCells(worksheet, 5, otherDataStart, otherDataEnd);
   worksheet.getRow(otherTitleRow).height = 24;
 
-  const widths = [28, 18, 24, 14, 14, 14, 18, 12, 17, 17, 15, 20, 18, 23, 18, 23, 14, 18, 18];
+  const widths = [28, 18, 24, 14, 14, 14, 18, 12, 17, 17, 15, 20, 18, 23, 18, 28, 23, 14, 18, 18];
   widths.forEach((width, index) => {
     worksheet.getColumn(index + 1).width = width;
   });

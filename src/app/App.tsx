@@ -1139,6 +1139,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
       periodEndYear: validation.periodEndYear,
       additionalResultCents: validation.additionalResultCents,
       manualPointsTenths: validation.manualPointsTenths,
+      manualPointsNote: validation.manualPointsTenths > 0 ? form.manualPointsNote.trim() : "",
       section99: form.section99,
       submissionMonth: form.submissionMonth,
       status: normalizePointFormStatus(form.status)
@@ -1189,6 +1190,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
       id: usoEditingId ?? undefined,
       title: usoForm.title.trim(),
       manualPointsTenths: validation.manualPointsTenths,
+      manualPointsNote: validation.manualPointsTenths > 0 ? usoForm.manualPointsNote.trim() : "",
       submissionMonth: usoForm.submissionMonth,
       status: normalizePointFormStatus(usoForm.status)
     });
@@ -1239,6 +1241,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
       title: otherForm.title.trim(),
       measureType: otherForm.measureType.trim(),
       manualPointsTenths: validation.manualPointsTenths,
+      manualPointsNote: validation.manualPointsTenths > 0 ? otherForm.manualPointsNote.trim() : "",
       submissionMonth: otherForm.submissionMonth,
       status: normalizePointFormStatus(otherForm.status)
     });
@@ -1272,6 +1275,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             <div className="point-case-data">
               <strong>{pointCase.name}{pointCase.taxNumber ? ` · ${pointCase.taxNumber}` : ""}</strong>
               <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
+              {pointCase.manualPointsTenths && pointCase.manualPointsNote ? <span className="point-case-manual-note">Zusatzpunkte: {pointCase.manualPointsNote}</span> : null}
               {pointCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
             </div>
             <div className="trip-row-metrics point-case-metrics">
@@ -1302,6 +1306,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             <div className="point-case-data">
               <strong>{usoCase.title}</strong>
               <span>{usoCase.submissionMonth || "Kein Abgabemonat"}</span>
+              {usoCase.manualPointsTenths && usoCase.manualPointsNote ? <span className="point-case-manual-note">Zusatzpunkte: {usoCase.manualPointsNote}</span> : null}
               {usoCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
             </div>
             <div className="trip-row-metrics point-case-metrics">
@@ -1329,6 +1334,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
             <div className="point-case-data">
               <strong>{measure.title}</strong>
               <span>{measure.measureType} · {measure.submissionMonth || "Kein Abgabemonat"}</span>
+              {measure.manualPointsTenths && measure.manualPointsNote ? <span className="point-case-manual-note">Zusatzpunkte: {measure.manualPointsNote}</span> : null}
               {measure.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
             </div>
             <div className="trip-row-metrics point-case-metrics">
@@ -1421,6 +1427,11 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
               <Field label="Zusatzpunkte (manuell)" className="field-wide" error={errors.manualPoints}>
                 <input inputMode="decimal" placeholder="0,0" value={form.manualPoints} aria-invalid={Boolean(errors.manualPoints)} onChange={(event) => updateField("manualPoints", event.target.value)} />
               </Field>
+              {manualPointsInputIsPositive(form.manualPoints) ? (
+                <Field label="Hinweis zu Zusatzpunkten" className="field-wide">
+                  <input placeholder="z. B. COFAG" value={form.manualPointsNote} onChange={(event) => updateField("manualPointsNote", event.target.value)} />
+                </Field>
+              ) : null}
               <label className="check-row field-wide"><input type="checkbox" checked={form.section99} onChange={(event) => updateField("section99", event.target.checked)} /> §99-Zuschlag</label>
             </FormSection>
             <FormSection id="audit-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card points-form-card-submission">
@@ -1465,6 +1476,11 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                 <Field label="Zusatzpunkte (manuell)" className="field-wide" error={usoErrors.manualPoints}>
                   <input inputMode="decimal" placeholder="0,0" value={usoForm.manualPoints} aria-invalid={Boolean(usoErrors.manualPoints)} onChange={(event) => updateUsoField("manualPoints", event.target.value)} />
                 </Field>
+                {manualPointsInputIsPositive(usoForm.manualPoints) ? (
+                  <Field label="Hinweis zu Zusatzpunkten" className="field-wide">
+                    <input placeholder="z. B. COFAG" value={usoForm.manualPointsNote} onChange={(event) => updateUsoField("manualPointsNote", event.target.value)} />
+                  </Field>
+                ) : null}
               </FormSection>
               <FormSection id="uso-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card">
                 <Field label="Abgabemonat" error={usoErrors.submissionMonth}>
@@ -1513,6 +1529,11 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                 <Field label="Zusatzpunkte (manuell)" className="field-wide" error={otherErrors.manualPoints}>
                   <input inputMode="decimal" placeholder="0,0" value={otherForm.manualPoints} aria-invalid={Boolean(otherErrors.manualPoints)} onChange={(event) => updateOtherField("manualPoints", event.target.value)} />
                 </Field>
+                {manualPointsInputIsPositive(otherForm.manualPoints) ? (
+                  <Field label="Hinweis zu Zusatzpunkten" className="field-wide">
+                    <input placeholder="z. B. COFAG" value={otherForm.manualPointsNote} onChange={(event) => updateOtherField("manualPointsNote", event.target.value)} />
+                  </Field>
+                ) : null}
               </FormSection>
               <FormSection id="other-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card">
                 <Field label="Abgabemonat" error={otherErrors.submissionMonth}>
@@ -3626,6 +3647,7 @@ function auditPointCaseToForm(pointCase?: AuditPointCase, fallbackMonth = "") {
     periodEndYear: pointCase ? String(pointCase.periodEndYear) : String(currentYear()),
     additionalResultEuros: pointCase ? centsToEuroInput(pointCase.additionalResultCents) : "0",
     manualPoints: pointCase ? formatPointInput(pointCase.manualPointsTenths ?? 0) : "",
+    manualPointsNote: pointCase?.manualPointsNote ?? "",
     section99: pointCase?.section99 ?? false,
     submissionMonth: pointCase?.submissionMonth ?? fallbackMonth,
     status: (pointCase?.status ?? "in_progress") as PointFormStatus
@@ -3636,6 +3658,7 @@ function usoCaseToForm(usoCase?: UsoCase, fallbackMonth = "") {
   return {
     title: usoCase?.title ?? "",
     manualPoints: usoCase ? formatPointInput(usoCase.manualPointsTenths ?? 0) : "",
+    manualPointsNote: usoCase?.manualPointsNote ?? "",
     submissionMonth: usoCase?.submissionMonth ?? fallbackMonth,
     status: (usoCase?.status ?? "in_progress") as PointFormStatus
   };
@@ -3646,6 +3669,7 @@ function otherMeasureToForm(measure?: OtherMeasure, fallbackMonth = "") {
     title: measure?.title ?? "",
     measureType: measure?.measureType ?? "",
     manualPoints: measure ? formatPointInput(measure.manualPointsTenths ?? 0) : "",
+    manualPointsNote: measure?.manualPointsNote ?? "",
     submissionMonth: measure?.submissionMonth ?? fallbackMonth,
     status: (measure?.status ?? "in_progress") as PointFormStatus
   };
@@ -3659,6 +3683,10 @@ export function parsePointTenthsInput(value: string): number | null {
   const numeric = Number(normalized);
   if (!Number.isFinite(numeric)) return null;
   return Math.round(numeric * 10);
+}
+
+function manualPointsInputIsPositive(value: string): boolean {
+  return (parsePointTenthsInput(value) ?? 0) > 0;
 }
 
 export function formatAuditTaxNumber(value: string): string {
@@ -3676,7 +3704,7 @@ function parseUsoTargetInput(value: string): number | null {
   return numeric;
 }
 
-export function validateAuditPointCaseForm(form: Omit<AuditPointCaseForm, "manualPoints"> & { manualPoints?: string }):
+export function validateAuditPointCaseForm(form: Omit<AuditPointCaseForm, "manualPoints" | "manualPointsNote"> & { manualPoints?: string; manualPointsNote?: string }):
   | { valid: true; errors: Partial<Record<keyof AuditPointCaseForm, string>>; category: AuditPointCategory; periodStartYear: number; periodEndYear: number; additionalResultCents: number; manualPointsTenths: number }
   | { valid: false; errors: Partial<Record<keyof AuditPointCaseForm, string>> } {
   const errors: Partial<Record<keyof AuditPointCaseForm, string>> = {};
@@ -3703,7 +3731,7 @@ export function validateAuditPointCaseForm(form: Omit<AuditPointCaseForm, "manua
   return { valid: true, errors, category, periodStartYear, periodEndYear, additionalResultCents, manualPointsTenths };
 }
 
-export function validateUsoCaseForm(form: Omit<ReturnType<typeof usoCaseToForm>, "manualPoints"> & { manualPoints?: string }):
+export function validateUsoCaseForm(form: Omit<ReturnType<typeof usoCaseToForm>, "manualPoints" | "manualPointsNote"> & { manualPoints?: string; manualPointsNote?: string }):
   | { valid: true; errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>>; manualPointsTenths: number }
   | { valid: false; errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>> } {
   const errors: Partial<Record<keyof ReturnType<typeof usoCaseToForm>, string>> = {};
@@ -3716,7 +3744,7 @@ export function validateUsoCaseForm(form: Omit<ReturnType<typeof usoCaseToForm>,
   return { valid: true, errors, manualPointsTenths };
 }
 
-export function validateOtherMeasureForm(form: Omit<ReturnType<typeof otherMeasureToForm>, "manualPoints"> & { manualPoints?: string }):
+export function validateOtherMeasureForm(form: Omit<ReturnType<typeof otherMeasureToForm>, "manualPoints" | "manualPointsNote"> & { manualPoints?: string; manualPointsNote?: string }):
   | { valid: true; errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>>; manualPointsTenths: number }
   | { valid: false; errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>> } {
   const errors: Partial<Record<keyof ReturnType<typeof otherMeasureToForm>, string>> = {};
