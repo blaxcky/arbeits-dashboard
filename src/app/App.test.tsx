@@ -1,9 +1,15 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
-import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateOtherMeasureForm, validateSettingsForm, validateUsoCaseForm, WorkTimeField, yearFromUrlParam } from "./App";
+import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, PointsYearView, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateOtherMeasureForm, validateSettingsForm, validateUsoCaseForm, WorkTimeField, yearFromUrlParam } from "./App";
 import { summarizeAuditPoints } from "../modules/points/calculations";
 import type { AuditPointCase, Settings } from "../db/schema";
+import { downloadPointsYearWorkbook } from "../modules/points/yearExport";
+
+vi.mock("../modules/points/yearExport", () => ({
+  downloadPointsYearWorkbook: vi.fn()
+}));
 
 describe("normalizeTimeInput", () => {
   it("treats one and two digit values as full hours", () => {
@@ -117,6 +123,56 @@ describe("WorkTimeField", () => {
     expect(selectStart).toHaveBeenCalledWith("07:30");
     expect(selectEnd).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /Dienstende eintragen/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("PointsYearView Excel export", () => {
+  const data = {
+    auditPointCases: [],
+    auditPointGoals: [],
+    usoCases: [],
+    usoGoals: [],
+    otherMeasures: [],
+    saveAuditPointGoal: vi.fn(),
+    saveUsoGoal: vi.fn()
+  } as unknown as Parameters<typeof PointsYearView>[0]["data"];
+
+  beforeEach(() => {
+    vi.mocked(downloadPointsYearWorkbook).mockReset();
+  });
+
+  function renderView(showToast = vi.fn()) {
+    render(
+      <MemoryRouter initialEntries={["/punkte/jahr/2026"]}>
+        <Routes>
+          <Route path="/punkte/jahr/:year" element={<PointsYearView data={data} showToast={showToast} />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    return showToast;
+  }
+
+  it("shows loading state and reports successful and failed exports", async () => {
+    let finishExport: (() => void) | undefined;
+    vi.mocked(downloadPointsYearWorkbook).mockImplementationOnce(() => new Promise<void>((resolve) => {
+      finishExport = resolve;
+    }));
+    const showToast = renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Excel exportieren" }));
+
+    const loadingButton = await screen.findByRole("button", { name: "Excel wird erstellt …" });
+    expect(loadingButton).toBeDisabled();
+    expect(downloadPointsYearWorkbook).toHaveBeenCalledWith(expect.objectContaining({ year: 2026, exportedAt: expect.any(Date) }));
+
+    await act(async () => finishExport?.());
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith("Excel-Datei wurde exportiert."));
+    expect(screen.getByRole("button", { name: "Excel exportieren" })).toBeEnabled();
+
+    vi.mocked(downloadPointsYearWorkbook).mockRejectedValueOnce(new Error("Export fehlgeschlagen"));
+    fireEvent.click(screen.getByRole("button", { name: "Excel exportieren" }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith("Excel-Datei konnte nicht erstellt werden."));
+    expect(screen.getByRole("button", { name: "Excel exportieren" })).toBeEnabled();
   });
 });
 

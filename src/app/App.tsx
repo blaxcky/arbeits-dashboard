@@ -91,6 +91,7 @@ import {
   summarizeAuditPoints,
   usoTargetForYear
 } from "../modules/points/calculations";
+import { downloadPointsYearWorkbook } from "../modules/points/yearExport";
 import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
@@ -1591,7 +1592,7 @@ function AuditPointBreakdownPreview({ breakdown }: { breakdown: ReturnType<typeo
   );
 }
 
-function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
+export function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const navigate = useNavigate();
   const params = useParams();
   const year = yearFromUrlParam(params.year);
@@ -1612,6 +1613,7 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
   const highlightedMonth = currentMonth.startsWith(`${year}-`) ? currentMonth : null;
   const [auditGoalInput, setAuditGoalInput] = useState("");
   const [usoGoalInput, setUsoGoalInput] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setAuditGoalInput(auditGoal ? formatPointInput(auditGoal.targetPointsTenths) : "");
@@ -1641,20 +1643,46 @@ function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowTo
     showToast("USO-Jahresziel gespeichert.");
   }
 
+  async function exportYear() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      await downloadPointsYearWorkbook({
+        year,
+        exportedAt: new Date(),
+        auditPointCases: data.auditPointCases,
+        auditPointGoals: data.auditPointGoals,
+        usoCases: data.usoCases,
+        usoGoals: data.usoGoals,
+        otherMeasures: data.otherMeasures
+      });
+      showToast("Excel-Datei wurde exportiert.");
+    } catch {
+      showToast("Excel-Datei konnte nicht erstellt werden.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <section className="page-stack">
       <Header eyebrow="Punkte" title="Jahresübersicht" />
       <div className="panel">
         <div className="panel-heading year-overview-heading">
           <span className="section-label">Jahreswerte {year}</span>
-          <label className="year-select">
-            <span>Jahr</span>
-            <select value={year} onChange={(event) => navigate(`/punkte/jahr/${event.target.value}`)}>
-              {yearOptions.map((optionYear) => (
-                <option key={optionYear} value={optionYear}>{optionYear}</option>
-              ))}
-            </select>
-          </label>
+          <div className="year-overview-actions">
+            <label className="year-select">
+              <span>Jahr</span>
+              <select value={year} onChange={(event) => navigate(`/punkte/jahr/${event.target.value}`)}>
+                {yearOptions.map((optionYear) => (
+                  <option key={optionYear} value={optionYear}>{optionYear}</option>
+                ))}
+              </select>
+            </label>
+            <button className="secondary-button" type="button" disabled={exporting} onClick={() => void exportYear()}>
+              <DownloadSimple size={17} /> {exporting ? "Excel wird erstellt …" : "Excel exportieren"}
+            </button>
+          </div>
         </div>
         <dl className="detail-list points-year-summary">
           <div><dt>BP Ist</dt><dd>{formatPointTenths(auditCompleted)}</dd></div>
