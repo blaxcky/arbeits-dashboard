@@ -602,6 +602,48 @@ describe("point case list status presentation", () => {
     expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(6);
   });
 
+  it("keeps one row, metrics and action-column contract with and without additional points", () => {
+    const data = statusGroupData();
+    const [auditCase] = data.auditPointCases;
+    const [usoCase] = data.usoCases;
+    const [otherMeasure] = data.otherMeasures;
+
+    data.auditPointCases = [
+      { ...auditCase, id: "audit-without-points", name: "BP ohne Zusatzpunkte", manualPointsTenths: 0 },
+      { ...auditCase, id: "audit-with-points", name: "BP mit Zusatzpunkten", manualPointsTenths: 15 }
+    ];
+    data.usoCases = [
+      { ...usoCase, id: "uso-without-points", title: "USO ohne Zusatzpunkte", manualPointsTenths: 0 },
+      { ...usoCase, id: "uso-with-points", title: "USO mit Zusatzpunkten", manualPointsTenths: 10 }
+    ];
+    data.otherMeasures = [
+      { ...otherMeasure, id: "other-without-points", title: "Maßnahme ohne Zusatzpunkte", manualPointsTenths: 0 },
+      { ...otherMeasure, id: "other-with-points", title: "Maßnahme mit Zusatzpunkten", manualPointsTenths: 20 }
+    ];
+
+    render(<AuditPointsView data={data} showToast={vi.fn()} />);
+
+    const rows = [
+      ["BP ohne Zusatzpunkte", false],
+      ["BP mit Zusatzpunkten", false],
+      ["USO ohne Zusatzpunkte", false],
+      ["USO mit Zusatzpunkten", true],
+      ["Maßnahme ohne Zusatzpunkte", false],
+      ["Maßnahme mit Zusatzpunkten", true]
+    ] as const;
+
+    rows.forEach(([title, showsCompactMetric]) => {
+      const row = screen.getByText(title, { selector: "strong" }).closest("article") as HTMLElement;
+
+      expect(row).toHaveClass("point-case-row");
+      expect(row.querySelector(".point-case-data")).toBeInTheDocument();
+      expect(row.querySelector(".point-case-metrics")).toBeInTheDocument();
+      expect(row.querySelector(".point-case-actions")).toBeInTheDocument();
+      expect(row.querySelectorAll(".point-case-actions .trip-action-button")).toHaveLength(2);
+      expect(row.querySelector(".point-case-additional-metric") !== null).toBe(showsCompactMetric);
+    });
+  });
+
   it("changes every case type between completed and open through its edit form", async () => {
     const data = statusGroupData();
     render(<AuditPointsView data={data} showToast={vi.fn()} />);

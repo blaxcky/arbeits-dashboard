@@ -2063,12 +2063,31 @@ button:disabled {
   font-weight: 900;
 }
 
-.points-uso-row {
-  grid-template-columns: minmax(0, 1fr) auto;
+.trip-row.point-case-row {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr) 84px;
 }
 
-.points-uso-row-with-points {
-  grid-template-columns: minmax(0, 1fr) minmax(90px, auto) auto;
+.point-case-data {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.trip-actions.point-case-actions {
+  width: 84px;
+  flex-wrap: nowrap;
+}
+
+.point-case-additional-metric {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.point-case-additional-metric small {
+  grid-column: auto;
 }
 
 .points-type-breakdown {
@@ -3589,12 +3608,25 @@ button:disabled {
     text-align: left;
   }
 
+  .point-case-metrics:empty {
+    display: none;
+  }
+
   .points-goal-form {
     justify-content: flex-start;
   }
 
-  .points-uso-row {
+  .trip-row.point-case-row {
     grid-template-columns: 1fr;
+  }
+
+  .point-case-additional-metric {
+    justify-content: flex-start;
+  }
+
+  .trip-actions.point-case-actions {
+    width: auto;
+    justify-content: flex-start;
   }
 
   .points-lists-toolbar,

@@ -1268,19 +1268,19 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     return (
       <div className="trip-list">
         {cases.map((pointCase) => (
-          <article key={pointCase.id} className={`trip-row audit-point-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
-            <div>
+          <article key={pointCase.id} className={`trip-row point-case-row audit-point-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
+            <div className="point-case-data">
               <strong>{pointCase.name}{pointCase.taxNumber ? ` · ${pointCase.taxNumber}` : ""}</strong>
               <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
               {pointCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
             </div>
-            <div className="trip-row-metrics">
+            <div className="trip-row-metrics point-case-metrics">
               <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
               <span>{formatEuroCents(pointCase.additionalResultCents)}</span>
               {pointCase.manualPointsTenths ? <small>davon manuell {formatPointTenths(pointCase.manualPointsTenths)}</small> : null}
               <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
             </div>
-            <div className="trip-actions">
+            <div className="trip-actions point-case-actions">
               <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editCase(pointCase)}>
                 <PencilSimple size={17} />
               </button>
@@ -1298,14 +1298,16 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     return (
       <div className="trip-list">
         {cases.map((usoCase) => (
-          <article key={usoCase.id} className={`trip-row points-uso-row ${usoCase.manualPointsTenths ? "points-uso-row-with-points" : ""} ${usoCase.status === "completed" ? "trip-row-done" : ""}`}>
-            <div>
+          <article key={usoCase.id} className={`trip-row point-case-row ${usoCase.status === "completed" ? "trip-row-done" : ""}`}>
+            <div className="point-case-data">
               <strong>{usoCase.title}</strong>
               <span>{usoCase.submissionMonth || "Kein Abgabemonat"}</span>
               {usoCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
             </div>
-            {usoCase.manualPointsTenths ? <div className="trip-row-metrics"><strong>{formatPointTenths(usoCase.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
-            <div className="trip-actions">
+            <div className="trip-row-metrics point-case-metrics">
+              {usoCase.manualPointsTenths ? <div className="point-case-additional-metric"><strong>{formatPointTenths(usoCase.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
+            </div>
+            <div className="trip-actions point-case-actions">
               <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editUsoCase(usoCase)}>
                 <PencilSimple size={17} />
               </button>
@@ -1323,14 +1325,16 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     return (
       <div className="trip-list">
         {measures.map((measure) => (
-          <article key={measure.id} className={`trip-row points-uso-row ${measure.manualPointsTenths ? "points-uso-row-with-points" : ""} ${measure.status === "completed" ? "trip-row-done" : ""}`}>
-            <div>
+          <article key={measure.id} className={`trip-row point-case-row ${measure.status === "completed" ? "trip-row-done" : ""}`}>
+            <div className="point-case-data">
               <strong>{measure.title}</strong>
               <span>{measure.measureType} · {measure.submissionMonth || "Kein Abgabemonat"}</span>
               {measure.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
             </div>
-            {measure.manualPointsTenths ? <div className="trip-row-metrics"><strong>{formatPointTenths(measure.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
-            <div className="trip-actions">
+            <div className="trip-row-metrics point-case-metrics">
+              {measure.manualPointsTenths ? <div className="point-case-additional-metric"><strong>{formatPointTenths(measure.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
+            </div>
+            <div className="trip-actions point-case-actions">
               <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editOtherMeasure(measure)}>
                 <PencilSimple size={17} />
               </button>
