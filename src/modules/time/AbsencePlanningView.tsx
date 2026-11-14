@@ -1,4 +1,4 @@
-import { BellRinging, CalendarCheck, CaretLeft, CaretRight } from "@phosphor-icons/react";
+import { BellRinging, CalendarCheck, CaretLeft, CaretRight, DownloadSimple } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { PlannedAbsence, PlannedAbsenceType } from "../../db/schema";
@@ -7,6 +7,7 @@ import { formatDays, formatMinutes, formatSignedMinutes } from "../../lib/format
 import type { useWorkData } from "../../app/useWorkData";
 import { calculateFlexBalance, calculateVacation, entriesForFlexBalance } from "./calculations";
 import { formatShortDayLabel } from "./dashboard";
+import { absenceCalendarEvents, downloadAbsenceIcs } from "./absenceCalendarExport";
 import {
   ABSENCE_TYPE_LABELS,
   ABSENCE_TYPE_LETTERS,
@@ -203,6 +204,13 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
   const warn = summary.openMinutes > 0 || summary.status === "overplanned" || summary.status === "flex-too-low";
   const vacationOpenDays = Math.max(summary.vacationAfterMinutes, 0) / dailyTargetMinutes;
 
+  const exportEvents = absenceCalendarEvents(planning.absences, planning.today);
+
+  function exportCalendar() {
+    downloadAbsenceIcs(planning.absences, planning.today);
+    showToast(`Kalenderdatei mit ${exportEvents.length} ${exportEvents.length === 1 ? "Eintrag" : "Einträgen"} erstellt – in Outlook öffnen.`);
+  }
+
   async function toggleDay(date: string) {
     const existing = planning.byDate.get(date);
     const action = absencePlanAction(existing, mode);
@@ -240,6 +248,9 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
           <h1>Jahresplanung</h1>
         </div>
         <div className="trips-header-actions">
+          <button className="secondary-button" type="button" disabled={exportEvents.length === 0} title="Geplante und beantragte Tage ab heute als .ics-Datei für Outlook" onClick={exportCalendar}>
+            <DownloadSimple size={17} aria-hidden="true" /> Für Outlook exportieren
+          </button>
           <div className="year-stepper" role="group" aria-label="Jahr wählen">
             <button className="icon-button" type="button" title="Vorjahr" aria-label="Vorjahr" disabled={year <= yearOptions[0]} onClick={() => navigate(`/urlaub/${year - 1}`)}>
               <CaretLeft size={17} aria-hidden="true" />

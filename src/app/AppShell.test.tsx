@@ -172,6 +172,29 @@ describe("vacation planning", () => {
     expect(screen.getByRole("link", { name: /Urlaub - Jahresplanung/ })).toHaveTextContent("1");
   });
 
+  it("exports planned days as an Outlook calendar file", async () => {
+    workData.plannedAbsences = [{ id: "a1", date: "2026-12-21", type: "vacation", status: "planned", createdAt: "", updatedAt: "" }];
+    const createObjectURL = vi.fn(() => "blob:ics");
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Für Outlook exportieren/ }));
+
+    const blob = (createObjectURL.mock.calls[0] as unknown as [Blob])[0];
+    expect(blob.type).toBe("text/calendar;charset=utf-8");
+    expect(await blob.text()).toContain("DTSTART;VALUE=DATE:20261221");
+    expect(click).toHaveBeenCalled();
+    click.mockRestore();
+  });
+
+  it("disables the Outlook export without planned days", () => {
+    render(<App />);
+
+    expect(screen.getByRole("button", { name: /Für Outlook exportieren/ })).toBeDisabled();
+  });
+
   it("groups consecutive planned days into one request with its reminder date", () => {
     workData.plannedAbsences = [
       { id: "a1", date: "2026-12-21", type: "vacation", status: "planned", createdAt: "", updatedAt: "" },
