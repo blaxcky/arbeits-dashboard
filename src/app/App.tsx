@@ -509,12 +509,9 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           }}
         >
           {plannedFlexDays > 0 ? (
-            <div className="absence-metric-plan">
-              <div className="absence-metric-row">
-                <span>Nach Planung ({plannedFlexDays === 1 ? "1 Gleittag" : `${plannedFlexDays} Gleittage`})</span>
-                <strong className={absenceSummary.status === "flex-too-low" ? "is-danger" : absenceSummary.flexOverLimitAfterMinutes > 0 ? "is-open" : "is-done"}>{formatSignedMinutes(absenceSummary.flexAfterMinutes)}</strong>
-              </div>
-            </div>
+            <p className={`absence-metric-note${absenceSummary.status === "flex-too-low" ? " is-danger" : ""}`}>
+              Nach Planung <b>{formatSignedMinutes(absenceSummary.flexAfterMinutes)}</b> · {plannedFlexDays === 1 ? "1 Gleittag" : `${plannedFlexDays} Gleittage`} verplant
+            </p>
           ) : null}
         </Metric>
         <Metric
@@ -552,30 +549,24 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           progress={{ value: vacationEntitlementMinutes > 0 ? vacationRemainingMinutes / vacationEntitlementMinutes : 0, tone: "vacation" }}
         >
           {plannedVacationDays > 0 ? (
-            <div className="absence-metric-plan">
-              <div className="absence-metric-row">
-                <span>Nach Planung ({daysLabel(plannedVacationDays)})</span>
-                <strong className={absenceSummary.vacationAfterMinutes === 0 ? "is-done" : absenceSummary.vacationAfterMinutes < 0 ? "is-danger" : "is-open"}>
-                  {absenceSummary.vacationAfterMinutes >= 0 ? `${daysLabel(Math.round(absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} übrig` : `${daysLabel(Math.round(-absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} zu viel`}
-                </strong>
-              </div>
-            </div>
+            <p className={`absence-metric-note${absenceSummary.vacationAfterMinutes < 0 ? " is-danger" : ""}`}>
+              Nach Planung <b>{absenceSummary.vacationAfterMinutes >= 0 ? `${daysLabel(Math.round(absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} übrig` : `${daysLabel(Math.round(-absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} zu viel`}</b> · {daysLabel(plannedVacationDays)} verplant
+            </p>
           ) : null}
         </Metric>
         <Metric
           title="Dieses Jahr verbrauchen"
           value={formatDays(requiredConsumption, dailyTargetMinutes)}
-          detail={`Resturlaub ${formatDays(vacationRemainingMinutes, dailyTargetMinutes)} · Gleitzeit über Grenze ${formatDays(flexOverLimitMinutes, dailyTargetMinutes)}`}
+          detail={consumptionDetail(vacationRemainingMinutes, flexOverLimitMinutes, dailyTargetMinutes)}
         >
-          <div className="absence-metric-plan">
-            <div className="absence-metric-row">
-              <span>Verplant <b>{formatDays(absenceSummary.scheduledMinutes, dailyTargetMinutes)}</b></span>
-              <span>Offen <b className={absenceSummary.openMinutes > 0 ? "is-open" : "is-done"}>{formatDays(absenceSummary.openMinutes, dailyTargetMinutes)}</b></span>
-            </div>
+          <div className="absence-metric-plan is-compact">
             {absenceSummary.neededMinutes > 0 ? (
               <PlanBar requested={absenceSummary.coveredRequestedMinutes} planned={absenceSummary.coveredPlannedMinutes} total={absenceSummary.neededMinutes} label={absenceHeadline.text} />
             ) : null}
-            <Link className="link-button absence-metric-link" to="/urlaub">Zur Jahresplanung</Link>
+            <div className="absence-metric-row">
+              <span>{formatDays(absenceSummary.scheduledMinutes, dailyTargetMinutes)} verplant · {formatDays(absenceSummary.openMinutes, dailyTargetMinutes)} offen</span>
+              <Link className="absence-metric-link" to="/urlaub">Jahresplanung</Link>
+            </div>
           </div>
         </Metric>
       </section>
@@ -655,6 +646,17 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
       </div>
     </section>
   );
+}
+
+export function consumptionDetail(vacationRemainingMinutes: number, flexOverLimitMinutes: number, dailyTargetMinutes: number): string {
+  const formatPart = (minutes: number) => {
+    const days = minutes / dailyTargetMinutes;
+    return Number.isInteger(days) ? daysLabel(days) : formatDays(minutes, dailyTargetMinutes);
+  };
+  const parts: string[] = [];
+  if (vacationRemainingMinutes > 0) parts.push(`${formatPart(vacationRemainingMinutes)} Urlaub`);
+  if (flexOverLimitMinutes > 0) parts.push(`${formatMinutes(flexOverLimitMinutes)} Gleitzeit über Grenze`);
+  return parts.length ? parts.join(" + ") : "Nichts mehr offen";
 }
 
 function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {

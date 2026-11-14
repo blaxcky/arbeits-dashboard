@@ -6324,3 +6324,50 @@ button.week-line:focus-visible {
   border-radius: 4px;
   font-size: 0.62rem;
 }
+
+.absence-metric-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.absence-metric-note b {
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.absence-metric-note.is-danger,
+.absence-metric-note.is-danger b {
+  color: var(--danger);
+}
+
+.absence-metric-plan.is-compact {
+  gap: 6px;
+  padding-top: 0;
+  border-top: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.absence-metric-plan.is-compact .absence-plan-bar {
+  height: 4px;
+}
+
+.absence-metric-plan.is-compact .absence-plan-bar-requested {
+  background: #7fa9ab;
+}
+
+.absence-metric-plan.is-compact .absence-plan-bar-planned {
+  background: repeating-linear-gradient(135deg, #7fa9ab 0 3px, #d3e4e5 3px 7px);
+}
+
+.absence-metric-plan.is-compact .absence-plan-bar-open {
+  background: #eedfb9;
+}
+
+.absence-metric-plan.is-compact .absence-metric-link {
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+}

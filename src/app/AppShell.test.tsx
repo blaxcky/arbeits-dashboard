@@ -79,7 +79,7 @@ const workData = vi.hoisted(() => ({
 
 vi.mock("./useWorkData", () => ({ useWorkData: () => workData }));
 
-import { App, openTripFields, tripEvidenceFileName } from "./App";
+import { App, consumptionDetail, openTripFields, tripEvidenceFileName } from "./App";
 
 describe("task workspace dashboard navigation", () => {
   beforeEach(() => {
@@ -148,7 +148,13 @@ describe("vacation planning", () => {
     expect(screen.queryByRole("button", { name: /Gleittag buchen/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Urlaub planen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Gleittag planen" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Zur Jahresplanung" })).toHaveAttribute("href", "#/urlaub");
+    expect(screen.getByRole("link", { name: "Jahresplanung" })).toHaveAttribute("href", "#/urlaub");
+  });
+
+  it("describes what still has to be used this year without zero parts", () => {
+    expect(consumptionDetail(10080, 0, 480)).toBe("21 Tage Urlaub");
+    expect(consumptionDetail(3360, 1050, 480)).toBe("7 Tage Urlaub + 17:30 h Gleitzeit über Grenze");
+    expect(consumptionDetail(0, 0, 480)).toBe("Nichts mehr offen");
   });
 
   it("plans a free working day as vacation or flex day from the calendar", () => {
