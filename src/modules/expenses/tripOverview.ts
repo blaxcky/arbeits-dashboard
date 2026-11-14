@@ -1,5 +1,5 @@
 import type { Trip } from "../../db/schema";
-import { isValidDateKey, parseDateKey } from "../../lib/dates";
+import { isValidDateKey, parseDateKey, toDateKey } from "../../lib/dates";
 import { calculateTripDifferentialCents, calculateTripTotalCents } from "./calculations";
 
 export type TripListTotals = {
@@ -69,4 +69,34 @@ export function splitTripDateLabel(dateKey: string): { weekday: string; date: st
   const [year, month, day] = dateKey.split("-");
   const weekday = new Intl.DateTimeFormat("de-AT", { weekday: "short" }).format(parseDateKey(dateKey));
   return { weekday: weekday.endsWith(".") ? weekday : `${weekday}.`, date: `${day}.${month}.${year}` };
+}
+
+export const TRIP_SUBMISSION_MONTHS = 6;
+export const TRIP_SUBMISSION_WARNING_MONTHS = 5;
+
+export type TripSubmissionStatus = {
+  deadline: string;
+  daysLeft: number;
+  level: "ok" | "warning" | "overdue";
+};
+
+export function addMonthsToDateKey(dateKey: string, months: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const target = new Date(year, month - 1 + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(day, lastDay));
+  return toDateKey(target);
+}
+
+export function tripSubmissionStatus(tripDate: string, today: string): TripSubmissionStatus | null {
+  if (!isValidDateKey(tripDate) || !isValidDateKey(today)) return null;
+  const deadline = addMonthsToDateKey(tripDate, TRIP_SUBMISSION_MONTHS);
+  const warningFrom = addMonthsToDateKey(tripDate, TRIP_SUBMISSION_WARNING_MONTHS);
+  const daysLeft = Math.round((parseDateKey(deadline).getTime() - parseDateKey(today).getTime()) / 86_400_000);
+  const level = today > deadline ? "overdue" : today > warningFrom ? "warning" : "ok";
+  return { deadline, daysLeft, level };
+}
+
+export function formatTripMonthName(month: number): string {
+  return new Intl.DateTimeFormat("de-AT", { month: "long" }).format(new Date(2026, month - 1, 1));
 }

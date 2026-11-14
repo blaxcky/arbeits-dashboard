@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Trip, TripFile } from "../db/schema";
+import type { TravelExpensePayment, Trip, TripFile } from "../db/schema";
 
 const pwaRegistration = vi.hoisted(() => ({
   options: undefined as { onNeedRefresh?: () => void } | undefined,
@@ -39,7 +39,7 @@ const workData = vi.hoisted(() => ({
   entriesByDate: new Map(),
   flexCorrections: [],
   trips: [] as Trip[],
-  tripPayments: [],
+  tripPayments: [] as TravelExpensePayment[],
   auditPointCases: [],
   auditPointGoals: [],
   usoCases: [],
@@ -817,6 +817,112 @@ describe("travel expense view", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Als erledigt markieren" }));
     await waitFor(() => expect(workData.saveTrip).toHaveBeenCalledWith(expect.objectContaining({ id: incompleteTrip.id, done: true })));
+  });
+});
+
+describe("travel expense year overview", () => {
+  const yearTrip: Trip = {
+    id: "trip-march",
+    date: "2026-03-01",
+    startTime: "07:30",
+    endTime: "15:30",
+    durationMinutes: 480,
+    reason: "Prüfung Altfall",
+    origin: "Eisenstadt",
+    destination: "Wien",
+    transportType: "dienstauto",
+    oneWayKilometers: 50,
+    perDiemCents: 0,
+    otherCostsCents: 0,
+    otherCostsDescription: "",
+    employerReimbursedCosts: true,
+    taxableTransportSubsidyCents: 0,
+    transportSubsidyTaxCents: 0,
+    note: "",
+    done: false,
+    createdAt: "2026-03-01T06:00:00.000Z",
+    updatedAt: "2026-03-01T06:00:00.000Z"
+  };
+
+  beforeEach(() => {
+    workData.trips = [yearTrip, { ...yearTrip, id: "trip-july", date: "2026-07-20", reason: "Nachschau", done: true }];
+    workData.tripPayments = [];
+    workData.saveSettings.mockReset();
+    workData.saveSettings.mockResolvedValue(undefined);
+    workData.saveTripPayment.mockReset();
+    workData.saveTripPayment.mockResolvedValue(undefined);
+    window.location.hash = "#/reisekosten/jahr/2026";
+  });
+
+  afterEach(() => {
+    workData.trips = [];
+    workData.tripPayments = [];
+    window.location.hash = "";
+    vi.restoreAllMocks();
+  });
+
+  it("warns prominently when the oldest open trip is older than five months", () => {
+    render(<App />);
+
+    const alert = screen.getByRole("alert");
+    expect(within(alert).getByText("Älteste offene Reise ist über 5 Monate alt")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("Reise vom 01.03.2026 (Prüfung Altfall)");
+    expect(alert).toHaveTextContent("Frist endet am 01.09.2026 – noch 24 Tage.");
+    expect(screen.getByText("Frist bis 01.09.2026")).toBeInTheDocument();
+
+    const months = screen.getByRole("table", { name: "Reisen je Monat 2026" });
+    const march = within(months).getByRole("row", { name: /März/ });
+    expect(within(march).getByText("1 offen")).toHaveClass("is-late");
+    expect(within(within(months).getByRole("row", { name: /Juli/ })).getByText("erledigt")).toBeInTheDocument();
+    expect(within(months).getAllByRole("row")).toHaveLength(10);
+  });
+
+  it("does not warn for recent open trips", () => {
+    workData.trips = [{ ...yearTrip, date: "2026-07-01" }];
+    render(<App />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Frist bis/)).not.toBeInTheDocument();
+  });
+
+  it("edits the yearly limit inline from the BEZU figure", async () => {
+    render(<App />);
+
+    const metrics = screen.getByRole("region", { name: "Kennzahlen" });
+    expect(within(metrics).getByText(/^Jahresdeckel 2026: \d/)).toBeInTheDocument();
+    fireEvent.click(within(metrics).getByRole("button", { name: "Jahresdeckel 2026 ändern" }));
+    const input = within(metrics).getByLabelText("Jahresdeckel 2026");
+    expect(input).toHaveFocus();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(within(metrics).queryByLabelText("Jahresdeckel 2026")).not.toBeInTheDocument();
+
+    fireEvent.click(within(metrics).getByRole("button", { name: "Jahresdeckel 2026 ändern" }));
+    fireEvent.change(within(metrics).getByLabelText("Jahresdeckel 2026"), { target: { value: "500" } });
+    fireEvent.click(within(metrics).getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(workData.saveSettings).toHaveBeenCalledWith({ publicTransportTaxFreeYearLimitsCents: { 2026: 50000 } }));
+    await waitFor(() => expect(within(metrics).queryByLabelText("Jahresdeckel 2026")).not.toBeInTheDocument());
+  });
+
+  it("shows payouts as a calculation and lists transfers with their sum", async () => {
+    workData.tripPayments = [
+      { id: "pay-1", year: 2026, date: "2026-04-15", amountCents: 1000, note: "Jänner bis März", createdAt: "2026-04-15T08:00:00.000Z", updatedAt: "2026-04-15T08:00:00.000Z" }
+    ];
+    render(<App />);
+
+    const payout = screen.getByRole("region", { name: "Auszahlung" });
+    expect(within(payout).getByText("Offen nach Überweisung")).toBeInTheDocument();
+    const transfers = within(payout).getByRole("list", { name: "Überweisungen 2026" });
+    expect(within(transfers).getByText("15.04.2026")).toBeInTheDocument();
+    expect(within(transfers).getByText("Jänner bis März")).toBeInTheDocument();
+    expect(within(transfers).getAllByText("10,00 EUR")).toHaveLength(2);
+
+    fireEvent.change(within(payout).getByLabelText("Betrag (EUR)"), { target: { value: "25,50" } });
+    fireEvent.click(within(payout).getByRole("button", { name: "Überweisung speichern" }));
+    await waitFor(() => expect(workData.saveTripPayment).toHaveBeenCalledWith(expect.objectContaining({ year: 2026, amountCents: 2550 })));
+
+    const differential = screen.getByRole("table", { name: /Differenz und Werbungskosten 2026/ });
+    expect(within(differential).getByRole("columnheader", { name: "davon offen" })).toBeInTheDocument();
   });
 });
 

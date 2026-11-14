@@ -918,52 +918,11 @@ button:disabled {
   justify-content: flex-end;
 }
 
-.year-limit-control {
-  display: grid;
-  grid-template-columns: minmax(170px, 1fr) minmax(280px, auto);
-  align-items: end;
-  gap: 14px 18px;
-  margin: 4px 0 16px;
-  padding: 12px 0 14px;
-  border-top: 1px solid #eef1f5;
-  border-bottom: 1px solid #eef1f5;
-}
 
-.year-limit-copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
 
-.year-limit-label {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 
-.year-limit-copy strong {
-  color: #1f2937;
-  font-size: 1.02rem;
-  line-height: 1.25;
-}
 
-.year-limit-editor {
-  display: grid;
-  grid-template-columns: minmax(150px, 190px) auto;
-  align-items: end;
-  gap: 10px;
-  justify-content: end;
-}
 
-.year-limit-input {
-  display: grid;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
-}
 
 .amount-input-wrap {
   display: grid;
@@ -1008,15 +967,7 @@ button:disabled {
   font-weight: 900;
 }
 
-.year-limit-save {
-  min-height: 40px;
-  white-space: nowrap;
-}
 
-.year-limit-error {
-  grid-column: 2;
-  justify-self: start;
-}
 
 .year-select {
   display: grid;
@@ -1813,55 +1764,16 @@ button:disabled {
   border-top: 1px solid #eef1f5;
 }
 
-.trip-payment-box {
-  display: grid;
-  gap: 14px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid #eef1f5;
-}
 
-.trip-payment-form {
-  display: grid;
-  grid-template-columns: minmax(130px, 0.8fr) minmax(130px, 0.8fr);
-  gap: 12px;
-}
 
 .trip-payment-save {
   justify-self: start;
 }
 
-.trip-payment-list {
-  display: grid;
-  gap: 8px;
-}
 
-.trip-payment-list p {
-  margin: 0;
-}
 
-.trip-payment-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 10px;
-  align-items: center;
-  border: 1px solid #e5ebf2;
-  border-radius: 8px;
-  background: #fbfcfd;
-  padding: 10px;
-}
 
-.trip-payment-row div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
 
-.trip-payment-row span {
-  color: var(--muted);
-  font-size: 0.86rem;
-  overflow-wrap: anywhere;
-}
 
 .primary-button,
 .secondary-button,
@@ -2268,20 +2180,7 @@ button:disabled {
   min-width: 0;
 }
 
-.limit-bar {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #edf1f6;
-  margin: 14px 0;
-}
 
-.limit-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: #2f6f73;
-}
 
 .trip-actions {
   display: flex;
@@ -3188,25 +3087,16 @@ button:disabled {
   .split-grid,
   .settings-grid,
   .settings-layout,
-  .year-limit-control,
   .form-section-body,
   .points-form-card .form-section-body,
   .trip-form-grid,
-  .trip-payment-form,
   .points-year-summary,
   .points-form-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
 
-  .year-limit-editor {
-    grid-template-columns: minmax(0, 1fr) auto;
-    justify-content: stretch;
-  }
 
-  .year-limit-error {
-    grid-column: 1;
-  }
 
   .toast-stack {
     top: 14px;
@@ -3286,14 +3176,7 @@ button:disabled {
     justify-content: flex-start;
   }
 
-  .trip-payment-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
 
-  .trip-payment-row .icon-button {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
 
   .date-row,
   .button-row {
@@ -4873,4 +4756,584 @@ button.week-line:focus-visible {
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+
+/* Reisen-Jahresübersicht: Jahreswechsel, Abgabefrist, Auszahlung, Werbungskosten, Monate */
+
+.trips-year-page {
+  gap: 18px;
+}
+
+.year-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.year-stepper .icon-button {
+  width: 36px;
+  min-height: 36px;
+  border: 0;
+}
+
+.year-stepper-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.year-stepper-select select {
+  border: 0;
+  background: transparent;
+  color: #1f2937;
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 6px 4px;
+}
+
+.deadline-alert {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 2px solid #d4554b;
+  border-radius: 8px;
+  background: #fdeceb;
+  color: #5c1f1a;
+}
+
+.deadline-alert strong {
+  color: #8f2219;
+  font-size: 1rem;
+}
+
+.deadline-alert p {
+  margin: 2px 0 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.deadline-alert-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.metric .metric-subdetail {
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
+.year-limit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #eef0f3;
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
+.year-limit-inline {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #eef0f3;
+}
+
+.year-limit-inline label {
+  color: #4b5563;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.year-limit-inline-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.year-limit-inline .primary-button {
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.year-limit-cancel {
+  justify-self: end;
+  color: var(--muted);
+}
+
+.year-overview-workspace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.year-payout {
+  flex: 999 1 520px;
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+  padding: 20px 22px;
+  container-type: inline-size;
+}
+
+.year-differential {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px;
+}
+
+.year-payout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px 28px;
+}
+
+.year-payout-calc {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.year-payout-equation {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.year-payout-equation div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.year-payout-equation dt {
+  padding-left: 18px;
+}
+
+.year-payout-equation dt span {
+  display: inline-block;
+  width: 18px;
+  margin-left: -18px;
+  color: var(--muted);
+}
+
+.year-payout-equation dd {
+  margin: 0;
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  text-align: right;
+}
+
+.year-payout-equation .year-payout-result {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-weight: 800;
+}
+
+.year-payout-result dd {
+  font-size: 1.25rem;
+}
+
+.year-share-bar {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f5;
+}
+
+.year-share-bar span {
+  display: block;
+  height: 100%;
+}
+
+.year-share-bar .is-done,
+.year-legend-swatch.is-done {
+  background: #2f6f73;
+}
+
+.year-share-bar .is-open,
+.year-legend-swatch.is-open {
+  background: #e2bd6a;
+}
+
+.year-open-trips {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.year-open-trips h3,
+.year-payments h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.year-open-trips .detail-list .year-oldest-late {
+  margin: 4px -10px 0;
+  padding: 10px;
+  border-top-color: transparent;
+  border-radius: 8px;
+  background: #fdeceb;
+}
+
+.year-oldest-late dt {
+  color: #8f2219;
+  font-weight: 800;
+}
+
+.year-oldest-late dd {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  color: #a12d26;
+}
+
+.year-oldest-late small {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.year-oldest-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deadline-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.year-payments {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #eef0f3;
+}
+
+.year-payment-form {
+  display: grid;
+  grid-template-columns: 160px 150px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.year-payment-save {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.year-payments > .muted {
+  margin: 0;
+}
+
+.year-payment-list {
+  display: grid;
+}
+
+.year-payment-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto 36px;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  padding: 6px 0;
+}
+
+.year-payment-row + .year-payment-row {
+  border-top: 1px solid #eef0f3;
+}
+
+.year-payment-date,
+.year-payment-row strong {
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+.year-payment-row strong {
+  text-align: right;
+}
+
+.year-payment-note {
+  color: #4b5563;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.year-payment-list .year-payment-sum {
+  border-top-color: var(--line);
+  font-weight: 800;
+}
+
+@container (max-width: 560px) {
+  .year-payment-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .year-payment-form > :nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
+
+.year-differential-share {
+  display: grid;
+  gap: 8px;
+}
+
+.year-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.year-legend .trip-cost-swatch {
+  margin-right: 6px;
+}
+
+.year-legend-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.year-differential-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.year-differential-table th,
+.year-differential-table td {
+  padding: 8px 0;
+  border-top: 1px solid #eef0f3;
+  text-align: right;
+  font-weight: 400;
+}
+
+.year-differential-table thead th {
+  padding-top: 0;
+  border-top: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.year-differential-table tbody th,
+.year-differential-table tfoot th {
+  padding-right: 10px;
+  color: #374151;
+  text-align: left;
+}
+
+.year-differential-table td {
+  width: 84px;
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  white-space: nowrap;
+}
+
+.year-differential-table .year-differential-open {
+  color: #4b5563;
+}
+
+.year-differential-table .is-zero {
+  color: #8a94a3;
+}
+
+.year-differential-table tfoot th,
+.year-differential-table tfoot td {
+  border-top: 1px solid var(--line);
+  font-weight: 800;
+}
+
+.year-differential-table tfoot td:nth-of-type(1) {
+  color: var(--accent-dark);
+}
+
+.year-differential-unit {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.year-months {
+  display: grid;
+  gap: 10px;
+  padding: 20px 22px;
+  container-type: inline-size;
+}
+
+.year-months-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.year-months > .muted {
+  margin: 0;
+}
+
+.year-months-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.9rem;
+}
+
+.year-months-table th,
+.year-months-table td {
+  height: 46px;
+  padding: 0 10px;
+  border-top: 1px solid #eef0f3;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.year-months-table thead th {
+  height: 30px;
+  border-top: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.year-months-table th:nth-child(1) { width: 120px; }
+.year-months-table th:nth-child(2) { width: 72px; }
+.year-months-table th:nth-child(3) { width: 84px; }
+.year-months-table th:nth-child(4) { width: 100px; }
+.year-months-table th:nth-child(6) { width: 110px; }
+.year-months-table th:nth-child(7) { width: 110px; }
+
+.year-months-table tbody th {
+  font-weight: 600;
+}
+
+.year-months-table .is-number {
+  text-align: right;
+}
+
+.year-months-table td.is-number {
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+.year-months-table tfoot th,
+.year-months-table tfoot td {
+  height: 48px;
+  border-top: 1px solid var(--line);
+  font-weight: 800;
+}
+
+.year-months-table tr.is-zero th,
+.year-months-table tr.is-zero td {
+  color: #8a94a3;
+}
+
+.year-month-cost {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.year-month-cost .year-share-bar {
+  flex: 1 1 auto;
+  min-width: 40px;
+}
+
+.year-month-cost > span:last-child {
+  flex: 0 0 112px;
+  text-align: right;
+}
+
+.year-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border: 1px solid #e8d3a6;
+  border-radius: 999px;
+  background: #fdf6e7;
+  color: #7a5418;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.year-status-badge.is-late {
+  border-color: #e7b4ae;
+  background: #fdeceb;
+  color: #a12d26;
+}
+
+.year-status-badge.is-late span {
+  font-weight: 900;
+}
+
+.year-status-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-dark);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+@container (max-width: 760px) {
+  .year-months-table .year-col-duration,
+  .year-months-table .year-col-km {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
+  .year-months-table th:nth-child(6),
+  .year-months-table td:nth-child(6),
+  .year-month-cost .year-share-bar {
+    display: none;
+  }
 }

@@ -21,6 +21,7 @@ import {
   Gear,
   House,
   ListChecks,
+  Money,
   MagnifyingGlass,
   MapTrifold,
   MapPin,
@@ -71,6 +72,7 @@ import {
   calculateTripTravelCostCents,
   remainingTransportSubsidyYearLimitCents,
   summarizeTripsByYear,
+  summarizeTripsByYearMonth,
   TRIP_RULES,
   TRANSPORT_LABELS
 } from "../modules/expenses/calculations";
@@ -94,7 +96,7 @@ import {
   usoTargetForYear
 } from "../modules/points/calculations";
 import { downloadPointsYearWorkbook } from "../modules/points/yearExport";
-import { groupTripsByMonth, splitTripDateLabel, summarizeTripList, tripCostShares } from "../modules/expenses/tripOverview";
+import { formatTripMonthName, groupTripsByMonth, splitTripDateLabel, summarizeTripList, tripCostShares, tripSubmissionStatus } from "../modules/expenses/tripOverview";
 import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
@@ -2936,21 +2938,39 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
   const navigate = useNavigate();
   const params = useParams();
   const year = yearFromUrlParam(params.year);
+  const today = todayKey(data.clock);
   const yearOptions = tripYearOptions(data.trips, currentYear(), year);
   const publicTransportTaxFreeYearLimitCents = publicTransportTaxFreeYearLimitForYear(data.settings, year);
   const summary = summarizeTripsByYear(data.trips, year, data.tripPayments, publicTransportTaxFreeYearLimitCents);
+  const months = summarizeTripsByYearMonth(data.trips, year, today, publicTransportTaxFreeYearLimitCents);
   const transportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(summary.transportSubsidyCents, publicTransportTaxFreeYearLimitCents);
   const transportSubsidyYearLimitCents = Math.max(publicTransportTaxFreeYearLimitCents ?? 0, 0);
   const [paymentForm, setPaymentForm] = useState(() => tripPaymentToForm());
   const [paymentAmountError, setPaymentAmountError] = useState<string | undefined>();
   const [yearLimitEuros, setYearLimitEuros] = useState(() => publicTransportYearLimitToForm(data.settings, year));
   const [yearLimitError, setYearLimitError] = useState<string | undefined>();
-  const yearPayments = data.tripPayments.filter((payment) => payment.year === year);
+  const [yearLimitEditing, setYearLimitEditing] = useState(false);
+  const yearPayments = data.tripPayments.filter((payment) => payment.year === year).sort((left, right) => right.date.localeCompare(left.date));
+  const yearIndex = yearOptions.indexOf(year);
+  const previousYear = yearIndex >= 0 ? yearOptions[yearIndex + 1] : undefined;
+  const nextYear = yearIndex > 0 ? yearOptions[yearIndex - 1] : undefined;
+  const lateOpenTrips = data.trips
+    .filter((trip) => !trip.done && (tripSubmissionStatus(trip.date, today)?.level ?? "ok") !== "ok")
+    .sort((left, right) => left.date.localeCompare(right.date));
+  const oldestOpenStatus = summary.oldestOpenTrip ? tripSubmissionStatus(summary.oldestOpenTrip.date, today) : null;
+  const oldestOpenLate = Boolean(oldestOpenStatus && oldestOpenStatus.level !== "ok");
+  const paidShare = summary.totalCents > 0 ? Math.min(Math.max(summary.paidCents / summary.totalCents, 0), 1) * 100 : 0;
+  const differentialShares = tripCostShares(summary.perDiemDifferentialCents, summary.transportDifferentialCents, summary.otherCostsDifferentialCents);
+  const maxMonthCents = Math.max(0, ...months.map((month) => month.totalCents));
 
   useEffect(() => {
     setYearLimitEuros(publicTransportYearLimitToForm(data.settings, year));
     setYearLimitError(undefined);
   }, [data.settings, year]);
+
+  useEffect(() => {
+    setYearLimitEditing(false);
+  }, [year]);
 
   function printAdvertisingCostsExport() {
     const rows = buildTripAdvertisingCostsExportRows(data.trips, year, publicTransportTaxFreeYearLimitCents);
@@ -3008,7 +3028,14 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
         [String(year)]: amountCents
       }
     });
+    setYearLimitEditing(false);
     showToast(`Öffi-BEZU-Jahresdeckel ${year} gespeichert.`);
+  }
+
+  function cancelYearLimitEdit() {
+    setYearLimitEuros(publicTransportYearLimitToForm(data.settings, year));
+    setYearLimitError(undefined);
+    setYearLimitEditing(false);
   }
 
   async function removePayment(payment: TravelExpensePayment) {
@@ -3017,77 +3044,147 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
     showToast("Überweisung gelöscht.");
   }
 
+  function differentialRow(label: string, totalCents: number, openCents: number, className?: string) {
+    return (
+      <tr className={className}>
+        <th scope="row">{label}</th>
+        <td className={totalCents === 0 ? "is-zero" : undefined}>{formatEuroAmount(totalCents)}</td>
+        <td className={openCents === 0 ? "is-zero" : "year-differential-open"}>{formatEuroAmount(openCents)}</td>
+      </tr>
+    );
+  }
+
   return (
-    <section className="page-stack">
-      <Header eyebrow="Reisekosten" title="Jahresübersicht" />
-      <div className="settings-grid">
-        <div className="panel">
-          <div className="panel-heading year-overview-heading">
-            <span className="section-label">Jahreswerte {year}</span>
-            <div className="year-overview-actions">
-              <button className="secondary-button" type="button" onClick={printAdvertisingCostsExport}>
-                <Printer size={17} /> Werbungskosten-PDF
-              </button>
-              <label className="year-select">
-                <span>Jahr</span>
-                <select value={year} onChange={(event) => navigate(`/reisekosten/jahr/${event.target.value}`)}>
-                  {yearOptions.map((optionYear) => (
-                    <option key={optionYear} value={optionYear}>{optionYear}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
+    <section className="page-stack dashboard-page trips-year-page">
+      <header className="dashboard-header">
+        <div className="trips-title">
+          <span className="section-label">Reisekosten</span>
+          <h1>Jahresübersicht</h1>
+        </div>
+        <div className="trips-header-actions">
+          <button className="secondary-button" type="button" onClick={printAdvertisingCostsExport}>
+            <Printer size={17} aria-hidden="true" /> Werbungskosten-PDF
+          </button>
+          <div className="year-stepper" role="group" aria-label="Jahr wählen">
+            <button className="icon-button" type="button" title="Vorjahr" aria-label="Vorjahr" disabled={previousYear === undefined} onClick={() => { if (previousYear !== undefined) navigate(`/reisekosten/jahr/${previousYear}`); }}>
+              <CaretLeft size={17} aria-hidden="true" />
+            </button>
+            <label className="year-stepper-select">
+              <span>Jahr</span>
+              <select value={year} onChange={(event) => navigate(`/reisekosten/jahr/${event.target.value}`)}>
+                {yearOptions.map((optionYear) => (
+                  <option key={optionYear} value={optionYear}>{optionYear}</option>
+                ))}
+              </select>
+            </label>
+            <button className="icon-button" type="button" title="Folgejahr" aria-label="Folgejahr" disabled={nextYear === undefined} onClick={() => { if (nextYear !== undefined) navigate(`/reisekosten/jahr/${nextYear}`); }}>
+              <CaretRight size={17} aria-hidden="true" />
+            </button>
           </div>
-          <div className="year-limit-control">
-            <div className="year-limit-copy">
-              <span className="year-limit-label">Steuerfreier Öffi-BEZU</span>
-              <strong>Jahresdeckel {year}</strong>
-            </div>
-            <div className="year-limit-editor">
-              <label className="year-limit-input">
-                <span>Betrag</span>
+        </div>
+      </header>
+
+      {lateOpenTrips.length > 0 ? <TripDeadlineAlert trip={lateOpenTrips[0]} today={today} moreCount={lateOpenTrips.length - 1} /> : null}
+
+      <section className="dashboard-metrics" aria-label="Kennzahlen">
+        <Metric
+          title={`Reisekosten gesamt ${year}`}
+          value={formatEuroCents(summary.totalCents)}
+          detail={`${summary.count} ${summary.count === 1 ? "Reise" : "Reisen"} · ${summary.doneCount} erledigt`}
+        >
+          <p className="metric-subdetail">{formatKilometers(summary.kilometers)} · {formatMinutes(summary.durationMinutes)}</p>
+        </Metric>
+        <Metric
+          title="Offen nach Überweisung"
+          value={formatEuroCents(summary.remainingPayoutCents)}
+          detail={`Überwiesen ${formatEuroCents(summary.paidCents)}`}
+        />
+        <Metric
+          title="BEZU Jahresstand"
+          value={formatEuroCents(summary.transportSubsidyCents)}
+          detail={`BEZU Restgrenze ${formatEuroCents(transportSubsidyRemainingCents)}`}
+          tone={transportSubsidyRemainingCents < 0 ? "warning" : "default"}
+          progress={{
+            value: transportSubsidyYearLimitCents > 0 ? summary.transportSubsidyCents / transportSubsidyYearLimitCents : 0,
+            tone: transportSubsidyRemainingCents < 0 ? "warning" : "default"
+          }}
+        >
+          {yearLimitEditing ? (
+            <form className="year-limit-inline" onSubmit={(event) => { event.preventDefault(); void saveYearLimit(); }}>
+              <label htmlFor="year-limit-input">Jahresdeckel {year}</label>
+              <div className="year-limit-inline-row">
                 <span className="amount-input-wrap">
-                  <input inputMode="decimal" value={yearLimitEuros} aria-invalid={Boolean(yearLimitError)} onChange={(event) => { setYearLimitEuros(event.target.value); setYearLimitError(undefined); }} placeholder="leer" />
+                  <input
+                    id="year-limit-input"
+                    inputMode="decimal"
+                    value={yearLimitEuros}
+                    aria-invalid={Boolean(yearLimitError)}
+                    placeholder="leer"
+                    autoFocus
+                    onKeyDown={(event) => { if (event.key === "Escape") cancelYearLimitEdit(); }}
+                    onChange={(event) => { setYearLimitEuros(event.target.value); setYearLimitError(undefined); }}
+                  />
                   <span>EUR</span>
                 </span>
-              </label>
-              <button className="secondary-button year-limit-save" type="button" onClick={() => void saveYearLimit()}>
-                <CheckCircle size={17} /> Speichern
-              </button>
+                <button className="primary-button" type="submit">Speichern</button>
+              </div>
+              {yearLimitError ? <small className="field-error">{yearLimitError}</small> : null}
+              <button className="link-button year-limit-cancel" type="button" onClick={cancelYearLimitEdit}>Abbrechen</button>
+            </form>
+          ) : (
+            <div className="year-limit-summary">
+              <span>Jahresdeckel {year}: {publicTransportTaxFreeYearLimitCents === null ? "leer" : formatEuroCents(publicTransportTaxFreeYearLimitCents)}</span>
+              <button className="link-button" type="button" aria-label={`Jahresdeckel ${year} ändern`} onClick={() => setYearLimitEditing(true)}>Ändern</button>
             </div>
-            {yearLimitError ? <small className="field-error year-limit-error">{yearLimitError}</small> : null}
+          )}
+        </Metric>
+        <Metric
+          title={`Differenz gesamt ${year}`}
+          value={formatEuroCents(summary.differentialCents)}
+          detail={`Diäten ${formatEuroCents(summary.perDiemDifferentialCents)} · Werbungskosten ${formatEuroCents(summary.transportDifferentialCents + summary.otherCostsDifferentialCents)}`}
+        />
+      </section>
+
+      {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
+
+      <div className="year-overview-workspace">
+        <section className="panel year-payout" aria-labelledby="year-payout-heading">
+          <h2 id="year-payout-heading" className="trip-entry-heading"><Money size={18} weight="duotone" aria-hidden="true" />Auszahlung</h2>
+          <div className="year-payout-grid">
+            <div className="year-payout-calc">
+              <dl className="year-payout-equation">
+                <div><dt>Reisekosten gesamt</dt><dd>{formatEuroCents(summary.totalCents)}</dd></div>
+                <div><dt><span aria-hidden="true">−</span>Überwiesen</dt><dd>{formatEuroCents(summary.paidCents)}</dd></div>
+                <div className="year-payout-result"><dt><span aria-hidden="true">=</span>Offen nach Überweisung</dt><dd>{formatEuroCents(summary.remainingPayoutCents)}</dd></div>
+              </dl>
+              <div className="year-share-bar" role="img" aria-label={`Überwiesen ${formatEuroCents(summary.paidCents)} von ${formatEuroCents(summary.totalCents)}`}>
+                <span className="is-done" style={{ width: `${paidShare}%` }} />
+                <span className="is-open" style={{ width: `${summary.totalCents > 0 ? 100 - paidShare : 0}%` }} />
+              </div>
+            </div>
+            <div className="year-open-trips">
+              <h3>Offene Reiserechnungen</h3>
+              <dl className="detail-list">
+                <div><dt>Offene Anzahl</dt><dd>{summary.openCount}</dd></div>
+                <div><dt>Offener Gesamtbetrag</dt><dd>{formatEuroCents(summary.openTotalCents)}</dd></div>
+                <div className={oldestOpenLate ? "year-oldest-late" : undefined}>
+                  <dt>Älteste offene Reise</dt>
+                  <dd>
+                    {summary.oldestOpenTrip ? (
+                      <>
+                        <span className="year-oldest-date">{oldestOpenLate ? <span className="deadline-mark" aria-hidden="true">!</span> : null}{formatDateKey(summary.oldestOpenTrip.date)}</span>
+                        {oldestOpenLate && oldestOpenStatus ? <small>{oldestOpenStatus.level === "overdue" ? "Frist abgelaufen am" : "Frist bis"} {splitTripDateLabel(oldestOpenStatus.deadline).date}</small> : null}
+                      </>
+                    ) : "-"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </div>
-          <dl className="detail-list">
-            <div><dt>Reisen</dt><dd>{summary.count}</dd></div>
-            <div><dt>Erledigt</dt><dd>{summary.doneCount}</dd></div>
-            <div><dt>Dauer</dt><dd>{formatMinutes(summary.durationMinutes)}</dd></div>
-            <div><dt>Kilometer</dt><dd>{summary.kilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
-            <div><dt>Reisekosten gesamt</dt><dd>{formatEuroCents(summary.totalCents)}</dd></div>
-            <div><dt>BEZU Jahresstand</dt><dd>{formatEuroCents(summary.transportSubsidyCents)}</dd></div>
-            <div><dt>BEZU Restgrenze</dt><dd>{formatEuroCents(transportSubsidyRemainingCents)}</dd></div>
-            <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(summary.perDiemDifferentialCents)}</dd></div>
-            <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(summary.transportDifferentialCents)}</dd></div>
-            <div><dt>Werbungskosten Sonstiges</dt><dd>{formatEuroCents(summary.otherCostsDifferentialCents)}</dd></div>
-            <div><dt>Differenz gesamt</dt><dd>{formatEuroCents(summary.differentialCents)}</dd></div>
-          </dl>
-          <div className="limit-bar" aria-label={`Beförderungszuschuss Jahresgrenze: ${formatEuroCents(summary.transportSubsidyCents)} von ${formatEuroCents(transportSubsidyYearLimitCents)}`}>
-            <span style={{ width: `${transportSubsidyYearLimitCents > 0 ? Math.min(summary.transportSubsidyCents / transportSubsidyYearLimitCents, 1) * 100 : 0}%` }} />
-          </div>
-          {transportSubsidyRemainingCents < 0 ? <Notice tone="warning" title="BEZU-Grenze überschritten" text={`Die Jahresgrenze ist um ${formatEuroCents(Math.abs(transportSubsidyRemainingCents))} überschritten.`} /> : null}
-        </div>
-        <div className="panel">
-          <span className="section-label">Offene Reiserechnungen</span>
-          <dl className="detail-list">
-            <div><dt>Offene Anzahl</dt><dd>{summary.openCount}</dd></div>
-            <div><dt>Offener Gesamtbetrag</dt><dd>{formatEuroCents(summary.openTotalCents)}</dd></div>
-            <div><dt>Überwiesen</dt><dd>{formatEuroCents(summary.paidCents)}</dd></div>
-            <div><dt>Offen nach Überweisung</dt><dd>{formatEuroCents(summary.remainingPayoutCents)}</dd></div>
-            <div><dt>Offene Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(summary.openTransportDifferentialCents)}</dd></div>
-            <div><dt>Offene Werbungskosten Sonstiges</dt><dd>{formatEuroCents(summary.openOtherCostsDifferentialCents)}</dd></div>
-            <div><dt>Älteste offene Reise</dt><dd>{summary.oldestOpenTrip ? formatDateKey(summary.oldestOpenTrip.date) : "-"}</dd></div>
-          </dl>
-          <div className="trip-payment-box">
-            <div className="trip-payment-form">
+
+          <div className="year-payments">
+            <h3>Überweisungen</h3>
+            <div className="year-payment-form">
               <Field label="Datum">
                 <input type="date" value={paymentForm.date} onChange={(event) => setPaymentForm((current) => ({ ...current, date: event.target.value }))} />
               </Field>
@@ -3104,32 +3201,166 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
                   }}
                 />
               </Field>
-              <Field label="Notiz" className="field-wide">
+              <Field label="Notiz">
                 <input value={paymentForm.note} onChange={(event) => setPaymentForm((current) => ({ ...current, note: event.target.value }))} />
               </Field>
-              <button className="secondary-button trip-payment-save" type="button" onClick={() => void savePayment()}>
+              <button className="secondary-button year-payment-save" type="button" onClick={() => void savePayment()}>
                 <Plus size={17} /> Überweisung speichern
               </button>
             </div>
-            <div className="trip-payment-list">
-              {yearPayments.length === 0 ? <p className="muted">Noch keine Überweisungen erfasst.</p> : null}
-              {yearPayments.map((payment) => (
-                <div key={payment.id} className="trip-payment-row">
-                  <div>
-                    <strong>{formatDateKey(payment.date)}</strong>
-                    {payment.note ? <span>{payment.note}</span> : null}
+            {yearPayments.length === 0 ? <p className="muted">Noch keine Überweisungen erfasst.</p> : (
+              <div className="year-payment-list" role="list" aria-label={`Überweisungen ${year}`}>
+                {yearPayments.map((payment) => (
+                  <div key={payment.id} className="year-payment-row" role="listitem">
+                    <span className="year-payment-date">{splitTripDateLabel(payment.date).date}</span>
+                    <span className="year-payment-note">{payment.note}</span>
+                    <strong>{formatEuroCents(payment.amountCents)}</strong>
+                    <button className="icon-button danger-icon-button" type="button" title="Überweisung löschen" aria-label="Überweisung löschen" onClick={() => void removePayment(payment)}>
+                      <Trash size={17} />
+                    </button>
                   </div>
-                  <strong>{formatEuroCents(payment.amountCents)}</strong>
-                  <button className="icon-button" type="button" title="Überweisung löschen" aria-label="Überweisung löschen" onClick={() => void removePayment(payment)}>
-                    <Trash size={17} />
-                  </button>
+                ))}
+                <div className="year-payment-row year-payment-sum">
+                  <span />
+                  <span>Überwiesen</span>
+                  <strong>{formatEuroCents(summary.paidCents)}</strong>
+                  <span />
                 </div>
-              ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="panel year-differential" aria-labelledby="year-differential-heading">
+          <h2 id="year-differential-heading" className="trip-entry-heading"><Receipt size={18} weight="duotone" aria-hidden="true" />Differenz &amp; Werbungskosten</h2>
+          <div className="year-differential-share">
+            <div
+              className="trip-cost-bar"
+              role="img"
+              aria-label={`Differenz Diäten ${formatEuroCents(summary.perDiemDifferentialCents)}, Werbungskosten Fahrtkosten ${formatEuroCents(summary.transportDifferentialCents)}, Werbungskosten Sonstiges ${formatEuroCents(summary.otherCostsDifferentialCents)}`}
+            >
+              <span className="trip-cost-swatch-per-diem" style={{ width: `${differentialShares.perDiem}%` }} />
+              <span className="trip-cost-swatch-travel" style={{ width: `${differentialShares.travel}%` }} />
+              <span className="trip-cost-swatch-other" style={{ width: `${differentialShares.other}%` }} />
+            </div>
+            <div className="year-legend" aria-hidden="true">
+              <span><i className="trip-cost-swatch trip-cost-swatch-per-diem" />Diäten</span>
+              <span><i className="trip-cost-swatch trip-cost-swatch-travel" />Fahrtkosten</span>
+              <span><i className="trip-cost-swatch trip-cost-swatch-other" />Sonstiges</span>
             </div>
           </div>
-        </div>
+          <table className="year-differential-table">
+            <caption className="sr-only">Differenz und Werbungskosten {year} in EUR</caption>
+            <thead>
+              <tr><th scope="col"><span className="sr-only">Posten</span></th><th scope="col">Gesamt</th><th scope="col">davon offen</th></tr>
+            </thead>
+            <tbody>
+              {differentialRow("Differenz Diäten", summary.perDiemDifferentialCents, summary.openPerDiemDifferentialCents)}
+              {differentialRow("Werbungskosten Fahrtkosten", summary.transportDifferentialCents, summary.openTransportDifferentialCents)}
+              {differentialRow("Werbungskosten Sonstiges", summary.otherCostsDifferentialCents, summary.openOtherCostsDifferentialCents)}
+            </tbody>
+            <tfoot>
+              {differentialRow("Differenz gesamt", summary.differentialCents, summary.openDifferentialCents, "year-differential-total")}
+            </tfoot>
+          </table>
+          <span className="year-differential-unit">Beträge in EUR</span>
+        </section>
       </div>
+
+      <section className="panel year-months" aria-labelledby="year-months-heading">
+        <div className="year-months-head">
+          <h2 id="year-months-heading" className="trip-entry-heading"><ChartBar size={18} weight="duotone" aria-hidden="true" />Monate {year}</h2>
+          {months.length > 0 ? (
+            <div className="year-legend" aria-hidden="true">
+              <span><i className="year-legend-swatch is-done" />erledigt</span>
+              <span><i className="year-legend-swatch is-open" />offen</span>
+            </div>
+          ) : null}
+        </div>
+        {months.length === 0 ? <p className="muted">Keine Reisen in diesem Jahr.</p> : (
+          <table className="year-months-table">
+            <caption className="sr-only">Reisen je Monat {year}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Monat</th>
+                <th scope="col" className="is-number">Reisen</th>
+                <th scope="col" className="is-number year-col-duration">Dauer</th>
+                <th scope="col" className="is-number year-col-km">Kilometer</th>
+                <th scope="col" className="is-number">Reisekosten</th>
+                <th scope="col" className="is-number">Differenz</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {months.map((month) => {
+                const monthStatus = month.oldestOpenDate ? tripSubmissionStatus(month.oldestOpenDate, today) : null;
+                const monthLate = Boolean(monthStatus && monthStatus.level !== "ok");
+                const doneCents = month.totalCents - month.openTotalCents;
+                return (
+                  <tr key={month.monthKey} className={month.count === 0 ? "is-zero" : undefined}>
+                    <th scope="row">{formatTripMonthName(month.month)}</th>
+                    <td className="is-number">{month.count}</td>
+                    <td className="is-number year-col-duration">{formatMinutes(month.durationMinutes)}</td>
+                    <td className="is-number year-col-km">{formatKilometers(month.kilometers)}</td>
+                    <td className="is-number">
+                      <span className="year-month-cost">
+                        <span className="year-share-bar" aria-hidden="true">
+                          {maxMonthCents > 0 ? <span className="is-done" style={{ width: `${(Math.max(doneCents, 0) / maxMonthCents) * 100}%` }} /> : null}
+                          {maxMonthCents > 0 ? <span className="is-open" style={{ width: `${(Math.max(month.openTotalCents, 0) / maxMonthCents) * 100}%` }} /> : null}
+                        </span>
+                        <span>{formatEuroCents(month.totalCents)}</span>
+                      </span>
+                    </td>
+                    <td className="is-number">{formatEuroCents(month.differentialCents)}</td>
+                    <td>
+                      {month.openCount > 0 ? (
+                        <span className={`year-status-badge${monthLate ? " is-late" : ""}`}>{monthLate ? <span aria-hidden="true">!</span> : null}{month.openCount} offen</span>
+                      ) : month.count > 0 ? (
+                        <span className="year-status-done"><Check size={15} weight="bold" aria-hidden="true" />erledigt</span>
+                      ) : "–"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row">Summe</th>
+                <td className="is-number">{summary.count}</td>
+                <td className="is-number year-col-duration">{formatMinutes(summary.durationMinutes)}</td>
+                <td className="is-number year-col-km">{formatKilometers(summary.kilometers)}</td>
+                <td className="is-number">{formatEuroCents(summary.totalCents)}</td>
+                <td className="is-number">{formatEuroCents(summary.differentialCents)}</td>
+                <td>{summary.openCount > 0 ? <span className={`year-status-badge${oldestOpenLate ? " is-late" : ""}`}>{summary.openCount} offen</span> : null}</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </section>
     </section>
+  );
+}
+
+function TripDeadlineAlert({ trip, today, moreCount }: { trip: Trip; today: string; moreCount: number }) {
+  const status = tripSubmissionStatus(trip.date, today);
+  if (!status) return null;
+  const overdue = status.level === "overdue";
+  const deadline = splitTripDateLabel(status.deadline).date;
+  const deadlineText = overdue
+    ? `Frist am ${deadline} abgelaufen.`
+    : status.daysLeft === 0
+      ? `Frist endet heute (${deadline}).`
+      : `Frist endet am ${deadline} – noch ${status.daysLeft} ${status.daysLeft === 1 ? "Tag" : "Tage"}.`;
+  const moreText = moreCount > 0 ? ` Dazu ${moreCount} weitere offene ${moreCount === 1 ? "Reise" : "Reisen"} über 5 Monate.` : "";
+
+  return (
+    <div className={`deadline-alert${overdue ? " is-overdue" : ""}`} role="alert">
+      <span className="deadline-alert-mark" aria-hidden="true">!</span>
+      <div>
+        <strong>{overdue ? "Abgabefrist für offene Reise überschritten" : "Älteste offene Reise ist über 5 Monate alt"}</strong>
+        <p>Reise vom {splitTripDateLabel(trip.date).date}{trip.reason.trim() ? ` (${trip.reason.trim()})` : ""} · Reiserechnungen müssen innerhalb von 6 Monaten abgegeben werden. {deadlineText}{moreText}</p>
+      </div>
+    </div>
   );
 }
 
@@ -3680,7 +3911,7 @@ type MetricProgress = {
   tone?: "default" | "warning" | "vacation";
 };
 
-function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, icon, action, tone = "default", progress }: { title: string; value: string; detail: string; editableDetail?: React.ReactNode; onDetailDoubleClick?: () => void; icon?: React.ReactNode; action?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress }) {
+function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, icon, action, tone = "default", progress, children }: { title: string; value: string; detail: string; editableDetail?: React.ReactNode; onDetailDoubleClick?: () => void; icon?: React.ReactNode; action?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress; children?: React.ReactNode }) {
   const progressValue = progress ? clampProgress(progress.value) : 0;
   const overflowValue = progress?.overflow ? clampProgress(progress.overflow) : 0;
 
@@ -3700,6 +3931,7 @@ function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, ico
         <p onDoubleClick={onDetailDoubleClick} className={onDetailDoubleClick ? "metric-editable-detail" : undefined}>{editableDetail ?? detail}</p>
         {action}
       </div>
+      {children}
     </article>
   );
 }

@@ -210,8 +210,53 @@ export function summarizeTripsByYear(trips: Trip[], year: number, payments: Trav
     openTotalCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + calculateTripTotalCents(trip), 0),
     openTransportDifferentialCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + (yearBreakdowns.get(trip.id)?.transportDifferentialCents ?? calculateTransportDifferentialCents(trip)), 0),
     openOtherCostsDifferentialCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + calculateOtherCostsDifferentialCents(trip), 0),
+    openPerDiemDifferentialCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + calculatePerDiemDifferentialCents(trip.durationMinutes, trip.perDiemCents, employerReimbursesCosts(trip)), 0),
+    openDifferentialCents: yearTrips.filter((trip) => !trip.done).reduce((sum, trip) => sum + calculateTripDifferentialCents(trip, yearBreakdowns.get(trip.id)?.transportDifferentialCents), 0),
     oldestOpenTrip: yearTrips.filter((trip) => !trip.done).sort((a, b) => a.date.localeCompare(b.date))[0]
   };
+}
+
+export type TripYearMonthSummary = {
+  month: number;
+  monthKey: string;
+  count: number;
+  openCount: number;
+  durationMinutes: number;
+  kilometers: number;
+  totalCents: number;
+  openTotalCents: number;
+  differentialCents: number;
+  oldestOpenDate: string | null;
+};
+
+export function summarizeTripsByYearMonth(trips: Trip[], year: number, today: string, publicTransportTaxFreeYearLimitCents: number | null = null): TripYearMonthSummary[] {
+  const yearTrips = trips.filter((trip) => trip.date.startsWith(`${year}-`));
+  const yearBreakdowns = calculatePublicTransportYearBreakdown(yearTrips, year, publicTransportTaxFreeYearLimitCents);
+  const todayYear = Number(today.slice(0, 4));
+  const todayMonth = Number(today.slice(5, 7));
+  const lastTripMonth = yearTrips.reduce((last, trip) => Math.max(last, Number(trip.date.slice(5, 7)) || 0), 0);
+  const lastMonth = year < todayYear ? 12 : year === todayYear ? Math.max(todayMonth, lastTripMonth) : lastTripMonth;
+  const months: TripYearMonthSummary[] = [];
+
+  for (let month = lastMonth; month >= 1; month -= 1) {
+    const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+    const monthTrips = yearTrips.filter((trip) => trip.date.startsWith(`${monthKey}-`));
+    const openTrips = monthTrips.filter((trip) => !trip.done);
+    months.push({
+      month,
+      monthKey,
+      count: monthTrips.length,
+      openCount: openTrips.length,
+      durationMinutes: monthTrips.reduce((sum, trip) => sum + Math.max(trip.durationMinutes, 0), 0),
+      kilometers: monthTrips.reduce((sum, trip) => sum + Math.max(trip.oneWayKilometers, 0) * 2, 0),
+      totalCents: monthTrips.reduce((sum, trip) => sum + calculateTripTotalCents(trip), 0),
+      openTotalCents: openTrips.reduce((sum, trip) => sum + calculateTripTotalCents(trip), 0),
+      differentialCents: monthTrips.reduce((sum, trip) => sum + calculateTripDifferentialCents(trip, yearBreakdowns.get(trip.id)?.transportDifferentialCents), 0),
+      oldestOpenDate: openTrips.map((trip) => trip.date).sort()[0] ?? null
+    });
+  }
+
+  return months;
 }
 
 export function remainingTransportSubsidyYearLimitCents(transportSubsidyCents: number, publicTransportTaxFreeYearLimitCents: number | null = null): number {

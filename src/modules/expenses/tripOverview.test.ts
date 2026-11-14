@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Trip } from "../../db/schema";
-import { formatTripMonthLabel, groupTripsByMonth, splitTripDateLabel, summarizeTripList, tripCostShares } from "./tripOverview";
+import { summarizeTripsByYear, summarizeTripsByYearMonth } from "./calculations";
+import { addMonthsToDateKey, formatTripMonthLabel, formatTripMonthName, groupTripsByMonth, splitTripDateLabel, summarizeTripList, tripCostShares, tripSubmissionStatus } from "./tripOverview";
 
 const baseTrip: Trip = {
   id: "trip-1",
@@ -63,5 +64,45 @@ describe("trip labels and shares", () => {
   it("calculates cost shares in percent", () => {
     expect(tripCostShares(2000, 2800, 0)).toEqual({ perDiem: 2000 / 4800 * 100, travel: 2800 / 4800 * 100, other: 0 });
     expect(tripCostShares(0, 0, 0)).toEqual({ perDiem: 0, travel: 0, other: 0 });
+  });
+});
+
+describe("trip submission deadline", () => {
+  it("adds months and clamps to the end of shorter months", () => {
+    expect(addMonthsToDateKey("2026-06-05", 6)).toBe("2026-12-05");
+    expect(addMonthsToDateKey("2026-08-31", 6)).toBe("2027-02-28");
+  });
+
+  it("warns after five months and marks trips past six months as overdue", () => {
+    expect(tripSubmissionStatus("2026-06-14", "2026-11-14")).toEqual({ deadline: "2026-12-14", daysLeft: 30, level: "ok" });
+    expect(tripSubmissionStatus("2026-06-05", "2026-11-14")).toEqual({ deadline: "2026-12-05", daysLeft: 21, level: "warning" });
+    expect(tripSubmissionStatus("2026-05-10", "2026-11-14")).toEqual({ deadline: "2026-11-10", daysLeft: -4, level: "overdue" });
+    expect(tripSubmissionStatus("kaputt", "2026-11-14")).toBeNull();
+  });
+});
+
+describe("summarizeTripsByYearMonth", () => {
+  it("lists every month up to today, newest first, with open amounts", () => {
+    const trips = [
+      { ...baseTrip, id: "jun", date: "2026-06-05", done: false },
+      { ...baseTrip, id: "nov-done", date: "2026-11-03", done: true },
+      { ...baseTrip, id: "nov-open", date: "2026-11-12", done: false },
+      { ...baseTrip, id: "old", date: "2025-12-01" }
+    ];
+    const months = summarizeTripsByYearMonth(trips, 2026, "2026-11-14");
+    expect(months.map((month) => month.month)).toEqual([11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(months[0]).toMatchObject({ count: 2, openCount: 1, oldestOpenDate: "2026-11-12", kilometers: 138 });
+    expect(months[0].openTotalCents * 2).toBe(months[0].totalCents);
+    expect(months[1]).toMatchObject({ count: 0, totalCents: 0, oldestOpenDate: null });
+    expect(months[5]).toMatchObject({ count: 1, openCount: 1, oldestOpenDate: "2026-06-05" });
+    expect(summarizeTripsByYearMonth(trips, 2025, "2026-11-14")).toHaveLength(12);
+    expect(summarizeTripsByYearMonth(trips, 2027, "2026-11-14")).toEqual([]);
+    expect(formatTripMonthName(1)).toBe("Jänner");
+  });
+
+  it("splits the open share of the differential in the year summary", () => {
+    const summary = summarizeTripsByYear([baseTrip, { ...baseTrip, id: "done", done: true }], 2026);
+    expect(summary.openPerDiemDifferentialCents * 2).toBe(summary.perDiemDifferentialCents);
+    expect(summary.openDifferentialCents * 2).toBe(summary.differentialCents);
   });
 });
