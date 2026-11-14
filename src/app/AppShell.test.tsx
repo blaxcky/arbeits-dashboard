@@ -146,10 +146,9 @@ describe("vacation planning", () => {
 
     expect(screen.queryByRole("button", { name: /Urlaubstag buchen/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Gleittag buchen/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Urlaub planen" })).toHaveAttribute("href", "#/urlaub");
-
-    fireEvent.click(screen.getByRole("link", { name: "Gleittag planen" }));
-    expect(screen.getByRole("button", { name: /Gleittag/, pressed: true })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Urlaub planen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Gleittag planen" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Zur Jahresplanung" })).toHaveAttribute("href", "#/urlaub");
   });
 
   it("plans a free working day as vacation or flex day from the calendar", () => {

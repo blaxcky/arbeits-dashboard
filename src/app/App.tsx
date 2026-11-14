@@ -3,7 +3,6 @@ import {
   Briefcase,
   CalendarBlank,
   CalendarCheck,
-  CalendarPlus,
   CaretDown,
   CaretLeft,
   CaretRight,
@@ -99,7 +98,7 @@ import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalityS
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
 import { TodosView } from "../modules/todos/TodosView";
-import { AbsencePlanningView, AbsenceRequestAlert, absencePlanHeadline, computeAbsencePlanning, daysLabel, PlannedDayNotice, PlanBar, rememberAbsencePlanMode } from "../modules/time/AbsencePlanningView";
+import { AbsencePlanningView, AbsenceRequestAlert, absencePlanHeadline, computeAbsencePlanning, daysLabel, PlannedDayNotice, PlanBar } from "../modules/time/AbsencePlanningView";
 import { ABSENCE_TYPE_LABELS, ABSENCE_TYPE_LETTERS } from "../modules/time/absencePlanning";
 import {
   applyPointFormStatus,
@@ -502,12 +501,6 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           title="Gleitzeit"
           value={formatSignedMinutes(flex)}
           detail={flexDistanceToLimit >= 0 ? `noch ${formatMinutes(flexDistanceToLimit)} bis Grenze` : `${formatMinutes(Math.abs(flexDistanceToLimit))} über Grenze`}
-          action={
-            <Link className="secondary-button metric-action" to="/urlaub" title="Gleittage werden in der Jahresplanung pro Tag eingetragen und am Tag selbst gebucht" onClick={() => rememberAbsencePlanMode("flex")}>
-              <CalendarPlus size={16} />
-              Gleittag planen
-            </Link>
-          }
           tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"}
           progress={{
             value: flexLimitMinutes > 0 ? flex / flexLimitMinutes : 0,
@@ -556,12 +549,6 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             setVacationEditValue(minutesToHourInput(vacation.remainingMinutes));
             setVacationEditError(undefined);
           }}
-          action={
-            <Link className="secondary-button metric-action" to="/urlaub" title="Urlaubstage werden in der Jahresplanung pro Tag eingetragen und am Tag selbst gebucht" onClick={() => rememberAbsencePlanMode("vacation")}>
-              <CalendarPlus size={16} />
-              Urlaub planen
-            </Link>
-          }
           progress={{ value: vacationEntitlementMinutes > 0 ? vacationRemainingMinutes / vacationEntitlementMinutes : 0, tone: "vacation" }}
         >
           {plannedVacationDays > 0 ? (
