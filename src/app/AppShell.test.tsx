@@ -153,7 +153,7 @@ describe("time tracking dashboard", () => {
 
     expect(screen.getByText("Montag, 03.08.2026 · KW 32")).toBeInTheDocument();
     expect(screen.getByLabelText("Dienstbeginn")).toHaveValue("07:30");
-    expect(screen.getByText("Gearbeitet")).toBeInTheDocument();
+    expect(screen.getByText("8:15 h gearbeitet")).toBeInTheDocument();
     expect(within(week).getByRole("button", { name: /Mo 03\.08\./ })).toHaveAttribute("aria-pressed", "true");
   });
 

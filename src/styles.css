@@ -3627,9 +3627,9 @@ button:disabled {
 
 .day-summary-main {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px 14px;
+  gap: 14px;
+  min-width: 0;
 }
 
 .day-summary-main strong {
@@ -3639,22 +3639,35 @@ button:disabled {
   letter-spacing: -0.02em;
 }
 
-.day-summary-remaining {
+.day-summary-main strong.day-summary-value-muted {
+  color: #b6bfcb;
+}
+
+.day-summary-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--accent-dark);
   font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.95rem;
   font-weight: 700;
 }
 
-.day-summary-hint {
-  margin: 0;
-  color: #374151;
-  font-size: 0.95rem;
-  line-height: 1.45;
+.day-summary-side-muted {
+  color: var(--muted);
+  font-weight: 500;
 }
 
-.day-summary-hint strong {
-  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+.day-summary-side-minus {
+  color: #8a5418;
+}
+
+.day-summary-side-zero {
+  color: #4b5563;
 }
 
 .day-progress {
@@ -3682,8 +3695,8 @@ button:disabled {
 }
 
 .day-summary-scale {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
   color: var(--muted);
   font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
@@ -3691,9 +3704,12 @@ button:disabled {
 }
 
 .day-summary-now {
+  overflow: hidden;
   color: #1f2937;
   font-weight: 700;
   text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .day-card-times {
@@ -3716,9 +3732,11 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-height: 34px;
 }
 
 .time-quick-select {
+  min-height: 34px;
   border-radius: 999px;
   font-weight: 600;
 }

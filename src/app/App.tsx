@@ -578,6 +578,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
               placeholder="07:30"
               error={timeErrors.startTime}
               preferredTime={preferredStartTime}
+              reserveQuickRow
               onChange={(value) => setForm({ ...form, startTime: value })}
               onBlur={(value) => void handleTimeBlur("startTime", value)}
               onPreferredTime={(value) => void selectPreferredTime("startTime", value)}
@@ -590,6 +591,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
               error={endTimeError}
               preferredTime={settings?.preferredWorkEndTime ?? null}
               extraQuickTimes={targetEndQuickTimes}
+              reserveQuickRow
               onChange={(value) => setForm({ ...form, endTime: value })}
               onBlur={(value) => void handleTimeBlur("endTime", value)}
               onPreferredTime={(value) => void selectPreferredTime("endTime", value)}
@@ -3422,60 +3424,50 @@ function DaySummary({
   targetMinutes: number;
   startPreview: { startTime: string; endTime: string | null } | null;
 }) {
+  const emptyTime = "--:--";
+  const progress = day.hasStart ? clampProgress(targetMinutes > 0 ? day.netMinutes / targetMinutes : 0) : 0;
+  let value = day.targetEndTime ?? emptyTime;
+  let valueMuted = false;
+  let side: ReactNode;
+  let scaleStart = startTime ?? emptyTime;
+  let scaleMiddle: ReactNode;
+  let scaleEnd = day.targetEndTime ?? emptyTime;
+  let marker = false;
+
   if (!day.hasStart) {
-    return (
-      <div className="day-summary">
-        <span className="day-summary-label">Noch kein Dienstbeginn</span>
-        {startPreview?.endTime ? (
-          <p className="day-summary-hint">Mit Beginn <strong>{startPreview.startTime}</strong> wäre um <strong>{startPreview.endTime}</strong> Feierabend.</p>
-        ) : (
-          <p className="day-summary-hint">Soll {formatMinutes(targetMinutes)}</p>
-        )}
-      </div>
-    );
+    value = startPreview?.endTime ?? emptyTime;
+    valueMuted = true;
+    side = <span className="day-summary-side day-summary-side-muted">{startPreview?.endTime ? `bei Beginn ${startPreview.startTime}` : `Soll ${formatMinutes(targetMinutes)}`}</span>;
+    scaleStart = emptyTime;
+    scaleMiddle = "noch kein Dienstbeginn";
+    scaleEnd = startPreview?.endTime ?? emptyTime;
+  } else if (day.hasEnd) {
+    value = day.effectiveEndTime ?? emptyTime;
+    side = <span className={`day-summary-side day-summary-side-${deltaTone(day.deltaMinutes)}`}>{formatSignedMinutes(day.deltaMinutes)}</span>;
+    scaleMiddle = `${formatMinutes(day.netMinutes)} gearbeitet`;
+    scaleEnd = day.effectiveEndTime ?? emptyTime;
+  } else if (!isToday) {
+    side = <span className="day-summary-side week-missing"><Warning size={16} weight="duotone" />Dienstende fehlt</span>;
+    scaleMiddle = "Soll-Ende";
+  } else {
+    const remainingMinutes = Math.max(targetMinutes - day.netMinutes, 0);
+    side = <span className="day-summary-side">{remainingMinutes > 0 ? `noch ${formatMinutes(remainingMinutes)}` : `${formatSignedMinutes(day.deltaMinutes)} über Soll`}</span>;
+    scaleMiddle = `jetzt ${day.effectiveEndTime} · ${formatMinutes(day.netMinutes)}`;
+    marker = true;
   }
 
-  const progress = clampProgress(targetMinutes > 0 ? day.netMinutes / targetMinutes : 0);
-
-  if (day.hasEnd) {
-    const tone = deltaTone(day.deltaMinutes);
-    return (
-      <div className="day-summary">
-        <span className="day-summary-label">Gearbeitet</span>
-        <div className="day-summary-main">
-          <strong>{formatMinutes(day.netMinutes)}</strong>
-          <span className={`week-pill week-pill-${tone}`}>{formatSignedMinutes(day.deltaMinutes)}</span>
-        </div>
-        <DayProgress progress={progress} />
-      </div>
-    );
-  }
-
-  if (!isToday) {
-    return (
-      <div className="day-summary">
-        <span className="day-summary-label">Soll-Ende</span>
-        <div className="day-summary-main">
-          <strong>{day.targetEndTime}</strong>
-          <span className="week-missing"><Warning size={16} weight="duotone" />Dienstende fehlt</span>
-        </div>
-      </div>
-    );
-  }
-
-  const remainingMinutes = Math.max(targetMinutes - day.netMinutes, 0);
   return (
     <div className="day-summary">
       <span className="day-summary-label">Feierabend um</span>
       <div className="day-summary-main">
-        <strong>{day.targetEndTime}</strong>
-        <span className="day-summary-remaining">{remainingMinutes > 0 ? `noch ${formatMinutes(remainingMinutes)}` : `Soll erreicht · ${formatSignedMinutes(day.deltaMinutes)}`}</span>
+        <strong className={valueMuted ? "day-summary-value-muted" : undefined}>{value}</strong>
+        {side}
       </div>
-      <DayProgress progress={progress} marker />
+      <DayProgress progress={progress} marker={marker} />
       <div className="day-summary-scale">
-        <span>{startTime}</span>
-        <span className="day-summary-now">jetzt {day.effectiveEndTime} · {formatMinutes(day.netMinutes)}</span>
-        <span>{day.targetEndTime}</span>
+        <span>{scaleStart}</span>
+        <span className="day-summary-now">{scaleMiddle}</span>
+        <span>{scaleEnd}</span>
       </div>
     </div>
   );
@@ -3630,6 +3622,7 @@ export function WorkTimeField({
   error,
   preferredTime,
   extraQuickTimes = [],
+  reserveQuickRow = false,
   onChange,
   onBlur,
   onPreferredTime
@@ -3641,6 +3634,7 @@ export function WorkTimeField({
   error?: string;
   preferredTime: string | null;
   extraQuickTimes?: Array<{ value: string; label: string; ariaLabel: string }>;
+  reserveQuickRow?: boolean;
   onChange: (value: string) => void;
   onBlur: (value: string) => void;
   onPreferredTime: (value: string) => void;
@@ -3659,7 +3653,7 @@ export function WorkTimeField({
         onChange={(event) => onChange(event.target.value)}
         onBlur={(event) => onBlur(event.target.value)}
       />
-      {preferredTime || extraQuickTimes.length ? (
+      {preferredTime || extraQuickTimes.length || reserveQuickRow ? (
         <div className="time-quick-row">
           {preferredTime ? (
             <button
