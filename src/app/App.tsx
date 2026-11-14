@@ -81,11 +81,7 @@ import {
   AUDIT_POINT_CATEGORIES,
   AUDIT_POINT_CATEGORY_RULES,
   calculateAuditPointBreakdown,
-  buildAuditPointYearRows,
-  buildCombinedPointYearRows,
   buildOtherMeasureTypeBreakdown,
-  buildOtherMeasureYearRows,
-  buildUsoYearRows,
   compareAuditPointCases,
   compareOtherMeasures,
   compareUsoCases,
@@ -99,6 +95,7 @@ import {
 } from "../modules/points/calculations";
 import { downloadPointsYearWorkbook } from "../modules/points/yearExport";
 import { formatPointMonthLabel, groupPointCasesByMonth, summarizePointCaseOverview } from "../modules/points/overview";
+import { buildPointYearCases, niceAxisScale, summarizePointYear, type PointYearCase, type PointYearSummary, type PointYearTab } from "../modules/points/yearOverview";
 import { formatTripMonthName, groupTripsByMonth, splitTripDateLabel, summarizeTripList, tripCostShares, tripSubmissionStatus } from "../modules/expenses/tripOverview";
 import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
@@ -1659,28 +1656,38 @@ function AuditPointBreakdownPreview({ breakdown, category }: { breakdown: Return
   );
 }
 
+const POINT_YEAR_TABS: { id: PointYearTab; label: string }[] = [
+  { id: "points", label: "Punkte" },
+  { id: "uso", label: "USO" },
+  { id: "other", label: "Sonstige Maßnahmen" }
+];
+
 export function PointsYearView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const navigate = useNavigate();
   const params = useParams();
   const year = yearFromUrlParam(params.year);
   const yearOptions = pointYearOptions(data.auditPointCases, data.usoCases, data.otherMeasures, currentYear(), year);
-  const auditRows = buildCombinedPointYearRows(data.auditPointCases, data.usoCases, data.otherMeasures, year, data.auditPointGoals);
-  const usoRows = buildUsoYearRows(data.usoCases, year, data.usoGoals);
-  const otherRows = buildOtherMeasureYearRows(data.otherMeasures, year);
-  const otherTypeBreakdown = buildOtherMeasureTypeBreakdown(data.otherMeasures, year);
+  const yearIndex = yearOptions.indexOf(year);
+  const previousYear = yearIndex >= 0 ? yearOptions[yearIndex + 1] : undefined;
+  const nextYear = yearIndex > 0 ? yearOptions[yearIndex - 1] : undefined;
+  const currentMonth = todayKey().slice(0, 7);
   const auditGoal = data.auditPointGoals.find((goal) => goal.year === year);
   const usoGoal = data.usoGoals.find((goal) => goal.year === year);
-  const auditCompleted = auditRows[auditRows.length - 1]?.cumulativeValue ?? 0;
-  const auditOpen = auditRows.reduce((sum, row) => sum + row.openValue, 0);
-  const usoCompleted = usoRows[usoRows.length - 1]?.cumulativeValue ?? 0;
-  const usoOpen = usoRows.reduce((sum, row) => sum + row.openValue, 0);
-  const otherCompleted = otherRows[otherRows.length - 1]?.cumulativeValue ?? 0;
-  const otherOpen = otherRows.reduce((sum, row) => sum + row.openValue, 0);
-  const currentMonth = todayKey().slice(0, 7);
-  const highlightedMonth = currentMonth.startsWith(`${year}-`) ? currentMonth : null;
+  const usoTarget = usoTargetForYear(data.usoGoals, year);
+  const summaries: Record<PointYearTab, PointYearSummary> = {
+    points: summarizePointYear(buildPointYearCases("points", data.auditPointCases, data.usoCases, data.otherMeasures), year, auditGoal?.targetPointsTenths ?? null, currentMonth),
+    uso: summarizePointYear(buildPointYearCases("uso", data.auditPointCases, data.usoCases, data.otherMeasures), year, usoTarget, currentMonth),
+    other: summarizePointYear(buildPointYearCases("other", data.auditPointCases, data.usoCases, data.otherMeasures), year, null, currentMonth)
+  };
+  const otherTypeBreakdown = buildOtherMeasureTypeBreakdown(data.otherMeasures, year);
+  const maxTypeCount = Math.max(1, ...otherTypeBreakdown.map((item) => item.totalCount));
+  const [tab, setTab] = useState<PointYearTab>("points");
+  const [goalEditing, setGoalEditing] = useState<"audit" | "uso" | null>(null);
   const [auditGoalInput, setAuditGoalInput] = useState("");
   const [usoGoalInput, setUsoGoalInput] = useState("");
   const [exporting, setExporting] = useState(false);
+  const activeSummary = summaries[tab];
+  const formatValue = tab === "points" ? formatPointTenths : (value: number) => String(value);
 
   useEffect(() => {
     setAuditGoalInput(auditGoal ? formatPointInput(auditGoal.targetPointsTenths) : "");
@@ -1690,6 +1697,10 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
     setUsoGoalInput(String(usoTargetForYear(data.usoGoals, year)));
   }, [data.usoGoals, year]);
 
+  useEffect(() => {
+    setGoalEditing(null);
+  }, [year]);
+
   async function saveAuditGoal() {
     const targetPointsTenths = parsePointTenthsInput(auditGoalInput);
     if (targetPointsTenths === null) {
@@ -1697,6 +1708,7 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
       return;
     }
     await data.saveAuditPointGoal({ id: auditGoal?.id, year, targetPointsTenths });
+    setGoalEditing(null);
     showToast("BP-Jahresziel gespeichert.");
   }
 
@@ -1707,7 +1719,14 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
       return;
     }
     await data.saveUsoGoal({ id: usoGoal?.id, year, targetCount });
+    setGoalEditing(null);
     showToast("USO-Jahresziel gespeichert.");
+  }
+
+  function cancelGoalEdit() {
+    setAuditGoalInput(auditGoal ? formatPointInput(auditGoal.targetPointsTenths) : "");
+    setUsoGoalInput(String(usoTarget));
+    setGoalEditing(null);
   }
 
   async function exportYear() {
@@ -1731,14 +1750,66 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
     }
   }
 
+  function goalDetail(summary: PointYearSummary, format: (value: number) => string) {
+    const parts = [`${format(summary.openValue)} offen`];
+    if (summary.currentTarget) parts.push(`Soll ${formatMonthName(summary.currentTarget.month)} ${format(summary.currentTarget.value)}`);
+    return parts.join(" · ");
+  }
+
+  function renderGoal(kind: "audit" | "uso") {
+    const label = kind === "audit" ? "Jahresziel BP" : "Jahresziel USO";
+    const value = kind === "audit" ? auditGoalInput : usoGoalInput;
+    const setValue = kind === "audit" ? setAuditGoalInput : setUsoGoalInput;
+    const display = kind === "audit" ? (auditGoal ? formatPointTenths(auditGoal.targetPointsTenths) : "-") : String(usoTarget);
+    if (goalEditing === kind) {
+      return (
+        <form className="year-limit-inline" onSubmit={(event) => { event.preventDefault(); void (kind === "audit" ? saveAuditGoal() : saveUsoGoal()); }}>
+          <label htmlFor={`points-goal-${kind}`}>{label} {year}</label>
+          <div className="year-limit-inline-row">
+            <input
+              id={`points-goal-${kind}`}
+              inputMode={kind === "audit" ? "decimal" : "numeric"}
+              placeholder={kind === "audit" ? "0" : "8"}
+              value={value}
+              autoFocus
+              onKeyDown={(event) => { if (event.key === "Escape") cancelGoalEdit(); }}
+              onChange={(event) => setValue(event.target.value)}
+            />
+            <button className="primary-button" type="submit">Speichern</button>
+          </div>
+          <button className="link-button year-limit-cancel" type="button" onClick={cancelGoalEdit}>Abbrechen</button>
+        </form>
+      );
+    }
+    return (
+      <div className="year-limit-summary">
+        <span>{label} {year}: {display}</span>
+        <button className="link-button" type="button" aria-label={`${label} ${year} ändern`} onClick={() => setGoalEditing(kind)}>Ändern</button>
+      </div>
+    );
+  }
+
+  const points = summaries.points;
+  const uso = summaries.uso;
+  const other = summaries.other;
+  const otherTotal = other.completedValue + other.openValue;
+
   return (
-    <section className="page-stack">
-      <Header eyebrow="Punkte" title="Jahresübersicht" />
-      <div className="panel">
-        <div className="panel-heading year-overview-heading">
-          <span className="section-label">Jahreswerte {year}</span>
-          <div className="year-overview-actions">
-            <label className="year-select">
+    <section className="page-stack dashboard-page points-year-page">
+      <header className="dashboard-header">
+        <div className="trips-title">
+          <span className="section-label">Punkte</span>
+          <h1>Jahresübersicht</h1>
+        </div>
+        <div className="trips-header-actions">
+          <button className="secondary-button" type="button" disabled={exporting} onClick={() => void exportYear()}>
+            <DownloadSimple size={17} aria-hidden="true" /> {exporting ? "Excel wird erstellt …" : "Excel exportieren"}
+          </button>
+          <div className="year-stepper" role="group" aria-label="Jahr wählen">
+            <button className="icon-button" type="button" title="Vorjahr" aria-label="Vorjahr" disabled={previousYear === undefined} onClick={() => { if (previousYear !== undefined) navigate(`/punkte/jahr/${previousYear}`); }}>
+              <CaretLeft size={17} aria-hidden="true" />
+            </button>
+            <label className="year-stepper-select">
               <span>Jahr</span>
               <select value={year} onChange={(event) => navigate(`/punkte/jahr/${event.target.value}`)}>
                 {yearOptions.map((optionYear) => (
@@ -1746,129 +1817,275 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
                 ))}
               </select>
             </label>
-            <button className="secondary-button" type="button" disabled={exporting} onClick={() => void exportYear()}>
-              <DownloadSimple size={17} /> {exporting ? "Excel wird erstellt …" : "Excel exportieren"}
+            <button className="icon-button" type="button" title="Folgejahr" aria-label="Folgejahr" disabled={nextYear === undefined} onClick={() => { if (nextYear !== undefined) navigate(`/punkte/jahr/${nextYear}`); }}>
+              <CaretRight size={17} aria-hidden="true" />
             </button>
           </div>
         </div>
-        <dl className="detail-list points-year-summary">
-          <div><dt>BP Ist</dt><dd>{formatPointTenths(auditCompleted)}</dd></div>
-          <div><dt>BP offen</dt><dd>{formatPointTenths(auditOpen)}</dd></div>
-          <div><dt>BP Jahresziel</dt><dd>{auditGoal ? formatPointTenths(auditGoal.targetPointsTenths) : "-"}</dd></div>
-          <div><dt>USO Ist</dt><dd>{usoCompleted}</dd></div>
-          <div><dt>USO offen</dt><dd>{usoOpen}</dd></div>
-          <div><dt>USO Jahresziel</dt><dd>{usoTargetForYear(data.usoGoals, year)}</dd></div>
-          <div><dt>Sonstige Ist</dt><dd>{otherCompleted}</dd></div>
-          <div><dt>Sonstige offen</dt><dd>{otherOpen}</dd></div>
-          <div><dt>Sonstige gesamt</dt><dd>{otherCompleted + otherOpen}</dd></div>
-        </dl>
-      </div>
-      <div className="settings-grid">
-        <section className="panel">
-          <div className="panel-heading">
-            <span className="section-label">Betriebsprüfungen</span>
-            <div className="points-goal-form">
-              <Field label="Jahresziel BP">
-                <input inputMode="decimal" placeholder="0" value={auditGoalInput} onChange={(event) => setAuditGoalInput(event.target.value)} />
-              </Field>
-              <button className="secondary-button" type="button" onClick={() => void saveAuditGoal()}>
-                <Plus size={17} /> Ziel speichern
-              </button>
+      </header>
+
+      <section className="dashboard-metrics points-year-metrics" aria-label="Kennzahlen">
+        <Metric
+          title={`Punkte ${year}`}
+          value={formatPointTenths(points.completedValue)}
+          detail={goalDetail(points, formatPointTenths)}
+          progress={points.goal ? { value: points.completedValue / points.goal } : undefined}
+        >
+          {renderGoal("audit")}
+        </Metric>
+        <Metric
+          title={`USO ${year}`}
+          value={String(uso.completedValue)}
+          detail={goalDetail(uso, String)}
+          progress={uso.goal ? { value: uso.completedValue / uso.goal } : undefined}
+        >
+          {renderGoal("uso")}
+        </Metric>
+        <Metric
+          title={`Sonstige Maßnahmen ${year}`}
+          value={String(other.completedValue)}
+          detail={`${other.openValue} offen · ${otherTotal} gesamt`}
+          progress={otherTotal > 0 ? { value: other.completedValue / otherTotal } : undefined}
+        />
+      </section>
+
+      <div className="points-year-workspace">
+        <section className="panel points-year-main" aria-label="Monate">
+          <div className="points-year-toolbar">
+            <div className="trip-tabs" role="tablist" aria-label="Bereich">
+              {POINT_YEAR_TABS.map((option) => (
+                <button
+                  key={option.id}
+                  id={`points-year-tab-${option.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === option.id}
+                  aria-controls="points-year-tabpanel"
+                  tabIndex={tab === option.id ? 0 : -1}
+                  onClick={() => setTab(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="points-year-legend" aria-hidden="true">
+              <span><i className="is-stand" />Stand</span>
+              <span><i className="is-projection" />inkl. offene Fälle</span>
+              {activeSummary.goal !== null ? <span><i className="is-target" />Soll</span> : null}
             </div>
           </div>
-          <PointsYearTable rows={auditRows} valueFormatter={formatPointTenths} highlightedMonth={highlightedMonth} />
-        </section>
-        <section className="panel">
-          <div className="panel-heading">
-            <span className="section-label">USO</span>
-            <div className="points-goal-form">
-              <Field label="Jahresziel USO">
-                <input inputMode="numeric" placeholder="8" value={usoGoalInput} onChange={(event) => setUsoGoalInput(event.target.value)} />
-              </Field>
-              <button className="secondary-button" type="button" onClick={() => void saveUsoGoal()}>
-                <Plus size={17} /> Ziel speichern
-              </button>
-            </div>
+          <div id="points-year-tabpanel" role="tabpanel" aria-labelledby={`points-year-tab-${tab}`} className="points-year-tabpanel">
+            <PointsYearChart summary={activeSummary} formatValue={formatValue} currentMonth={currentMonth} />
+            <PointsYearRemainder summary={activeSummary} formatValue={formatValue} showCaseValues={tab === "points"} />
           </div>
-          <PointsYearTable rows={usoRows} valueFormatter={(value) => String(value)} highlightedMonth={highlightedMonth} />
         </section>
-        <section className="panel">
-          <div className="panel-heading">
-            <span className="section-label">Sonstige Maßnahmen</span>
-          </div>
-          <OtherMeasureYearTable rows={otherRows} highlightedMonth={highlightedMonth} />
-          <div className="points-type-breakdown">
-            <span className="section-label">Art</span>
-            {otherTypeBreakdown.length === 0 ? <p className="muted">Keine sonstigen Maßnahmen in diesem Jahr.</p> : null}
-            {otherTypeBreakdown.length > 0 ? (
-              <dl className="detail-list">
-                {otherTypeBreakdown.map((item) => (
-                  <div key={item.measureType}>
-                    <dt>{item.measureType}</dt>
-                    <dd>{item.completedCount} erledigt / {item.openCount} offen / {item.totalCount} gesamt</dd>
+
+        <section className="panel points-year-types" aria-labelledby="points-year-types-heading">
+          <span id="points-year-types-heading" className="section-label">Sonstige Maßnahmen nach Art</span>
+          {otherTypeBreakdown.length === 0 ? <p className="muted">Keine sonstigen Maßnahmen in diesem Jahr.</p> : null}
+          {otherTypeBreakdown.length > 0 ? (
+            <ul className="points-year-type-list">
+              {otherTypeBreakdown.map((item) => (
+                <li key={item.measureType}>
+                  <div className="points-year-type-head">
+                    <strong>{item.measureType}</strong>
+                    <span>{[item.completedCount > 0 ? `${item.completedCount} erledigt` : "", item.openCount > 0 ? `${item.openCount} offen` : ""].filter(Boolean).join(" · ")}</span>
                   </div>
-                ))}
-              </dl>
-            ) : null}
-          </div>
+                  <div className="points-year-bar" aria-hidden="true">
+                    {item.completedCount > 0 ? <span className="is-done" style={{ width: `${(item.completedCount / maxTypeCount) * 100}%` }} /> : null}
+                    {item.openCount > 0 ? <span className="is-open" style={{ width: `${(item.openCount / maxTypeCount) * 100}%` }} /> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </section>
       </div>
     </section>
   );
 }
 
-function PointsYearTable({ rows, valueFormatter, highlightedMonth }: { rows: ReturnType<typeof buildAuditPointYearRows>; valueFormatter: (value: number) => string; highlightedMonth: string | null }) {
+const CHART_WIDTH = 740;
+const CHART_HEIGHT = 200;
+const CHART_LEFT = 44;
+const CHART_RIGHT = 700;
+const CHART_TOP = 20;
+const CHART_BOTTOM = 170;
+const SHORT_MONTH_NAMES = ["Jän", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+
+function PointsYearChart({ summary, formatValue, currentMonth }: { summary: PointYearSummary; formatValue: (value: number) => string; currentMonth: string }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const { stand, projection, target } = summary.series;
+  const highest = Math.max(0, ...[...stand, ...projection, ...target].map((value) => value ?? 0));
+  const scale = niceAxisScale(highest, formatValue === formatPointTenths ? 10 : 1);
+  const step = (CHART_RIGHT - CHART_LEFT) / 11;
+  const x = (index: number) => CHART_LEFT + index * step;
+  const y = (value: number) => CHART_BOTTOM - (value / scale.max) * (CHART_BOTTOM - CHART_TOP);
+  const ticks = Array.from({ length: Math.round(scale.max / scale.step) + 1 }, (_, index) => index * scale.step);
+  const points = (values: (number | null)[]) => values.flatMap((value, index) => (value === null ? [] : [`${x(index).toFixed(1)},${y(value).toFixed(1)}`])).join(" ");
+  const standPoints = points(stand);
+  const projectionPoints = points(projection);
+  const targetPoints = points(target);
+  const lastStandIndex = stand.reduce<number>((last, value, index) => (value === null ? last : index), -1);
+  const lastProjectionIndex = projection.reduce<number>((last, value, index) => (value === null ? last : index), -1);
+  const currentIndex = currentMonth.startsWith(`${summary.year}-`) ? Number(currentMonth.slice(5, 7)) - 1 : -1;
+  const lastStandValue = lastStandIndex >= 0 ? stand[lastStandIndex] : null;
+  const lastProjectionValue = lastProjectionIndex >= 0 ? projection[lastProjectionIndex] : null;
+  const lastTargetValue = target[11];
+  const description = [
+    lastStandValue !== null ? `Stand ${formatMonthName(`${summary.year}-${String(lastStandIndex + 1).padStart(2, "0")}`)} ${formatValue(lastStandValue)}` : "",
+    lastProjectionValue !== null ? `inklusive offener Fälle ${formatValue(lastProjectionValue)}` : "",
+    lastTargetValue !== null ? `Soll Dezember ${formatValue(lastTargetValue)}` : ""
+  ].filter(Boolean).join(", ");
+  const tooltip = hovered === null ? null : {
+    month: formatMonthName(`${summary.year}-${String(hovered + 1).padStart(2, "0")}`),
+    lines: [
+      stand[hovered] !== null ? `Stand ${formatValue(stand[hovered] ?? 0)}` : "",
+      projection[hovered] !== null && hovered !== lastStandIndex ? `inkl. offene Fälle ${formatValue(projection[hovered] ?? 0)}` : "",
+      target[hovered] !== null ? `Soll ${formatValue(target[hovered] ?? 0)}` : ""
+    ].filter(Boolean)
+  };
+  const tooltipWidth = 150;
+  const tooltipX = hovered === null ? 0 : Math.min(Math.max(x(hovered) - tooltipWidth / 2, CHART_LEFT), CHART_WIDTH - tooltipWidth - 4);
+  const endLabels = [
+    lastTargetValue !== null && lastTargetValue !== undefined ? { key: "target", value: lastTargetValue, y: y(lastTargetValue), className: "is-target" } : null,
+    lastProjectionIndex === 11 && lastProjectionValue !== null ? { key: "projection", value: lastProjectionValue, y: y(lastProjectionValue), className: "is-projection" } : null
+  ].filter((label): label is { key: string; value: number; y: number; className: string } => label !== null).sort((left, right) => left.y - right.y);
+  for (let index = 1; index < endLabels.length; index += 1) {
+    if (endLabels[index].y - endLabels[index - 1].y < 14) endLabels[index].y = endLabels[index - 1].y + 14;
+  }
+
   return (
-    <div className="points-year-table-wrap">
-      <table className="points-year-table">
-        <thead>
-          <tr>
-            <th>Monat</th>
-            <th>Abgabe</th>
-            <th>Soll</th>
-            <th>Stand</th>
-            <th>noch offen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.month} className={row.month === highlightedMonth ? "points-year-current-month" : undefined}>
-              <th scope="row">{formatMonthName(row.month)}</th>
-              <td>{valueFormatter(row.submissionValue)}</td>
-              <td>{row.targetValue === null ? "-" : valueFormatter(row.targetValue)}</td>
-              <td>{valueFormatter(row.cumulativeValue)}</td>
-              <td className={row.targetReached ? "points-year-ok" : ""}>{row.targetReached ? "OK" : row.remainingValue === null ? "-" : valueFormatter(row.remainingValue)}</td>
-            </tr>
+    <svg className="points-year-chart" viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} role="img" aria-label={description ? `Verlauf ${summary.year}: ${description}` : `Verlauf ${summary.year}: keine Werte`} onMouseLeave={() => setHovered(null)}>
+      {currentIndex >= 0 ? <rect className="points-year-chart-current" x={x(currentIndex) - step / 2 + 2} y={CHART_TOP - 4} width={step - 4} height={CHART_BOTTOM - CHART_TOP + 8} rx={6} /> : null}
+      {ticks.map((tick) => (
+        <g key={tick}>
+          <line className="points-year-chart-grid" x1={CHART_LEFT} x2={CHART_RIGHT} y1={y(tick)} y2={y(tick)} />
+          <text className="points-year-chart-axis" x={CHART_LEFT - 8} y={y(tick) + 4} textAnchor="end">{formatValue(tick)}</text>
+        </g>
+      ))}
+      {lastStandIndex >= 0 ? <polygon className="points-year-chart-area" points={`${standPoints} ${x(lastStandIndex).toFixed(1)},${CHART_BOTTOM} ${x(0).toFixed(1)},${CHART_BOTTOM}`} /> : null}
+      {targetPoints ? <polyline className="points-year-chart-target" points={targetPoints} /> : null}
+      {projectionPoints ? <polyline className="points-year-chart-projection" points={projectionPoints} /> : null}
+      {standPoints ? <polyline className="points-year-chart-stand" points={standPoints} /> : null}
+      {lastStandValue !== null ? (
+        <>
+          <circle className="points-year-chart-dot" cx={x(lastStandIndex)} cy={y(lastStandValue)} r={4.5} />
+          <text className="points-year-chart-value is-stand" x={x(lastStandIndex) - 6} y={y(lastStandValue) + 20} textAnchor="end">{formatValue(lastStandValue)}</text>
+        </>
+      ) : null}
+      {lastProjectionIndex === 11 && lastProjectionValue !== null ? <circle className="points-year-chart-dot is-projection" cx={x(11)} cy={y(lastProjectionValue)} r={4} /> : null}
+      {endLabels.map((label) => (
+        <text key={label.key} className={`points-year-chart-value ${label.className}`} x={CHART_RIGHT + 8} y={label.y + 4}>{formatValue(label.value)}</text>
+      ))}
+      {SHORT_MONTH_NAMES.map((name, index) => (
+        <text key={name} className={`points-year-chart-month${index === currentIndex ? " is-current" : ""}`} x={x(index)} y={CHART_HEIGHT - 6} textAnchor="middle">{name}</text>
+      ))}
+      {hovered !== null ? <line className="points-year-chart-crosshair" x1={x(hovered)} x2={x(hovered)} y1={CHART_TOP} y2={CHART_BOTTOM} /> : null}
+      {SHORT_MONTH_NAMES.map((name, index) => (
+        <rect key={`hit-${name}`} className="points-year-chart-hit" x={x(index) - step / 2} y={0} width={step} height={CHART_HEIGHT} onMouseEnter={() => setHovered(index)} />
+      ))}
+      {tooltip && tooltip.lines.length > 0 ? (
+        <g className="points-year-chart-tooltip" pointerEvents="none">
+          <rect x={tooltipX} y={CHART_TOP} width={tooltipWidth} height={22 + tooltip.lines.length * 15} rx={6} />
+          <text x={tooltipX + 10} y={CHART_TOP + 16} className="is-month">{tooltip.month}</text>
+          {tooltip.lines.map((line, index) => (
+            <text key={line} x={tooltipX + 10} y={CHART_TOP + 32 + index * 15}>{line}</text>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </g>
+      ) : null}
+    </svg>
   );
 }
 
-function OtherMeasureYearTable({ rows, highlightedMonth }: { rows: ReturnType<typeof buildOtherMeasureYearRows>; highlightedMonth: string | null }) {
+function pointYearMonthValueLabel(month: { completedValue: number; openValue: number; completedCases: unknown[]; openCases: unknown[] }, formatValue: (value: number) => string): string {
+  const parts = [];
+  if (month.completedCases.length > 0) parts.push(`${formatValue(month.completedValue)} erledigt`);
+  if (month.openCases.length > 0) parts.push(`${formatValue(month.openValue)} offen`);
+  return parts.length > 0 ? parts.join(" · ") : "–";
+}
+
+function PointsYearCaseList({ cases, formatValue, showValues }: { cases: PointYearCase[]; formatValue: (value: number) => string; showValues: boolean }) {
+  if (cases.length === 0) return null;
   return (
-    <div className="points-year-table-wrap">
-      <table className="points-year-table points-other-year-table">
-        <thead>
-          <tr>
-            <th>Monat</th>
-            <th>Erledigt</th>
-            <th>Offen</th>
-            <th>Stand</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.month} className={row.month === highlightedMonth ? "points-year-current-month" : undefined}>
-              <th scope="row">{formatMonthName(row.month)}</th>
-              <td>{row.completedValue}</td>
-              <td>{row.openValue}</td>
-              <td>{row.cumulativeValue}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <ul className="point-year-cases">
+      {cases.map((pointCase) => (
+        <li key={`${pointCase.kind}-${pointCase.id}`}>
+          <span>{pointCase.title}{pointCase.detail ? <small>{pointCase.detail}</small> : null}</span>
+          {showValues ? <b className={pointCase.value === 0 ? "is-empty" : undefined}>{pointCase.value === 0 ? "–" : formatValue(pointCase.value)}</b> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PointsYearRemainder({ summary, formatValue, showCaseValues }: { summary: PointYearSummary; formatValue: (value: number) => string; showCaseValues: boolean }) {
+  const [pastOpen, setPastOpen] = useState(false);
+  const { past, months, withoutMonth } = summary.remainder;
+  const { calc } = summary;
+  const calcRow = (sign: string, label: string, value: number, className?: string) => (
+    <div className={className}><span aria-hidden="true">{sign}</span><dt>{label}</dt><dd>{formatValue(value)}</dd></div>
+  );
+
+  return (
+    <div className="points-year-rest">
+      <div className="point-year-months">
+        {past ? (
+          <section className="point-year-month is-past" aria-label={past.label}>
+            <div className="point-year-month-head">
+              <button className="point-year-past-toggle" type="button" aria-expanded={pastOpen} onClick={() => setPastOpen((open) => !open)}>
+                {pastOpen ? <CaretDown size={15} aria-hidden="true" /> : <CaretRight size={15} aria-hidden="true" />}
+                {past.label}
+              </button>
+              <span><b>{formatValue(past.completedValue)}</b> erledigt</span>
+            </div>
+            {pastOpen ? (
+              past.months.length > 0 ? (
+                <ul className="point-year-cases">
+                  {past.months.map((month) => (
+                    <li key={month.month}>
+                      <span>{formatMonthName(month.month)}<small>{month.completedCases.map((pointCase) => pointCase.title).join(", ")}</small></span>
+                      {showCaseValues ? <b className={month.completedValue === 0 ? "is-empty" : undefined}>{month.completedValue === 0 ? "–" : formatValue(month.completedValue)}</b> : <b>{formatValue(month.completedValue)}</b>}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="point-year-empty">Keine erledigten Fälle.</p>
+            ) : null}
+          </section>
+        ) : null}
+        {months.map((month) => {
+          const label = formatPointMonthLabel(month.month);
+          return (
+            <section key={month.month} className={`point-year-month${month.current ? " is-current" : ""}`} aria-label={label}>
+              <div className="point-year-month-head">
+                <strong>{formatMonthName(month.month)}</strong>
+                <span>{pointYearMonthValueLabel(month, formatValue)}</span>
+              </div>
+              <PointsYearCaseList cases={month.openCases} formatValue={formatValue} showValues={showCaseValues} />
+            </section>
+          );
+        })}
+        {withoutMonth ? (
+          <section className="point-year-month is-without-month" aria-label="ohne Abgabemonat">
+            <div className="point-year-month-head">
+              <strong><Warning size={15} weight="bold" aria-hidden="true" />ohne Abgabemonat</strong>
+              <span><b>{formatValue(withoutMonth.openValue)}</b> offen</span>
+            </div>
+            <PointsYearCaseList cases={withoutMonth.cases} formatValue={formatValue} showValues={showCaseValues} />
+          </section>
+        ) : null}
+        {!past && months.length === 0 && !withoutMonth ? <p className="muted">Keine Fälle in diesem Jahr.</p> : null}
+      </div>
+      <div className="points-calc points-year-calc">
+        <dl aria-label="Rechnung">
+          {calcRow("", "erledigt", calc.completedValue)}
+          {calcRow("+", "offen", calc.openValue, calc.openValue === 0 ? "is-zero" : undefined)}
+          {calc.withoutMonthValue !== null ? calcRow("+", "ohne Abgabemonat", calc.withoutMonthValue, "is-without-month") : null}
+          {calcRow("=", calc.goal === null ? "gesamt" : "möglich", calc.possibleValue, "points-calc-total")}
+          {calc.goal !== null ? calcRow("", "Jahresziel", calc.goal) : null}
+          {calc.difference !== null ? calcRow("", calc.difference >= 0 ? "über Jahresziel" : "fehlt", Math.abs(calc.difference), calc.difference >= 0 ? "is-reached" : "is-missing") : null}
+        </dl>
+      </div>
     </div>
   );
 }

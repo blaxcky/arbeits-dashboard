@@ -176,6 +176,117 @@ describe("PointsYearView Excel export", () => {
   });
 });
 
+describe("PointsYearView overview", () => {
+  const timestamp = "2026-01-01T08:00:00.000Z";
+  const audit = { taxNumber: "", firm: "", category: "M1", periodStartYear: 2021, periodEndYear: 2023, additionalResultCents: 0, section99: false, status: "in_progress", submittedPointsTenths: null, submittedAt: null, createdAt: timestamp, updatedAt: timestamp };
+
+  function yearData() {
+    return {
+      auditPointCases: [
+        { ...audit, id: "a1", name: "Steiner", status: "completed", submittedPointsTenths: 150, submissionMonth: "2026-03" },
+        { ...audit, id: "a2", name: "Huber Bau GmbH", submissionMonth: "2026-11" },
+        { ...audit, id: "a3", name: "Moser KG", category: "K1", periodStartYear: 2022, periodEndYear: 2024, submissionMonth: "2026-12" },
+        { ...audit, id: "a4", name: "Lindner OG", submissionMonth: "" }
+      ],
+      auditPointGoals: [{ id: "g1", year: 2026, targetPointsTenths: 300, createdAt: timestamp, updatedAt: timestamp }],
+      usoCases: [
+        { id: "u1", title: "USO Gastro Mayr", submissionMonth: "2026-11", status: "in_progress", createdAt: timestamp, updatedAt: timestamp },
+        { id: "u2", title: "USO Bäckerei", submissionMonth: "2026-05", status: "completed", createdAt: timestamp, updatedAt: timestamp }
+      ],
+      usoGoals: [],
+      otherMeasures: [
+        { id: "o1", title: "Kassennachschau Café Zentral", measureType: "Registrierkassennachschau", manualPointsTenths: 5, submissionMonth: "2026-06", status: "completed", createdAt: timestamp, updatedAt: timestamp }
+      ],
+      saveAuditPointGoal: vi.fn(async () => undefined),
+      saveUsoGoal: vi.fn(async () => undefined)
+    } as unknown as Parameters<typeof PointsYearView>[0]["data"];
+  }
+
+  function renderYear(data = yearData()) {
+    render(
+      <MemoryRouter initialEntries={["/punkte/jahr/2026"]}>
+        <Routes>
+          <Route path="/punkte/jahr/:year" element={<PointsYearView data={data} showToast={vi.fn()} />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    return data;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-14T10:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows key figures with the monthly target and the yearly goals", () => {
+    renderYear();
+    const metrics = screen.getByRole("region", { name: "Kennzahlen" });
+
+    expect(metrics).toHaveTextContent("Punkte 202615,5");
+    expect(metrics).toHaveTextContent("17 offen · Soll November 27,5");
+    expect(metrics).toHaveTextContent("Jahresziel BP 2026: 30");
+    expect(metrics).toHaveTextContent("USO 20261");
+    expect(metrics).toHaveTextContent("1 offen · Soll November 8");
+    expect(metrics).toHaveTextContent("Jahresziel USO 2026: 8");
+    expect(metrics).toHaveTextContent("Sonstige Maßnahmen 20261");
+    expect(metrics).toHaveTextContent("0 offen · 1 gesamt");
+  });
+
+  it("lists the rest of the year with cases and counts cases without month into the calculation", () => {
+    renderYear();
+    const panel = screen.getByRole("tabpanel");
+
+    expect(within(panel).getByRole("region", { name: "Jänner – Oktober" })).toHaveTextContent("15,5 erledigt");
+    const november = within(panel).getByRole("region", { name: "November 2026" });
+    expect(november).toHaveTextContent("10 offen");
+    expect(within(november).getByText("Huber Bau GmbH")).toBeInTheDocument();
+    expect(within(november).getByText("USO Gastro Mayr")).toBeInTheDocument();
+    expect(within(panel).getByRole("region", { name: "Dezember 2026" })).toHaveTextContent("Moser KG");
+    expect(within(panel).getByRole("region", { name: "ohne Abgabemonat" })).toHaveTextContent("Lindner OG");
+
+    const calculation = within(panel).getByLabelText("Rechnung");
+    expect(calculation).toHaveTextContent("erledigt15,5");
+    expect(calculation).toHaveTextContent("ohne Abgabemonat10");
+    expect(calculation).toHaveTextContent("möglich42,5");
+    expect(calculation).toHaveTextContent("über Jahresziel12,5");
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Jänner – Oktober" }));
+    expect(within(panel).getByText("März")).toBeInTheDocument();
+  });
+
+  it("switches between points, USO and other measures", () => {
+    renderYear();
+
+    fireEvent.click(screen.getByRole("tab", { name: "USO" }));
+    let calculation = within(screen.getByRole("tabpanel")).getByLabelText("Rechnung");
+    expect(calculation).toHaveTextContent("möglich2");
+    expect(calculation).toHaveTextContent("fehlt6");
+    expect(calculation).not.toHaveTextContent("ohne Abgabemonat");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sonstige Maßnahmen" }));
+    calculation = within(screen.getByRole("tabpanel")).getByLabelText("Rechnung");
+    expect(calculation).toHaveTextContent("gesamt1");
+    expect(calculation).not.toHaveTextContent("Jahresziel");
+  });
+
+  it("changes the yearly goal directly in the key figure", async () => {
+    const data = renderYear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Jahresziel BP 2026 ändern" }));
+    fireEvent.change(screen.getByLabelText("Jahresziel BP 2026"), { target: { value: "40" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    });
+
+    expect(data.saveAuditPointGoal).toHaveBeenCalledWith({ id: "g1", year: 2026, targetPointsTenths: 400 });
+    expect(screen.queryByLabelText("Jahresziel BP 2026")).not.toBeInTheDocument();
+  });
+});
+
 describe("CollapsiblePointLists", () => {
   const storageKey = "arbeits-dashboard:points-list-visibility";
 

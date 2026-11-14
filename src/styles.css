@@ -1479,85 +1479,6 @@ button:disabled {
   text-align: right;
 }
 
-.points-year-summary {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 18px;
-}
-
-.points-year-summary div {
-  min-width: 0;
-}
-
-.points-goal-form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.points-goal-form .field {
-  min-width: 150px;
-}
-
-.points-year-table-wrap {
-  overflow-x: auto;
-  margin-top: 14px;
-}
-
-.points-year-table {
-  width: 100%;
-  min-width: 440px;
-  border-collapse: collapse;
-  table-layout: auto;
-  font-size: 0.86rem;
-}
-
-.points-other-year-table {
-  min-width: 390px;
-}
-
-.points-year-table th,
-.points-year-table td {
-  border: 1px solid #e5ebf2;
-  padding: 8px 7px;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.points-year-table thead th {
-  background: #f4f7fa;
-  color: #56657a;
-  font-size: 0.75rem;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.points-year-table th:first-child,
-.points-year-table td:first-child {
-  text-align: left;
-}
-
-.points-year-table tbody th {
-  color: #334155;
-  font-weight: 900;
-}
-
-.points-year-table tbody tr.points-year-current-month {
-  background: #eef6f4;
-  font-weight: 900;
-}
-
-.points-year-table tbody tr.points-year-current-month th,
-.points-year-table tbody tr.points-year-current-month td {
-  border-color: #d2e5e1;
-}
-
-.points-year-ok {
-  color: #16734d;
-  font-weight: 900;
-}
-
 .point-case-data {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -1566,14 +1487,6 @@ button:disabled {
 .trip-actions.point-case-actions {
   width: 84px;
   flex-wrap: nowrap;
-}
-
-.points-type-breakdown {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #eef1f5;
 }
 
 .primary-button,
@@ -2873,7 +2786,6 @@ button:disabled {
   .settings-layout,
   .form-section-body,
   .trip-form-grid,
-  .points-year-summary,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -2920,10 +2832,6 @@ button:disabled {
 
   .point-case-metrics:empty {
     display: none;
-  }
-
-  .points-goal-form {
-    justify-content: flex-start;
   }
 
   .trip-actions.point-case-actions {
@@ -5441,4 +5349,391 @@ button.week-line:focus-visible {
   .point-case-row > .point-case-result:empty {
     display: none;
   }
+}
+
+/* Punkte-Jahresübersicht: Verlauf, Monate bis Jahresende, Rechnung */
+.points-year-workspace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.points-year-main {
+  flex: 999 1 560px;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px 20px;
+}
+
+.points-year-types {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px 20px;
+}
+
+.points-year-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.points-year-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
+.points-year-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.points-year-legend i {
+  display: block;
+  width: 22px;
+  height: 0;
+  border-top: 2.5px solid #2f6f73;
+}
+
+.points-year-legend i.is-projection {
+  border-top: 2px dashed #5f9ea2;
+}
+
+.points-year-legend i.is-target {
+  border-top: 2px dotted #8a94a3;
+}
+
+.points-year-tabpanel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.points-year-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.points-year-chart-current {
+  fill: #eef4f4;
+}
+
+.points-year-chart-grid {
+  stroke: #eef0f3;
+  stroke-width: 1;
+}
+
+.points-year-chart-axis,
+.points-year-chart-month {
+  fill: #5f6b7c;
+  font-size: 11px;
+}
+
+.points-year-chart-axis,
+.points-year-chart-value,
+.points-year-chart-tooltip text {
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.points-year-chart-month.is-current {
+  fill: var(--accent-dark);
+  font-weight: 800;
+}
+
+.points-year-chart-area {
+  fill: #2f6f73;
+  fill-opacity: 0.08;
+}
+
+.points-year-chart-stand,
+.points-year-chart-projection,
+.points-year-chart-target {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.points-year-chart-stand {
+  stroke: #2f6f73;
+  stroke-width: 2.5;
+}
+
+.points-year-chart-projection {
+  stroke: #5f9ea2;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+
+.points-year-chart-target {
+  stroke: #8a94a3;
+  stroke-width: 1.5;
+  stroke-dasharray: 1 4;
+}
+
+.points-year-chart-dot {
+  fill: #2f6f73;
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.points-year-chart-dot.is-projection {
+  fill: #fff;
+  stroke: #5f9ea2;
+}
+
+.points-year-chart-value {
+  fill: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.points-year-chart-value.is-stand {
+  fill: var(--accent-dark);
+}
+
+.points-year-chart-crosshair {
+  stroke: #c3cad4;
+  stroke-width: 1;
+}
+
+.points-year-chart-hit {
+  fill: transparent;
+}
+
+.points-year-chart-tooltip rect {
+  fill: #1f2937;
+}
+
+.points-year-chart-tooltip text {
+  fill: #fff;
+  font-size: 12px;
+}
+
+.points-year-chart-tooltip text.is-month {
+  fill: #c9d1db;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.points-year-rest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 24px;
+}
+
+.point-year-months {
+  flex: 999 1 340px;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.point-year-month {
+  display: grid;
+  gap: 3px;
+  padding: 11px 14px;
+  border: 1px solid #e3e7ee;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.point-year-month.is-past {
+  background: #fafbfc;
+}
+
+.point-year-month.is-current {
+  border-color: #cfe0e1;
+  background: #f3f8f8;
+}
+
+.point-year-month.is-without-month {
+  border-color: #e8d3a6;
+  background: #fffdf8;
+}
+
+.point-year-month-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.point-year-month-head > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.92rem;
+}
+
+.point-year-month.is-without-month .point-year-month-head > strong {
+  color: #7a5418;
+}
+
+.point-year-month-head > span {
+  color: #4b5563;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.point-year-month-head b {
+  color: #1f2937;
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.point-year-past-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1f2937;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.point-year-past-toggle svg {
+  color: var(--muted);
+}
+
+.point-year-cases {
+  display: grid;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.point-year-cases li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(31, 41, 55, 0.07);
+  font-size: 0.84rem;
+}
+
+.point-year-cases li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.point-year-cases small {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.point-year-cases b {
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.point-year-cases b.is-empty {
+  color: #8a94a3;
+  font-weight: 500;
+}
+
+.point-year-empty {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.points-calc.points-year-calc {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e3e7ee;
+  border-radius: 8px;
+}
+
+.points-year-calc .is-without-month dt {
+  color: #7a5418;
+}
+
+.points-year-calc .is-reached dt,
+.points-year-calc .is-reached dd {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.points-year-calc .is-missing dt,
+.points-year-calc .is-missing dd {
+  color: #7a5418;
+  font-weight: 800;
+}
+
+.points-year-type-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.points-year-type-list li {
+  display: grid;
+  gap: 6px;
+}
+
+.points-year-type-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+
+.points-year-type-head strong {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.points-year-type-head span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.points-year-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: 999px;
+  background: #eef2f5;
+  overflow: hidden;
+}
+
+.points-year-bar span {
+  display: block;
+  height: 100%;
+}
+
+.points-year-bar .is-done {
+  background: #2f6f73;
+}
+
+.points-year-bar .is-open {
+  background: #a9cbcd;
 }
