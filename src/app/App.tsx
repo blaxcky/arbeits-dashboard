@@ -1,12 +1,13 @@
 import {
   ArrowClockwise,
-  ArrowCircleDown,
-  ArrowCircleUp,
   Briefcase,
   CalendarBlank,
   CalendarCheck,
   CalendarPlus,
   CaretDown,
+  CaretLeft,
+  CaretRight,
+  Check,
   CaretDoubleLeft,
   CaretDoubleRight,
   Car,
@@ -23,7 +24,7 @@ import {
   MagnifyingGlass,
   MapTrifold,
   MapPin,
-  MinusCircle,
+  Minus,
   NotePencil,
   PencilSimple,
   Plus,
@@ -41,7 +42,7 @@ import { useRegisterSW } from "virtual:pwa-register/react";
 import type { AuditPointCase, AuditPointCategory, OtherMeasure, SavedDestination, Settings, TimeEntry, UsoCase, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
-import { addDays, currentYear, formatDateKey, isValidDateKey, isoWeekDays, parseDateKey, todayKey, weekdayName } from "../lib/dates";
+import { addDays, currentYear, formatDateKey, isValidDateKey, isoWeekDays, parseDateKey, startOfIsoWeek, todayKey, weekdayName } from "../lib/dates";
 import { formatAbsoluteMinutes, formatDays, formatMinutes, formatSignedMinutes, formatWholeDays, minutesToHourInput, parseHoursToMinutes } from "../lib/format";
 import {
   calculateDay,
@@ -53,6 +54,7 @@ import {
   calculateWeek,
   entriesForFlexBalance
 } from "../modules/time/calculations";
+import { completedWeekDelta, formatShortDayLabel, formatWeekRange, isoWeekNumber, TIMELINE_HOUR_LABELS, timelinePercent, weekLine, type WeekLine } from "../modules/time/dashboard";
 import {
   calculateDomesticPerDiemCents,
   calculateOtherCostsDifferentialCents,
@@ -181,6 +183,7 @@ function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToas
   });
   const sidebarCollapsed = isTodosView && sidebarPreference;
   const sidebarCollapseRef = useRef<HTMLButtonElement>(null);
+  const setupMissing = setupMissingItems(data.settings);
   const sidebarRevealRef = useRef<HTMLButtonElement>(null);
 
   function setSidebarCollapsed(collapsed: boolean) {
@@ -228,6 +231,12 @@ function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToas
             </div>
           ))}
         </nav>
+        {setupMissing.length ? (
+          <Link className="setup-card" to="/einstellungen">
+            <span className="setup-card-title"><strong>Einrichtung offen</strong><span>{setupMissing.length} offen</span></span>
+            <span className="setup-card-text">{setupMissing.join(" und ")} {setupMissing.length === 1 ? "fehlt" : "fehlen"} noch.</span>
+          </Link>
+        ) : null}
         <div className="privacy-note">
           <Database size={18} />
           <span>Arbeitsdaten bleiben in IndexedDB auf diesem Gerät.</span>
@@ -319,7 +328,6 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const flex = settings ? calculateFlexBalance(settings.flexStartMinutes ?? 0, flexEntries, data.flexCorrections) : 0;
   const vacation = settings ? calculateVacation(settings.vacationEntitlementMinutes, settings.vacationUsedMinutes, settings.dailyTargetMinutes) : null;
   const requiredConsumption = settings && vacation ? calculateRequiredYearConsumption(vacation.remainingMinutes, flex, settings.flexLimitMinutes) : 0;
-  const setupMissing = settings ? [settings.flexStartMinutes === null ? "Gleitzeitstartwert" : null, settings.vacationEntitlementMinutes === null ? "Urlaubsanspruch" : null].filter(Boolean) : [];
   const weeklyTargetMinutes = settings?.weeklyTargetMinutes ?? 2400;
   const weekDeltaToTarget = week.workedMinutes - weeklyTargetMinutes;
   const flexLimitMinutes = settings?.flexLimitMinutes ?? 6000;
@@ -331,22 +339,6 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const currentDate = todayKey(data.clock);
   const selectedEntryMissingEnd = isOverdueWeekdayMissingEnd(previewEntry, currentDate);
   const endTimeError = timeErrors.endTime ?? (selectedEntryMissingEnd ? "Dienstende fehlt. Bitte nachtragen." : undefined);
-  const breakField = (
-    <Field label="Pause in Minuten" className="break-field" error={breakError}>
-      <input
-        type="number"
-        min="0"
-        max="720"
-        value={form.breakMinutes}
-        aria-invalid={Boolean(breakError)}
-        onChange={(event) => {
-          setBreakError(undefined);
-          setForm({ ...form, breakMinutes: event.target.value });
-        }}
-        onBlur={(event) => void handleBreakBlur(event.target.value)}
-      />
-    </Field>
-  );
 
   useEffect(() => {
     setForm(entryToForm(entry, selectedDate, settings));
@@ -460,40 +452,132 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
     showToast("Resturlaub gespeichert.");
   }
 
+  async function changeBreakBy(deltaMinutes: number) {
+    const currentMinutes = parseIntegerInRange(form.breakMinutes, 0, 720) ?? 0;
+    const nextMinutes = Math.min(Math.max(currentMinutes + deltaMinutes, 0), 720);
+    const draft = { ...form, breakMinutes: String(nextMinutes) };
+    setForm(draft);
+    setBreakError(undefined);
+    await autoSave(draft, false);
+  }
+
+  const isToday = selectedDate === currentDate;
+  const nowMinutes = data.clock.getHours() * 60 + data.clock.getMinutes();
+  const vacationRemainingMinutes = vacation?.remainingMinutes ?? 0;
+  const flexOverLimitMinutes = Math.max(flex - flexLimitMinutes, 0);
+  const preferredStartTime = settings?.preferredWorkStartTime ?? null;
+  const startPreview = !day.hasStart && preferredStartTime
+    ? { startTime: preferredStartTime, endTime: calculateDay({ ...previewEntry, startTime: preferredStartTime, endTime: undefined }, data.clock).targetEndTime ?? null }
+    : null;
+  const targetEndQuickTimes = !form.endTime.trim() && day.hasStart && day.targetEndTime
+    ? [{ value: day.targetEndTime, label: `${day.targetEndTime} Soll`, ariaLabel: `Soll-Ende ${day.targetEndTime} als Dienstende eintragen` }]
+    : [];
+
   return (
-    <section className="page-stack">
-      <Header eyebrow="Dashboard" title="Zeiterfassung" />
-      {data.loading ? <SkeletonRows /> : null}
-      {setupMissing.length ? (
-        <Notice
-          tone="warning"
-          title="Einrichtung offen"
-          text={`${setupMissing.join(" und ")} fehlen noch. Die App bleibt nutzbar, rechnet aber mit neutralen Werten.`}
-          action={<Link to="/einstellungen">Einstellungen öffnen</Link>}
-        />
-      ) : null}
-      <div className="dashboard-workflow-grid">
-        <form className={`panel form-panel day-entry-panel${selectedEntryMissingEnd ? " day-entry-panel-missing-end" : ""}`} onSubmit={(event) => event.preventDefault()}>
-          <div className="panel-heading">
-            <span className="section-label">Tageserfassung</span>
-            <strong>{formatLongDateKey(selectedDate)}</strong>
-          </div>
-          <div className="date-row">
-            <button type="button" className="secondary-button" onClick={() => selectDate(addDays(selectedDate, -1))}>Zurück</button>
-            <label>
-              Datum
-              <input type="date" value={selectedDate} onChange={(event) => selectDate(event.target.value)} />
+    <section className="page-stack dashboard-page">
+      <header className="dashboard-header">
+        <div className="dashboard-title">
+          <h1>Zeiterfassung</h1>
+          <span>{formatLongDateKey(selectedDate)} · KW {isoWeekNumber(selectedDate)}</span>
+        </div>
+        <div className="dashboard-date-nav">
+          <div className="date-stepper">
+            <button type="button" className="date-stepper-button" aria-label="Vorheriger Tag" onClick={() => selectDate(addDays(selectedDate, -1))}><CaretLeft size={18} weight="bold" /></button>
+            <label className="date-stepper-field">
+              <span className="sr-only">Datum</span>
+              <input type="date" value={selectedDate} onChange={(event) => { if (event.target.value) selectDate(event.target.value); }} />
             </label>
-            <button type="button" className="secondary-button" onClick={() => selectDate(addDays(selectedDate, 1))}>Weiter</button>
+            <button type="button" className="date-stepper-button" aria-label="Nächster Tag" onClick={() => selectDate(addDays(selectedDate, 1))}><CaretRight size={18} weight="bold" /></button>
           </div>
-          <div className="form-grid day-entry-grid">
+          <button type="button" className="secondary-button" disabled={isToday} onClick={() => selectDate(currentDate)}>Heute</button>
+        </div>
+      </header>
+      {data.loading ? <SkeletonRows /> : null}
+      <section className="dashboard-metrics" aria-label="Kennzahlen">
+        <Metric
+          title="Woche"
+          value={formatMinutes(week.workedMinutes)}
+          detail={weekDeltaToTarget >= 0 ? `${formatMinutes(weekDeltaToTarget)} über Wochensoll` : `noch ${formatMinutes(Math.abs(weekDeltaToTarget))} bis Wochensoll`}
+          progress={{ value: week.workedMinutes / weeklyTargetMinutes }}
+        />
+        <Metric
+          title="Gleitzeit"
+          value={formatSignedMinutes(flex)}
+          detail={flexDistanceToLimit >= 0 ? `noch ${formatMinutes(flexDistanceToLimit)} bis Grenze` : `${formatMinutes(Math.abs(flexDistanceToLimit))} über Grenze`}
+          action={
+            <button className="secondary-button metric-action" type="button" title={canBookFlexDay ? "Gleittag buchen" : "Gleittag nicht möglich: maximal 10:00 h Minusstunden"} onClick={() => void bookFlexDay()} disabled={!canBookFlexDay}>
+              <CalendarPlus size={16} />
+              Gleittag buchen
+            </button>
+          }
+          tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"}
+          progress={{
+            value: flexLimitMinutes > 0 ? flex / flexLimitMinutes : 0,
+            overflow: flexLimitMinutes > 0 && flex > flexLimitMinutes ? (flex - flexLimitMinutes) / flexLimitMinutes : 0,
+            tone: flex > flexLimitMinutes ? "warning" : "default"
+          }}
+        />
+        <Metric
+          title="Resturlaub"
+          value={vacation ? formatWholeDays(vacation.remainingMinutes, dailyTargetMinutes) : "0 Tage"}
+          detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}
+          icon={<CalendarCheck size={18} />}
+          editableDetail={vacationEditValue !== null ? (
+            <span className="inline-edit">
+              <input
+                autoFocus
+                value={vacationEditValue}
+                aria-invalid={Boolean(vacationEditError)}
+                onChange={(event) => {
+                  setVacationEditError(undefined);
+                  setVacationEditValue(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setVacationEditValue(null);
+                    setVacationEditError(undefined);
+                  }
+                  if (event.key === "Enter") void saveVacationRemaining();
+                }}
+                onBlur={() => void saveVacationRemaining()}
+              />
+              {vacationEditError ? <small>{vacationEditError}</small> : null}
+            </span>
+          ) : undefined}
+          onDetailDoubleClick={() => {
+            if (!vacation || vacationEntitlementMinutes <= 0) return;
+            setVacationEditValue(minutesToHourInput(vacation.remainingMinutes));
+            setVacationEditError(undefined);
+          }}
+          action={
+            <button className="secondary-button metric-action" type="button" onClick={() => void bookVacationDay()} disabled={!settings || vacationEntitlementMinutes <= 0 || vacationRemainingMinutes <= 0}>
+              <CalendarPlus size={16} />
+              Urlaubstag buchen
+            </button>
+          }
+          progress={{ value: vacationEntitlementMinutes > 0 ? vacationRemainingMinutes / vacationEntitlementMinutes : 0, tone: "vacation" }}
+        />
+        <Metric
+          title="Dieses Jahr verbrauchen"
+          value={formatDays(requiredConsumption, dailyTargetMinutes)}
+          detail={`Resturlaub ${formatDays(vacationRemainingMinutes, dailyTargetMinutes)} · Gleitzeit über Grenze ${formatDays(flexOverLimitMinutes, dailyTargetMinutes)}`}
+        />
+      </section>
+      <div className="dashboard-workflow">
+        <form className={`panel day-card${selectedEntryMissingEnd ? " day-card-missing-end" : ""}`} aria-label="Tageserfassung" onSubmit={(event) => event.preventDefault()}>
+          <div className="day-card-heading">
+            <span className="section-label">{isToday ? "Heute" : formatShortDayLabel(selectedDate)}</span>
+            {entry ? <span className="day-card-saved"><Check size={14} weight="bold" />Gespeichert</span> : null}
+          </div>
+          <DaySummary day={day} isToday={isToday} startTime={previewEntry.startTime} targetMinutes={previewEntry.targetMinutes} startPreview={startPreview} />
+          <div className="day-card-times">
             <WorkTimeField
               id="work-start-time"
               label="Dienstbeginn"
               value={form.startTime}
               placeholder="07:30"
               error={timeErrors.startTime}
-              preferredTime={settings?.preferredWorkStartTime ?? null}
+              preferredTime={preferredStartTime}
               onChange={(value) => setForm({ ...form, startTime: value })}
               onBlur={(value) => void handleTimeBlur("startTime", value)}
               onPreferredTime={(value) => void selectPreferredTime("startTime", value)}
@@ -505,83 +589,50 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
               placeholder="15:30"
               error={endTimeError}
               preferredTime={settings?.preferredWorkEndTime ?? null}
+              extraQuickTimes={targetEndQuickTimes}
               onChange={(value) => setForm({ ...form, endTime: value })}
               onBlur={(value) => void handleTimeBlur("endTime", value)}
               onPreferredTime={(value) => void selectPreferredTime("endTime", value)}
             />
           </div>
-          <div className="button-row">
-            <button className="secondary-button" type="button" onClick={() => void remove()} disabled={!entry}>Löschen</button>
-            {breakField}
+          <div className="day-card-footer">
+            <div className="break-stepper">
+              <label htmlFor="work-break-minutes">Pause</label>
+              <div className="break-stepper-control">
+                <button type="button" aria-label="Pause um 5 Minuten verkürzen" onClick={() => void changeBreakBy(-5)} disabled={(parseIntegerInRange(form.breakMinutes, 0, 720) ?? 0) <= 0}><Minus size={16} weight="bold" /></button>
+                <input
+                  id="work-break-minutes"
+                  type="number"
+                  min="0"
+                  max="720"
+                  step="5"
+                  value={form.breakMinutes}
+                  aria-invalid={Boolean(breakError)}
+                  onChange={(event) => {
+                    setBreakError(undefined);
+                    setForm({ ...form, breakMinutes: event.target.value });
+                  }}
+                  onBlur={(event) => void handleBreakBlur(event.target.value)}
+                />
+                <span className="break-stepper-unit" aria-hidden="true">min</span>
+                <button type="button" aria-label="Pause um 5 Minuten verlängern" onClick={() => void changeBreakBy(5)}><Plus size={16} weight="bold" /></button>
+              </div>
+              {breakError ? <small className="field-error">{breakError}</small> : null}
+            </div>
+            <button className="ghost-danger-button" type="button" onClick={() => void remove()} disabled={!entry}><Trash size={16} />Löschen</button>
           </div>
         </form>
-        <LiveDayClock day={day} targetMinutes={previewEntry.targetMinutes} />
-        <div className="dashboard-side-grid">
-          <Metric
-            title="Woche"
-            value={formatMinutes(week.workedMinutes)}
-            detail={weekDeltaToTarget >= 0 ? `${formatMinutes(weekDeltaToTarget)} über Wochensoll` : `noch ${formatMinutes(Math.abs(weekDeltaToTarget))} bis Wochensoll`}
-            progress={{ value: week.workedMinutes / weeklyTargetMinutes }}
-          />
-          <Metric
-            title="Gleitzeit"
-            value={formatSignedMinutes(flex)}
-            detail={flexDistanceToLimit >= 0 ? `noch ${formatMinutes(flexDistanceToLimit)} bis Grenze` : `${formatMinutes(Math.abs(flexDistanceToLimit))} über Grenze`}
-            action={
-              <button className="icon-button metric-action" type="button" title={canBookFlexDay ? "Gleittag buchen" : "Gleittag nicht möglich: maximal 10:00 h Minusstunden"} aria-label="Gleittag buchen" onClick={() => void bookFlexDay()} disabled={!canBookFlexDay}>
-                <CalendarPlus size={18} />
-              </button>
-            }
-            tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"}
-            progress={{
-              value: flexLimitMinutes > 0 ? flex / flexLimitMinutes : 0,
-              overflow: flexLimitMinutes > 0 && flex > flexLimitMinutes ? (flex - flexLimitMinutes) / flexLimitMinutes : 0,
-              tone: flex > flexLimitMinutes ? "warning" : "default"
-            }}
-          />
-          <Metric
-            title="Resturlaub"
-            value={vacation ? formatWholeDays(vacation.remainingMinutes, dailyTargetMinutes) : "0 Tage"}
-            detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}
-            icon={<CalendarCheck size={22} />}
-            editableDetail={vacationEditValue !== null ? (
-              <span className="inline-edit">
-                <input
-                  autoFocus
-                  value={vacationEditValue}
-                  aria-invalid={Boolean(vacationEditError)}
-                  onChange={(event) => {
-                    setVacationEditError(undefined);
-                    setVacationEditValue(event.target.value);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      setVacationEditValue(null);
-                      setVacationEditError(undefined);
-                    }
-                    if (event.key === "Enter") void saveVacationRemaining();
-                  }}
-                  onBlur={() => void saveVacationRemaining()}
-                />
-                {vacationEditError ? <small>{vacationEditError}</small> : null}
-              </span>
-            ) : undefined}
-            onDetailDoubleClick={() => {
-              if (!vacation || vacationEntitlementMinutes <= 0) return;
-              setVacationEditValue(minutesToHourInput(vacation.remainingMinutes));
-              setVacationEditError(undefined);
-            }}
-            action={
-              <button className="icon-button metric-action" type="button" title="Urlaubstag buchen" aria-label="Urlaubstag buchen" onClick={() => void bookVacationDay()} disabled={!settings || vacationEntitlementMinutes <= 0 || (vacation?.remainingMinutes ?? 0) <= 0}>
-                <CalendarPlus size={18} />
-              </button>
-            }
-            progress={{ value: vacationEntitlementMinutes > 0 ? (vacation?.remainingMinutes ?? 0) / vacationEntitlementMinutes : 0, tone: "vacation" }}
-          />
-          <Metric title="Dieses Jahr verbrauchen" value={formatDays(requiredConsumption, dailyTargetMinutes)} detail="Resturlaub plus Gleitzeit über Grenze" />
-        </div>
+        <WeekTimeline
+          week={week}
+          selectedDate={selectedDate}
+          currentDate={currentDate}
+          nowMinutes={nowMinutes}
+          weeklyTargetMinutes={weeklyTargetMinutes}
+          onSelectDate={selectDate}
+          onWeekChange={(offsetDays) => selectDate(addDays(selectedDate, offsetDays))}
+          onThisWeek={() => selectDate(currentDate)}
+        />
       </div>
-      <WeekTable week={week} currentDate={currentDate} onWeekChange={(offsetDays) => selectDate(addDays(selectedDate, offsetDays))} />
     </section>
   );
 }
@@ -3256,47 +3307,185 @@ export function automaticDestinationDraft(destination: string, reason: string, m
   return { name: `(${trimmedReason})`, address, municipalityCode: municipality };
 }
 
-function WeekTable({ week, currentDate, onWeekChange }: { week: ReturnType<typeof calculateWeek>; currentDate: string; onWeekChange: (offsetDays: number) => void }) {
+function WeekTimeline({
+  week,
+  selectedDate,
+  currentDate,
+  nowMinutes,
+  weeklyTargetMinutes,
+  onSelectDate,
+  onWeekChange,
+  onThisWeek
+}: {
+  week: ReturnType<typeof calculateWeek>;
+  selectedDate: string;
+  currentDate: string;
+  nowMinutes: number;
+  weeklyTargetMinutes: number;
+  onSelectDate: (date: string) => void;
+  onWeekChange: (offsetDays: number) => void;
+  onThisWeek: () => void;
+}) {
+  const isCurrentWeek = startOfIsoWeek(currentDate) === week.weekStart;
+  const completedDelta = completedWeekDelta(week);
+  const lines = week.days.map((day) => ({ day, line: weekLine(day.entry, day.calculation, day.date, currentDate, nowMinutes) }));
+  const hasRunningDay = lines.some(({ line }) => line.kind === "running");
+  const shownWorkedMinutes = lines.reduce((sum, { day, line }) => (line.kind === "complete" || line.kind === "running" ? sum + day.calculation.netMinutes : sum), 0);
+
   return (
-    <div className="panel">
-      <div className="panel-heading week-heading">
-        <div>
-          <span className="section-label">Woche ab {formatDateKey(week.weekStart)}</span>
-        </div>
+    <section className="panel week-card" aria-label="Wochenübersicht">
+      <div className="week-card-heading">
+        <span className="section-label">Woche {isoWeekNumber(week.weekStart)} · {formatWeekRange(week.weekStart)}</span>
         <div className="week-nav">
-          <button type="button" className="secondary-button" onClick={() => onWeekChange(-7)}>Vorwoche</button>
-          <button type="button" className="secondary-button" onClick={() => onWeekChange(7)}>Folgewoche</button>
+          <button type="button" className="secondary-button week-nav-step" aria-label="Vorwoche" onClick={() => onWeekChange(-7)}><CaretLeft size={18} weight="bold" /></button>
+          <button type="button" className="secondary-button" disabled={isCurrentWeek} onClick={onThisWeek}>Diese Woche</button>
+          <button type="button" className="secondary-button week-nav-step" aria-label="Folgewoche" onClick={() => onWeekChange(7)}><CaretRight size={18} weight="bold" /></button>
         </div>
       </div>
-      <div className="week-table">
-        <div className="week-row week-row-head">
+      <div className="week-grid">
+        <div className="week-line week-line-head" aria-hidden="true">
           <span>Tag</span>
-          <span>Datum</span>
-          <span>Von</span>
-          <span>Bis</span>
-          <span>Status</span>
-          <span>Stunden</span>
+          <span className="week-col-time">Zeit</span>
+          <span className="week-col-lane week-scale">{TIMELINE_HOUR_LABELS.map((label) => <span key={label}>{label}</span>)}</span>
+          <span>Ist</span>
+          <span>Saldo</span>
+          <span />
         </div>
-        {week.days.map((day) => {
+        {lines.map(({ day, line }) => {
+          const selected = day.date === selectedDate;
+          const startTime = day.entry?.startTime ?? "";
+          const timeLabel = line.kind === "empty" ? "–" : line.kind === "complete" ? `${startTime}–${day.entry?.endTime ?? ""}` : line.kind === "running" ? `${startTime}–läuft` : `${startTime}–offen`;
           const tone = deltaTone(day.calculation.deltaMinutes);
-          const missingEnd = isOverdueWeekdayMissingEnd(day.entry, currentDate);
-          const statusLabel = missingEnd ? "Dienstende fehlt" : tone === "plus" ? "Plusstunden" : tone === "minus" ? "Minusstunden" : "Ausgeglichen";
           return (
-            <div key={day.date} className={`week-row${missingEnd ? " week-row-missing-end" : ""}`}>
-              <span>{weekdayName(day.date)}</span>
-              <span>{formatDateOnly(day.date)}</span>
-              <span>{day.entry?.startTime ?? "-"}</span>
-              <span className={missingEnd ? "week-open-end" : undefined}>{day.entry?.endTime ?? "offen"}</span>
-              <span className={`week-status ${missingEnd ? "week-status-missing-end" : `week-delta-${tone}`}`} aria-label={statusLabel}>
-                {missingEnd ? <Warning size={16} weight="duotone" /> : day.calculation.deltaMinutes > 0 ? <ArrowCircleUp size={16} weight="duotone" /> : day.calculation.deltaMinutes < 0 ? <ArrowCircleDown size={16} weight="duotone" /> : <MinusCircle size={16} weight="duotone" />}
+            <button key={day.date} type="button" className={`week-line week-line-${line.kind}${selected ? " is-selected" : ""}`} aria-pressed={selected} onClick={() => onSelectDate(day.date)}>
+              <span className="week-col-day">{formatShortDayLabel(day.date)}</span>
+              <span className="week-col-time">{timeLabel}</span>
+              <span className="week-col-lane week-lane" aria-hidden="true"><WeekLaneBar line={line} /></span>
+              <span className="week-col-hours">{line.kind === "empty" || line.kind === "missing-end" ? "–" : formatMinutes(day.calculation.netMinutes)}</span>
+              <span className="week-col-saldo">
+                {line.kind === "complete" ? <span className={`week-pill week-pill-${tone}`}>{formatSignedMinutes(day.calculation.deltaMinutes)}</span> : null}
+                {line.kind === "running" ? <span className="week-running">bis {day.calculation.targetEndTime}</span> : null}
+                {line.kind === "missing-end" ? <span className="week-missing"><Warning size={15} weight="duotone" />fehlt</span> : null}
+                {line.kind === "empty" ? "–" : null}
               </span>
-              <strong className={`week-hours ${missingEnd ? "week-hours-missing-end" : `week-delta-${tone}`}`}>
-                {missingEnd ? "fehlt" : formatAbsoluteMinutes(day.calculation.deltaMinutes)}
-              </strong>
-            </div>
+              <CaretRight className="week-line-caret" size={14} weight="bold" aria-hidden="true" />
+            </button>
           );
         })}
+        <div className="week-line week-line-total">
+          <span>Summe</span>
+          <span className="week-col-time">Soll {formatMinutes(weeklyTargetMinutes)}</span>
+          <span className="week-col-lane week-legend">
+            {hasRunningDay ? (
+              <>
+                <span><i className="week-legend-solid" />gearbeitet</span>
+                <span><i className="week-legend-planned" />geplant bis Feierabend</span>
+              </>
+            ) : null}
+          </span>
+          <span className="week-col-hours">{formatMinutes(shownWorkedMinutes)}</span>
+          <span className="week-col-saldo"><span className={`week-pill week-pill-${deltaTone(completedDelta)}`}>{formatSignedMinutes(completedDelta)}</span></span>
+          <span />
+        </div>
       </div>
+    </section>
+  );
+}
+
+function WeekLaneBar({ line }: { line: WeekLine }) {
+  if (line.kind === "empty" || line.startMinutes === undefined) return null;
+  const start = timelinePercent(line.startMinutes);
+  if (line.kind === "complete" && line.endMinutes !== undefined) {
+    return <span className="week-bar" style={{ left: `${start}%`, width: `${Math.max(timelinePercent(line.endMinutes) - start, 0.8)}%` }} />;
+  }
+  const solidEnd = line.kind === "running" && line.endMinutes !== undefined ? timelinePercent(line.endMinutes) : start;
+  const plannedEnd = line.plannedEndMinutes !== undefined ? timelinePercent(line.plannedEndMinutes) : solidEnd;
+  return (
+    <>
+      <span className={`week-bar${line.kind === "missing-end" ? " week-bar-missing" : ""}`} style={{ left: `${start}%`, width: `${Math.max(solidEnd - start, 0.8)}%` }} />
+      {plannedEnd > solidEnd ? <span className="week-bar-planned" style={{ left: `${solidEnd}%`, width: `${plannedEnd - solidEnd}%` }} /> : null}
+      {line.kind === "running" ? <span className="week-now" style={{ left: `${solidEnd}%` }} /> : null}
+    </>
+  );
+}
+
+function DaySummary({
+  day,
+  isToday,
+  startTime,
+  targetMinutes,
+  startPreview
+}: {
+  day: ReturnType<typeof calculateDay>;
+  isToday: boolean;
+  startTime?: string;
+  targetMinutes: number;
+  startPreview: { startTime: string; endTime: string | null } | null;
+}) {
+  if (!day.hasStart) {
+    return (
+      <div className="day-summary">
+        <span className="day-summary-label">Noch kein Dienstbeginn</span>
+        {startPreview?.endTime ? (
+          <p className="day-summary-hint">Mit Beginn <strong>{startPreview.startTime}</strong> wäre um <strong>{startPreview.endTime}</strong> Feierabend.</p>
+        ) : (
+          <p className="day-summary-hint">Soll {formatMinutes(targetMinutes)}</p>
+        )}
+      </div>
+    );
+  }
+
+  const progress = clampProgress(targetMinutes > 0 ? day.netMinutes / targetMinutes : 0);
+
+  if (day.hasEnd) {
+    const tone = deltaTone(day.deltaMinutes);
+    return (
+      <div className="day-summary">
+        <span className="day-summary-label">Gearbeitet</span>
+        <div className="day-summary-main">
+          <strong>{formatMinutes(day.netMinutes)}</strong>
+          <span className={`week-pill week-pill-${tone}`}>{formatSignedMinutes(day.deltaMinutes)}</span>
+        </div>
+        <DayProgress progress={progress} />
+      </div>
+    );
+  }
+
+  if (!isToday) {
+    return (
+      <div className="day-summary">
+        <span className="day-summary-label">Soll-Ende</span>
+        <div className="day-summary-main">
+          <strong>{day.targetEndTime}</strong>
+          <span className="week-missing"><Warning size={16} weight="duotone" />Dienstende fehlt</span>
+        </div>
+      </div>
+    );
+  }
+
+  const remainingMinutes = Math.max(targetMinutes - day.netMinutes, 0);
+  return (
+    <div className="day-summary">
+      <span className="day-summary-label">Feierabend um</span>
+      <div className="day-summary-main">
+        <strong>{day.targetEndTime}</strong>
+        <span className="day-summary-remaining">{remainingMinutes > 0 ? `noch ${formatMinutes(remainingMinutes)}` : `Soll erreicht · ${formatSignedMinutes(day.deltaMinutes)}`}</span>
+      </div>
+      <DayProgress progress={progress} marker />
+      <div className="day-summary-scale">
+        <span>{startTime}</span>
+        <span className="day-summary-now">jetzt {day.effectiveEndTime} · {formatMinutes(day.netMinutes)}</span>
+        <span>{day.targetEndTime}</span>
+      </div>
+    </div>
+  );
+}
+
+function DayProgress({ progress, marker = false }: { progress: number; marker?: boolean }) {
+  return (
+    <div className="day-progress" role="img" aria-label={`${Math.round(progress * 100)} Prozent der Sollzeit`}>
+      <span className="day-progress-fill" style={{ width: `${progress * 100}%` }} />
+      {marker ? <span className="day-progress-marker" style={{ left: `${progress * 100}%` }} /> : null}
     </div>
   );
 }
@@ -3352,10 +3541,7 @@ function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, ico
 
   return (
     <article className={`metric metric-${tone}`}>
-      <div className="metric-title-row">
-        <div className="metric-title">{icon}{title}</div>
-        {action}
-      </div>
+      <div className="metric-title">{icon}{title}</div>
       <strong>{value}</strong>
       {progress ? (
         <div className={`metric-progress metric-progress-${progress.tone ?? "default"}`} aria-label={`${title}: ${Math.round(progressValue * 100)} Prozent`}>
@@ -3365,61 +3551,11 @@ function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, ico
           </span>
         </div>
       ) : null}
-      <p onDoubleClick={onDetailDoubleClick} className={onDetailDoubleClick ? "metric-editable-detail" : undefined}>{editableDetail ?? detail}</p>
-    </article>
-  );
-}
-
-function LiveDayClock({ day, targetMinutes }: { day: ReturnType<typeof calculateDay>; targetMinutes: number }) {
-  const mainProgress = day.hasStart ? ringProgress(day.netMinutes, targetMinutes) : 0;
-  const overtimeProgress = day.deltaMinutes > 0 ? ringProgress(day.deltaMinutes, targetMinutes) : 0;
-  const centerStatus = liveClockStatus(day);
-  const remainingMinutes = Math.max(targetMinutes - day.netMinutes, 0);
-  const ariaLabel = day.hasStart
-    ? `Live-Auswertung: ${formatMinutes(remainingMinutes)} verbleibend, bereits gearbeitet ${formatMinutes(day.netMinutes)}.`
-    : "Live-Auswertung: Dienstbeginn fehlt.";
-
-  return (
-    <aside className={`panel live-clock-panel live-clock-${day.status}${overtimeProgress > 0 ? " live-clock-has-overtime" : ""}`} aria-label={ariaLabel}>
-      <span className="section-label">Live-Auswertung</span>
-      <div className="live-clock-face">
-        <svg className="live-clock-svg" viewBox="0 0 200 200" role="img" aria-hidden="true">
-          <circle className="live-clock-track live-clock-track-main" cx="100" cy="100" r="70" pathLength="100" />
-          <circle
-            className="live-clock-ring live-clock-ring-main"
-            cx="100"
-            cy="100"
-            r="70"
-            pathLength="100"
-            strokeDasharray="100"
-            strokeDashoffset={100 - mainProgress * 100}
-          />
-          {overtimeProgress > 0 ? (
-            <>
-              <circle className="live-clock-track live-clock-track-overtime" cx="100" cy="100" r="86" pathLength="100" />
-              <circle
-                className="live-clock-ring live-clock-ring-overtime"
-                cx="100"
-                cy="100"
-                r="86"
-                pathLength="100"
-                strokeDasharray="100"
-                strokeDashoffset={100 - overtimeProgress * 100}
-              />
-            </>
-          ) : null}
-        </svg>
-        <div className="live-clock-center">
-          <strong>{day.hasStart ? formatMinutes(remainingMinutes) : formatMinutes(targetMinutes)}</strong>
-          <span>{centerStatus}</span>
-        </div>
+      <div className="metric-footer">
+        <p onDoubleClick={onDetailDoubleClick} className={onDetailDoubleClick ? "metric-editable-detail" : undefined}>{editableDetail ?? detail}</p>
+        {action}
       </div>
-      <dl className="detail-list live-clock-details">
-        <div><dt>arbeiten bis</dt><dd>{day.hasStart ? day.targetEndTime : "-"}</dd></div>
-        <div><dt>bereits gearbeitet</dt><dd>{day.hasStart ? formatMinutes(day.netMinutes) : "-"}</dd></div>
-      </dl>
-      <p className="live-clock-meta">Verwendetes Ende: {day.hasStart ? day.effectiveEndTime ?? "offen" : "-"}</p>
-    </aside>
+    </article>
   );
 }
 
@@ -3493,6 +3629,7 @@ export function WorkTimeField({
   placeholder,
   error,
   preferredTime,
+  extraQuickTimes = [],
   onChange,
   onBlur,
   onPreferredTime
@@ -3503,6 +3640,7 @@ export function WorkTimeField({
   placeholder: string;
   error?: string;
   preferredTime: string | null;
+  extraQuickTimes?: Array<{ value: string; label: string; ariaLabel: string }>;
   onChange: (value: string) => void;
   onBlur: (value: string) => void;
   onPreferredTime: (value: string) => void;
@@ -3521,16 +3659,32 @@ export function WorkTimeField({
         onChange={(event) => onChange(event.target.value)}
         onBlur={(event) => onBlur(event.target.value)}
       />
-      {preferredTime ? (
-        <button
-          className="time-quick-select"
-          type="button"
-          aria-label={`${preferredTime} als ${label} eintragen`}
-          onPointerDown={(event) => event.preventDefault()}
-          onClick={() => onPreferredTime(preferredTime)}
-        >
-          {preferredTime} eintragen
-        </button>
+      {preferredTime || extraQuickTimes.length ? (
+        <div className="time-quick-row">
+          {preferredTime ? (
+            <button
+              className="time-quick-select time-quick-select-preferred"
+              type="button"
+              aria-label={`${preferredTime} als ${label} eintragen`}
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() => onPreferredTime(preferredTime)}
+            >
+              <b>{preferredTime}</b> bevorzugt
+            </button>
+          ) : null}
+          {extraQuickTimes.map((option) => (
+            <button
+              key={option.value}
+              className="time-quick-select"
+              type="button"
+              aria-label={option.ariaLabel}
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() => onPreferredTime(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       ) : null}
       {error ? <small id={`${id}-error`} className="field-error">{error}</small> : null}
     </div>
@@ -3960,6 +4114,11 @@ export function formatDateOnly(dateKey: string): string {
   return `${day}.${month}.${year}`;
 }
 
+export function setupMissingItems(settings: Pick<Settings, "flexStartMinutes" | "vacationEntitlementMinutes"> | null): string[] {
+  if (!settings) return [];
+  return [settings.flexStartMinutes === null ? "Gleitzeitstartwert" : null, settings.vacationEntitlementMinutes === null ? "Urlaubsanspruch" : null].filter((item): item is string => item !== null);
+}
+
 function formatLongDateKey(dateKey: string): string {
   return `${weekdayName(dateKey)}, ${formatDateOnly(dateKey)}`;
 }
@@ -4163,28 +4322,6 @@ function errorMessage(error: unknown, fallback: string): string {
 function clampProgress(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(Math.max(value, 0), 1);
-}
-
-function ringProgress(minutes: number, targetMinutes: number): number {
-  if (targetMinutes <= 0) return 0;
-  return Math.min(Math.max(minutes / targetMinutes, 0), 1);
-}
-
-function liveClockStatus(day: ReturnType<typeof calculateDay>): string {
-  if (!day.hasStart) return "Start fehlt";
-  if (day.deltaMinutes > 0) return formatCompactSignedMinutes(day.deltaMinutes);
-  if (day.deltaMinutes === 0) return "erfüllt";
-  if (day.status === "running") return "läuft";
-  return formatCompactSignedMinutes(day.deltaMinutes);
-}
-
-function formatCompactSignedMinutes(minutes: number): string {
-  const sign = minutes > 0 ? "+" : "-";
-  const absolute = Math.abs(Math.round(minutes));
-  if (absolute < 60) return `${sign} ${absolute} min`;
-  const hours = Math.floor(absolute / 60);
-  const rest = absolute % 60;
-  return rest === 0 ? `${sign} ${hours} h` : `${sign} ${hours} h ${rest} min`;
 }
 
 export function normalizeTimeInput(value: string): string | null {

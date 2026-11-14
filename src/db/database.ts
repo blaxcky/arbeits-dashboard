@@ -292,16 +292,18 @@ export async function getTimeEntryByDate(date: string): Promise<TimeEntry | unde
 }
 
 export async function upsertTimeEntry(input: Omit<TimeEntry, "id" | "createdAt" | "updatedAt">): Promise<TimeEntry> {
-  const existing = await getTimeEntryByDate(input.date);
-  const now = new Date().toISOString();
-  const entry: TimeEntry = {
-    ...input,
-    id: existing?.id ?? crypto.randomUUID(),
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now
-  };
-  await db.timeEntries.put(entry);
-  return entry;
+  return db.transaction("rw", db.timeEntries, async () => {
+    const existing = await getTimeEntryByDate(input.date);
+    const now = new Date().toISOString();
+    const entry: TimeEntry = {
+      ...input,
+      id: existing?.id ?? crypto.randomUUID(),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now
+    };
+    await db.timeEntries.put(entry);
+    return entry;
+  });
 }
 
 export async function deleteTimeEntry(date: string): Promise<void> {

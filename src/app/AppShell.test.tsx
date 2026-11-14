@@ -113,6 +113,80 @@ describe("task workspace dashboard navigation", () => {
   });
 });
 
+describe("time tracking dashboard", () => {
+  const entries = [
+    { id: "a", date: "2026-08-03", startTime: "07:30", endTime: "15:45", breakMinutes: 30, targetMinutes: 480, note: "", createdAt: "", updatedAt: "" },
+    { id: "b", date: "2026-08-04", startTime: "07:30", endTime: "15:00", breakMinutes: 30, targetMinutes: 480, note: "", createdAt: "", updatedAt: "" }
+  ];
+
+  beforeEach(() => {
+    window.location.hash = "#/";
+    workData.timeEntries = entries as never;
+    workData.entriesByDate = new Map(entries.map((entry) => [entry.date, entry])) as never;
+    workData.saveTimeEntry.mockReset();
+  });
+
+  afterEach(() => {
+    window.location.hash = "";
+    workData.timeEntries = [];
+    workData.entriesByDate = new Map();
+  });
+
+  it("links open setup items from the sidebar instead of a page notice", () => {
+    render(<App />);
+
+    const setupLink = screen.getByRole("link", { name: /Einrichtung offen/ });
+    expect(setupLink).toHaveAttribute("href", "#/einstellungen");
+    expect(setupLink).toHaveTextContent("Gleitzeitstartwert und Urlaubsanspruch fehlen noch.");
+  });
+
+  it("shows the working week as a timeline with totals and opens a day on click", () => {
+    render(<App />);
+
+    const week = screen.getByRole("region", { name: "Wochenübersicht" });
+    expect(within(week).getByText("Woche 32 · 03.–07.08.2026")).toBeInTheDocument();
+    expect(within(week).getByText("+0:15 h")).toBeInTheDocument();
+    expect(within(week).getByText("-0:15 h")).toBeInTheDocument();
+    expect(within(week).getByText("15:45 h")).toBeInTheDocument();
+
+    fireEvent.click(within(week).getByRole("button", { name: /Mo 03\.08\./ }));
+
+    expect(screen.getByText("Montag, 03.08.2026 · KW 32")).toBeInTheDocument();
+    expect(screen.getByLabelText("Dienstbeginn")).toHaveValue("07:30");
+    expect(screen.getByText("Gearbeitet")).toBeInTheDocument();
+    expect(within(week).getByRole("button", { name: /Mo 03\.08\./ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows the end of the working day and the running day in the week", () => {
+    const previousClock = workData.clock;
+    const running = { id: "c", date: "2026-08-06", startTime: "07:30", breakMinutes: 30, targetMinutes: 480, note: "", createdAt: "", updatedAt: "" };
+    workData.clock = new Date(2026, 7, 6, 12, 0);
+    workData.timeEntries = [...entries, running] as never;
+    workData.entriesByDate = new Map([...entries, running].map((entry) => [entry.date, entry])) as never;
+
+    try {
+      render(<App />);
+
+      const dayCard = screen.getByRole("form", { name: "Tageserfassung" });
+      expect(within(dayCard).getByText("Feierabend um")).toBeInTheDocument();
+      expect(within(dayCard).getAllByText("15:30").length).toBeGreaterThan(0);
+      expect(within(dayCard).getByText("noch 3:30 h")).toBeInTheDocument();
+      expect(within(screen.getByRole("region", { name: "Wochenübersicht" })).getByText("bis 15:30")).toBeInTheDocument();
+    } finally {
+      workData.clock = previousClock;
+    }
+  });
+
+  it("saves the break immediately when using the stepper", async () => {
+    render(<App />);
+
+    fireEvent.click(within(screen.getByRole("region", { name: "Wochenübersicht" })).getByRole("button", { name: /Di 04\.08\./ }));
+    fireEvent.click(screen.getByRole("button", { name: "Pause um 5 Minuten verlängern" }));
+
+    await waitFor(() => expect(workData.saveTimeEntry).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-08-04", breakMinutes: 35 })));
+  });
+});
+
 describe("PWA updates", () => {
   beforeEach(() => {
     pwaRegistration.options = undefined;
