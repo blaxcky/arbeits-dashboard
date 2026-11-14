@@ -1688,6 +1688,7 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
   const [exporting, setExporting] = useState(false);
   const activeSummary = summaries[tab];
   const formatValue = tab === "points" ? formatPointTenths : (value: number) => String(value);
+  const activeHasCases = pointYearHasCases(activeSummary);
 
   useEffect(() => {
     setAuditGoalInput(auditGoal ? formatPointInput(auditGoal.targetPointsTenths) : "");
@@ -1829,7 +1830,7 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
           title={`Punkte ${year}`}
           value={formatPointTenths(points.completedValue)}
           detail={goalDetail(points, formatPointTenths)}
-          progress={points.goal ? { value: points.completedValue / points.goal } : undefined}
+          progress={{ value: points.goal ? points.completedValue / points.goal : 0 }}
         >
           {renderGoal("audit")}
         </Metric>
@@ -1837,7 +1838,7 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
           title={`USO ${year}`}
           value={String(uso.completedValue)}
           detail={goalDetail(uso, String)}
-          progress={uso.goal ? { value: uso.completedValue / uso.goal } : undefined}
+          progress={{ value: uso.goal ? uso.completedValue / uso.goal : 0 }}
         >
           {renderGoal("uso")}
         </Metric>
@@ -1845,7 +1846,7 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
           title={`Sonstige Maßnahmen ${year}`}
           value={String(other.completedValue)}
           detail={`${other.openValue} offen · ${otherTotal} gesamt`}
-          progress={otherTotal > 0 ? { value: other.completedValue / otherTotal } : undefined}
+          progress={{ value: otherTotal > 0 ? other.completedValue / otherTotal : 0 }}
         />
       </section>
 
@@ -1868,15 +1869,17 @@ export function PointsYearView({ data, showToast }: { data: WorkData; showToast:
                 </button>
               ))}
             </div>
-            <div className="points-year-legend" aria-hidden="true">
-              <span><i className="is-stand" />Stand</span>
-              <span><i className="is-projection" />inkl. offene Fälle</span>
-              {activeSummary.goal !== null ? <span><i className="is-target" />Soll</span> : null}
-            </div>
+            {activeHasCases || activeSummary.goal !== null ? (
+              <div className="points-year-legend" aria-hidden="true">
+                {activeHasCases ? <span><i className="is-stand" />Stand</span> : null}
+                {activeHasCases && activeSummary.series.projection.some((value) => value !== null) ? <span><i className="is-projection" />inkl. offene Fälle</span> : null}
+                {activeSummary.goal !== null ? <span><i className="is-target" />Soll</span> : null}
+              </div>
+            ) : null}
           </div>
           <div id="points-year-tabpanel" role="tabpanel" aria-labelledby={`points-year-tab-${tab}`} className="points-year-tabpanel">
-            <PointsYearChart summary={activeSummary} formatValue={formatValue} currentMonth={currentMonth} />
-            <PointsYearRemainder summary={activeSummary} formatValue={formatValue} showCaseValues={tab === "points"} />
+            {activeHasCases || activeSummary.goal !== null ? <PointsYearChart summary={activeSummary} formatValue={formatValue} currentMonth={currentMonth} showValues={activeHasCases} /> : null}
+            {activeHasCases ? <PointsYearRemainder summary={activeSummary} formatValue={formatValue} showCaseValues={tab === "points"} /> : <p className="muted points-year-empty">Keine Fälle in diesem Jahr.</p>}
           </div>
         </section>
 
@@ -1913,9 +1916,17 @@ const CHART_TOP = 20;
 const CHART_BOTTOM = 170;
 const SHORT_MONTH_NAMES = ["Jän", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
-function PointsYearChart({ summary, formatValue, currentMonth }: { summary: PointYearSummary; formatValue: (value: number) => string; currentMonth: string }) {
+function pointYearHasCases(summary: PointYearSummary): boolean {
+  const { past, months, withoutMonth } = summary.remainder;
+  return Boolean(withoutMonth) || months.some((month) => month.openCases.length > 0 || month.completedCases.length > 0) || Boolean(past && past.months.length > 0);
+}
+
+function PointsYearChart({ summary, formatValue, currentMonth, showValues }: { summary: PointYearSummary; formatValue: (value: number) => string; currentMonth: string; showValues: boolean }) {
   const [hovered, setHovered] = useState<number | null>(null);
-  const { stand, projection, target } = summary.series;
+  const emptySeries = Array.from({ length: 12 }, () => null);
+  const stand = showValues ? summary.series.stand : emptySeries;
+  const projection = showValues ? summary.series.projection : emptySeries;
+  const { target } = summary.series;
   const highest = Math.max(0, ...[...stand, ...projection, ...target].map((value) => value ?? 0));
   const scale = niceAxisScale(highest, formatValue === formatPointTenths ? 10 : 1);
   const step = (CHART_RIGHT - CHART_LEFT) / 11;
@@ -1971,7 +1982,7 @@ function PointsYearChart({ summary, formatValue, currentMonth }: { summary: Poin
       {lastStandValue !== null ? (
         <>
           <circle className="points-year-chart-dot" cx={x(lastStandIndex)} cy={y(lastStandValue)} r={4.5} />
-          <text className="points-year-chart-value is-stand" x={x(lastStandIndex) - 6} y={y(lastStandValue) + 20} textAnchor="end">{formatValue(lastStandValue)}</text>
+          <text className="points-year-chart-value is-stand" x={x(lastStandIndex) - 6} y={y(lastStandValue) > CHART_BOTTOM - 28 ? y(lastStandValue) - 10 : y(lastStandValue) + 20} textAnchor="end">{formatValue(lastStandValue)}</text>
         </>
       ) : null}
       {lastProjectionIndex === 11 && lastProjectionValue !== null ? <circle className="points-year-chart-dot is-projection" cx={x(11)} cy={y(lastProjectionValue)} r={4} /> : null}

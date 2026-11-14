@@ -5737,3 +5737,11 @@ button.week-line:focus-visible {
 .points-year-bar .is-open {
   background: #a9cbcd;
 }
+
+.dashboard-metrics.points-year-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.points-year-empty {
+  margin: 0;
+}

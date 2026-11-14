@@ -273,6 +273,18 @@ describe("PointsYearView overview", () => {
     expect(calculation).not.toHaveTextContent("Jahresziel");
   });
 
+  it("shows a short note instead of empty rows and zero values for a year without cases", () => {
+    renderYear({ ...yearData(), auditPointCases: [], auditPointGoals: [], usoCases: [], otherMeasures: [] } as unknown as Parameters<typeof PointsYearView>[0]["data"]);
+    const panel = screen.getByRole("tabpanel");
+
+    expect(within(panel).getByText("Keine Fälle in diesem Jahr.")).toBeInTheDocument();
+    expect(within(panel).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(panel).queryByLabelText("Rechnung")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "USO" }));
+    expect(within(screen.getByRole("tabpanel")).getByRole("img")).toHaveAccessibleName("Verlauf 2026: Soll Dezember 8");
+  });
+
   it("changes the yearly goal directly in the key figure", async () => {
     const data = renderYear();
 
