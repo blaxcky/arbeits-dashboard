@@ -6324,3 +6324,7 @@ button.week-line:focus-visible {
   border-radius: 4px;
   font-size: 0.62rem;
 }
+
+a.metric-action {
+  text-decoration: none;
+}

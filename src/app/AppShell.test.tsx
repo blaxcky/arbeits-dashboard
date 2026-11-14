@@ -140,6 +140,14 @@ describe("vacation planning", () => {
     expect(screen.getByRole("heading", { name: "Jahresplanung" })).toBeInTheDocument();
   });
 
+  it("only plans vacation by day instead of booking it manually on the dashboard", () => {
+    window.location.hash = "#/";
+    render(<App />);
+
+    expect(screen.queryByRole("button", { name: /Urlaubstag buchen/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Urlaub planen" })).toHaveAttribute("href", "#/urlaub");
+  });
+
   it("plans a free working day as vacation or flex day from the calendar", () => {
     render(<App />);
 

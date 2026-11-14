@@ -49,7 +49,6 @@ import {
   calculateDay,
   calculateFlexBalance,
   calculateNextFlexDayBalance,
-  calculateNextVacationUsedMinutes,
   calculateRequiredYearConsumption,
   calculateVacation,
   calculateWeek,
@@ -440,18 +439,6 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
     showToast("Zeiteintrag gelöscht.");
   }
 
-  async function bookVacationDay() {
-    if (!settings) return;
-    const minutesPerDay = settings.dailyTargetMinutes || 480;
-    const entitlementMinutes = settings.vacationEntitlementMinutes ?? 0;
-    const remainingMinutes = Math.max(entitlementMinutes - settings.vacationUsedMinutes, 0);
-    if (entitlementMinutes <= 0 || remainingMinutes <= 0) return;
-    const nextUsedMinutes = calculateNextVacationUsedMinutes(settings.vacationEntitlementMinutes, settings.vacationUsedMinutes, minutesPerDay);
-    const bookedMinutes = nextUsedMinutes - settings.vacationUsedMinutes;
-    await data.saveSettings({ vacationUsedMinutes: nextUsedMinutes });
-    showToast(`Urlaub mit ${formatMinutes(bookedMinutes)} gebucht.`);
-  }
-
   async function bookFlexDay() {
     if (!settings) return;
     const nextBalance = calculateNextFlexDayBalance(flex, settings.dailyTargetMinutes);
@@ -589,10 +576,10 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             setVacationEditError(undefined);
           }}
           action={
-            <button className="secondary-button metric-action" type="button" onClick={() => void bookVacationDay()} disabled={!settings || vacationEntitlementMinutes <= 0 || vacationRemainingMinutes <= 0}>
+            <Link className="secondary-button metric-action" to="/urlaub" title="Urlaubstage werden in der Jahresplanung pro Tag eingetragen und am Tag selbst gebucht">
               <CalendarPlus size={16} />
-              Urlaubstag buchen
-            </button>
+              Urlaub planen
+            </Link>
           }
           progress={{ value: vacationEntitlementMinutes > 0 ? vacationRemainingMinutes / vacationEntitlementMinutes : 0, tone: "vacation" }}
         >
