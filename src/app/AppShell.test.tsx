@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TravelExpensePayment, Trip, TripFile } from "../db/schema";
+import type { PlannedAbsence, TravelExpensePayment, Trip, TripFile } from "../db/schema";
 
 const pwaRegistration = vi.hoisted(() => ({
   options: undefined as { onNeedRefresh?: () => void } | undefined,
@@ -49,6 +49,12 @@ const workData = vi.hoisted(() => ({
   savedDestinations: [],
   todos: [],
   todoProjects: [],
+  plannedAbsences: [] as PlannedAbsence[],
+  lastBookedAbsences: [] as PlannedAbsence[],
+  planAbsence: vi.fn(),
+  removePlannedAbsence: vi.fn(),
+  setAbsenceStatus: vi.fn(),
+  bookAbsences: vi.fn(),
   refresh: vi.fn(),
   saveTimeEntry: vi.fn(),
   removeTimeEntry: vi.fn(),
@@ -110,6 +116,65 @@ describe("task workspace dashboard navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dashboard-Navigation ausklappen" }));
     expect(screen.getByRole("complementary", { name: "Hauptnavigation" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Dashboard-Navigation einklappen" })).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("vacation planning", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.location.hash = "#/urlaub";
+    workData.planAbsence.mockReset();
+    workData.setAbsenceStatus.mockReset();
+    workData.plannedAbsences = [];
+  });
+
+  afterEach(() => {
+    window.location.hash = "";
+    workData.plannedAbsences = [];
+  });
+
+  it("links the year planning from the dashboard navigation", () => {
+    render(<App />);
+
+    expect(screen.getByRole("link", { name: /Urlaub - Jahresplanung/ })).toHaveAttribute("href", "#/urlaub");
+    expect(screen.getByRole("heading", { name: "Jahresplanung" })).toBeInTheDocument();
+  });
+
+  it("plans a free working day as vacation or flex day from the calendar", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mo 10.08.: frei, als Urlaub planen" }));
+    expect(workData.planAbsence).toHaveBeenCalledWith("2026-08-10", "vacation");
+
+    fireEvent.click(screen.getByRole("button", { name: /Gleittag/, pressed: false }));
+    fireEvent.click(screen.getByRole("button", { name: "Di 11.08.: frei, als Gleittag planen" }));
+    expect(workData.planAbsence).toHaveBeenCalledWith("2026-08-11", "flex");
+    expect(screen.getByRole("button", { name: "Sa 15.08.: Feiertag (Mariä Himmelfahrt)" })).toBeDisabled();
+  });
+
+  it("reminds on every page to request a planned day and marks it as requested", () => {
+    workData.plannedAbsences = [{ id: "a1", date: "2026-08-14", type: "vacation", status: "planned", createdAt: "", updatedAt: "" }];
+    window.location.hash = "#/einstellungen";
+    render(<App />);
+
+    const alert = screen.getByText("Urlaub Fr 14.08. – dringend beantragen").closest(".absence-alert") as HTMLElement;
+    expect(alert).toHaveTextContent("Nur noch 6 Tage bis zum ersten Tag.");
+    fireEvent.click(within(alert).getByRole("button", { name: "Im System beantragt" }));
+    expect(workData.setAbsenceStatus).toHaveBeenCalledWith(["a1"], "requested");
+    expect(screen.getByRole("link", { name: /Urlaub - Jahresplanung/ })).toHaveTextContent("1");
+  });
+
+  it("groups consecutive planned days into one request with its reminder date", () => {
+    workData.plannedAbsences = [
+      { id: "a1", date: "2026-12-21", type: "vacation", status: "planned", createdAt: "", updatedAt: "" },
+      { id: "a2", date: "2026-12-22", type: "vacation", status: "planned", createdAt: "", updatedAt: "" }
+    ];
+    render(<App />);
+
+    const request = screen.getByText("Mo 21.12. – Di 22.12.").closest("li") as HTMLElement;
+    expect(request).toHaveTextContent("Urlaub · 2 Tage");
+    expect(request).toHaveTextContent("Ab Mo 07.12.");
+    expect(screen.queryByText(/jetzt beantragen/)).not.toBeInTheDocument();
   });
 });
 

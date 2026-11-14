@@ -1,7 +1,7 @@
 export const APP_NAME = "arbeits-dashboard";
 export const APP_VERSION = "0.1.0";
-export const BACKUP_SCHEMA_VERSION = "1.12.0";
-export const DB_SCHEMA_VERSION = 12;
+export const BACKUP_SCHEMA_VERSION = "1.13.0";
+export const DB_SCHEMA_VERSION = 13;
 
 export type TodoPriority = "P1" | "P2" | "P3" | "P4";
 
@@ -36,6 +36,8 @@ export interface Settings {
   preferredWorkEndTime: string | null;
   vacationEntitlementMinutes: number | null;
   vacationUsedMinutes: number;
+  absenceRequestLeadDays?: number;
+  absenceRequestUrgentDays?: number;
   publicTransportTaxFreeYearLimitCents?: number | null;
   publicTransportTaxFreeYearLimitsCents: Record<string, number | null>;
   updatedAt: string;
@@ -61,6 +63,19 @@ export interface FlexCorrection {
   diffMinutes: number;
   note: string;
   createdAt: string;
+}
+
+export type PlannedAbsenceType = "vacation" | "flex";
+export type PlannedAbsenceStatus = "planned" | "requested" | "booked";
+
+export interface PlannedAbsence {
+  id: string;
+  date: string;
+  type: PlannedAbsenceType;
+  status: PlannedAbsenceStatus;
+  bookedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface VacationSummary {
@@ -226,6 +241,7 @@ export interface BackupData {
   otherMeasures: OtherMeasure[];
   todos: Todo[];
   todoProjects: TodoProject[];
+  plannedAbsences: PlannedAbsence[];
   files: TripFile[];
 }
 
@@ -245,6 +261,8 @@ export function defaultSettings(now = new Date()): Settings {
     preferredWorkEndTime: null,
     vacationEntitlementMinutes: null,
     vacationUsedMinutes: 0,
+    absenceRequestLeadDays: 14,
+    absenceRequestUrgentDays: 7,
     publicTransportTaxFreeYearLimitsCents: {},
     updatedAt: now.toISOString()
   };

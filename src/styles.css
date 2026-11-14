@@ -5745,3 +5745,582 @@ button.week-line:focus-visible {
 .points-year-empty {
   margin: 0;
 }
+
+/* Urlaubsplanung */
+.nav-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.deadline-alert.absence-alert {
+  flex-wrap: wrap;
+  border-color: var(--accent);
+  background: #eef6f6;
+  color: #1d4447;
+}
+
+.absence-alert strong {
+  color: #1d4447;
+}
+
+.absence-alert .deadline-alert-mark {
+  background: var(--accent);
+}
+
+.deadline-alert.absence-alert.is-urgent {
+  border-color: #c39239;
+  background: #fffaf0;
+  color: #5c4214;
+}
+
+.absence-alert.is-urgent strong {
+  color: #5c4214;
+}
+
+.absence-alert.is-urgent .deadline-alert-mark {
+  background: var(--warning);
+}
+
+.absence-alert-copy {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.absence-alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.absence-alert-actions .link-button {
+  color: inherit;
+  font-weight: 700;
+}
+
+.absence-metric-plan {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #eef0f3;
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
+.metric-warning .absence-metric-plan {
+  border-top-color: #efe4c8;
+}
+
+.absence-metric-plan small {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.absence-metric-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.absence-metric-row strong,
+.absence-metric-row b {
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.9rem;
+  color: #1f2937;
+}
+
+.absence-metric-plan .is-done,
+.absence-headline.is-done {
+  color: #1f4a33;
+}
+
+.absence-metric-plan .is-open,
+.absence-headline.is-open {
+  color: #5c4214;
+}
+
+.absence-metric-plan .is-danger,
+.absence-headline.is-danger {
+  color: var(--danger);
+}
+
+.absence-headline {
+  font-weight: 700;
+}
+
+.absence-metric-link {
+  justify-self: start;
+  font-size: 0.82rem;
+}
+
+.absence-plan-bar {
+  display: flex;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f5;
+}
+
+.absence-plan-bar > span {
+  display: block;
+  height: 100%;
+}
+
+.absence-plan-bar-requested {
+  background: var(--accent);
+}
+
+.absence-plan-bar-planned {
+  background: repeating-linear-gradient(135deg, var(--accent) 0 3px, #9cc3c5 3px 7px);
+}
+
+.absence-plan-bar-open {
+  background: #e2bd6c;
+}
+
+.absence-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.absence-calendar {
+  flex: 3 1 560px;
+  min-width: 0;
+}
+
+.absence-requests {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.absence-calendar-toolbar,
+.absence-requests-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.absence-requests-heading > span:last-child {
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
+.absence-mode button[aria-pressed="true"] {
+  background: #fff;
+  color: var(--accent-dark);
+  box-shadow: 0 1px 2px rgba(31, 41, 55, 0.12);
+}
+
+.absence-letter {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.absence-letter.is-vacation {
+  background: #4d7890;
+}
+
+.absence-letter.is-flex {
+  background: #2e6648;
+}
+
+.absence-hint {
+  margin: 10px 0 0;
+  color: #4b5563;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.absence-months {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px 28px;
+  margin-top: 18px;
+}
+
+.absence-month h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+.absence-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.absence-weekdays {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.absence-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 46px;
+  padding: 4px 0;
+  border: 1px solid #e3e7ee;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2937;
+}
+
+.absence-day:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.absence-day:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.absence-day-number {
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.absence-day-tag {
+  min-height: 10px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+
+.absence-day.is-weekend,
+.absence-day.is-holiday {
+  border-color: transparent;
+  background: #f3f5f8;
+  color: var(--muted);
+}
+
+.absence-day.is-holiday {
+  color: var(--danger);
+}
+
+.absence-day.is-past {
+  border-color: #eef0f3;
+  color: #8a94a3;
+}
+
+.absence-day.is-vacation {
+  border: 2px dashed #4d7890;
+  background: #eaf1f6;
+  color: #24485c;
+}
+
+.absence-day.is-flex {
+  border: 2px dashed #2e6648;
+  background: #e7f2ea;
+  color: #1f4a33;
+}
+
+.absence-day.is-vacation.is-requested,
+.absence-day.is-vacation.is-booked {
+  border-style: solid;
+  background: #4d7890;
+  color: #fff;
+}
+
+.absence-day.is-flex.is-requested,
+.absence-day.is-flex.is-booked {
+  border-style: solid;
+  background: #2e6648;
+  color: #fff;
+}
+
+.absence-day.is-booked,
+.absence-day.is-past-day.is-vacation,
+.absence-day.is-past-day.is-flex {
+  opacity: 0.55;
+}
+
+.absence-day.is-today {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent);
+}
+
+.absence-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eef0f3;
+  color: #4b5563;
+  font-size: 0.78rem;
+}
+
+.absence-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.absence-swatch {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  border-radius: 5px;
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.absence-swatch.is-vacation {
+  border: 2px dashed #4d7890;
+  background: #eaf1f6;
+  color: #24485c;
+}
+
+.absence-swatch.is-flex {
+  border: 2px dashed #2e6648;
+  background: #e7f2ea;
+  color: #1f4a33;
+}
+
+.absence-swatch.is-vacation.is-requested {
+  border-style: solid;
+  background: #4d7890;
+  color: #fff;
+}
+
+.absence-swatch.is-flex.is-requested {
+  border-style: solid;
+  background: #2e6648;
+  color: #fff;
+}
+
+.absence-swatch.is-booked {
+  background: #4d7890;
+  color: #fff;
+  opacity: 0.55;
+}
+
+.absence-swatch.is-holiday {
+  background: #f3f5f8;
+  color: var(--danger);
+}
+
+.absence-empty {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: #4b5563;
+}
+
+.absence-request-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.absence-request {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e3e7ee;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.absence-request.is-open {
+  border-color: #b7d3d4;
+  background: #f2f8f8;
+}
+
+.absence-request.is-urgent,
+.absence-request.is-missed {
+  border-color: #ddc58d;
+  background: #fffaf0;
+}
+
+.absence-request p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.absence-request-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.absence-request-head .absence-letter {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.absence-request-head > div {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.absence-request-head strong {
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.86rem;
+}
+
+.absence-request-head small {
+  color: #4b5563;
+  font-size: 0.76rem;
+}
+
+.absence-pill {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #eef1f5;
+  color: #4b5563;
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.absence-pill.is-open {
+  background: var(--accent);
+  color: #fff;
+}
+
+.absence-pill.is-urgent,
+.absence-pill.is-missed {
+  border: 1px solid #c39239;
+  background: #fbecc9;
+  color: #5c4214;
+}
+
+.absence-pill.is-requested {
+  background: #e7f2ea;
+  color: #1f4a33;
+}
+
+.absence-request-actions,
+.planned-day-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.absence-request-actions .secondary-button,
+.planned-day-notice-actions .secondary-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.8rem;
+  color: var(--accent-dark);
+}
+
+.planned-day-notice {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 2px dashed #4d7890;
+  border-radius: 8px;
+  background: #f4f8fb;
+}
+
+.planned-day-notice.is-flex {
+  border-color: #2e6648;
+  background: #f2f8f4;
+}
+
+.planned-day-notice.is-requested,
+.planned-day-notice.is-booked {
+  border-style: solid;
+}
+
+.planned-day-notice strong {
+  color: #24485c;
+}
+
+.planned-day-notice.is-flex strong {
+  color: #1f4a33;
+}
+
+.planned-day-notice p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.week-lane.week-lane-absence {
+  display: flex;
+  align-items: center;
+  height: auto;
+}
+
+.week-lane-absence::before {
+  display: none;
+}
+
+.week-absence {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px 0 3px;
+  border: 2px dashed #4d7890;
+  border-radius: 6px;
+  background: #eaf1f6;
+  color: #24485c;
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.week-absence.is-flex {
+  border-color: #2e6648;
+  background: #e7f2ea;
+  color: #1f4a33;
+}
+
+.week-absence.is-requested,
+.week-absence.is-booked {
+  border-style: solid;
+}
+
+.week-absence .absence-letter {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+}

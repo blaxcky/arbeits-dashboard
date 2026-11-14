@@ -40,7 +40,7 @@ import {
 import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import type { AuditPointCase, AuditPointCategory, OtherMeasure, SavedDestination, Settings, TimeEntry, UsoCase, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
+import type { AuditPointCase, AuditPointCategory, OtherMeasure, PlannedAbsence, SavedDestination, Settings, TimeEntry, UsoCase, TravelExpensePayment, Trip, TripFile, TripFileType, TripTransportType } from "../db/schema";
 import { backupFileName, downloadBackup, importBackup, inspectBackup } from "../services/backup";
 import { resetServiceWorkerAndCaches } from "../services/pwa";
 import { addDays, currentYear, formatDateKey, isValidDateKey, isoWeekDays, parseDateKey, startOfIsoWeek, todayKey, weekdayName } from "../lib/dates";
@@ -101,6 +101,8 @@ import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalityS
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
 import { TodosView } from "../modules/todos/TodosView";
+import { AbsencePlanningView, AbsenceRequestAlert, absencePlanHeadline, computeAbsencePlanning, daysLabel, PlannedDayNotice, PlanBar } from "../modules/time/AbsencePlanningView";
+import { ABSENCE_TYPE_LABELS, ABSENCE_TYPE_LETTERS } from "../modules/time/absencePlanning";
 import {
   applyPointFormStatus,
   applyPointSubmissionMonth,
@@ -188,6 +190,14 @@ function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToas
   const sidebarCollapseRef = useRef<HTMLButtonElement>(null);
   const setupMissing = setupMissingItems(data.settings);
   const sidebarRevealRef = useRef<HTMLButtonElement>(null);
+  const dueAbsenceCount = computeAbsencePlanning(data).due.length;
+  const lastBookedAbsences = data.lastBookedAbsences;
+
+  useEffect(() => {
+    if (!lastBookedAbsences?.length) return;
+    const labels = lastBookedAbsences.map((absence) => `${ABSENCE_TYPE_LABELS[absence.type]} ${formatShortDayLabel(absence.date)}`);
+    showToast(`Laut Planung gebucht: ${labels.join(", ")}`);
+  }, [lastBookedAbsences, showToast]);
 
   function setSidebarCollapsed(collapsed: boolean) {
     setSidebarPreference(collapsed);
@@ -219,6 +229,13 @@ function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToas
                 <item.icon size={20} weight="duotone" />
                 <span>{item.label}</span>
               </NavLink>
+              {item.to === "/" ? (
+                <NavLink to="/urlaub" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
+                  <CalendarBlank size={15} weight="duotone" />
+                  <span>Urlaub - Jahresplanung</span>
+                  {dueAbsenceCount > 0 ? <span className="nav-badge" aria-label={`${dueAbsenceCount} ${dueAbsenceCount === 1 ? "Antrag" : "Anträge"} fällig`}>{dueAbsenceCount}</span> : null}
+                </NavLink>
+              ) : null}
               {item.to === "/reisekosten" ? (
                 <NavLink to="/reisekosten/jahr" className={({ isActive }) => `nav-link nav-link-sub ${isActive ? "active" : ""}`}>
                   <CalendarCheck size={15} weight="duotone" />
@@ -250,8 +267,11 @@ function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToas
         {updateAvailable ? <PwaUpdateNotice updateServiceWorker={updateServiceWorker} showToast={showToast} /> : null}
         {data.error ? <Notice tone="danger" title="Datenfehler" text={data.error} /> : null}
         <TripDeadlineAlert trips={data.trips} today={todayKey(data.clock)} />
+        <AbsenceRequestAlert data={data} showToast={showToast} />
         <Routes>
           <Route path="/" element={<Dashboard data={data} showToast={showToast} />} />
+          <Route path="/urlaub" element={<AbsencePlanningView data={data} showToast={showToast} />} />
+          <Route path="/urlaub/:year" element={<AbsencePlanningView data={data} showToast={showToast} />} />
           <Route path="/reisekosten" element={<TripsView data={data} showToast={showToast} />} />
           <Route path="/reisekosten/jahr" element={<TripsYearView data={data} showToast={showToast} />} />
           <Route path="/reisekosten/jahr/:year" element={<TripsYearView data={data} showToast={showToast} />} />
@@ -342,6 +362,12 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const canBookFlexDay = Boolean(settings && nextFlexDayBalance !== null);
   const currentDate = todayKey(data.clock);
   const selectedEntryMissingEnd = isOverdueWeekdayMissingEnd(previewEntry, currentDate);
+  const absencePlanning = computeAbsencePlanning(data);
+  const absenceSummary = absencePlanning.summary;
+  const selectedAbsence = absencePlanning.byDate.get(selectedDate);
+  const plannedFlexDays = absenceSummary.flexRequestedDays + absenceSummary.flexPlannedDays;
+  const plannedVacationDays = absenceSummary.vacationRequestedDays + absenceSummary.vacationPlannedDays;
+  const absenceHeadline = absencePlanHeadline(absenceSummary, dailyTargetMinutes);
   const endTimeError = timeErrors.endTime ?? (selectedEntryMissingEnd ? "Dienstende fehlt. Bitte nachtragen." : undefined);
 
   useEffect(() => {
@@ -520,7 +546,16 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             overflow: flexLimitMinutes > 0 && flex > flexLimitMinutes ? (flex - flexLimitMinutes) / flexLimitMinutes : 0,
             tone: flex > flexLimitMinutes ? "warning" : "default"
           }}
-        />
+        >
+          {plannedFlexDays > 0 ? (
+            <div className="absence-metric-plan">
+              <div className="absence-metric-row">
+                <span>Nach Planung ({plannedFlexDays === 1 ? "1 Gleittag" : `${plannedFlexDays} Gleittage`})</span>
+                <strong className={absenceSummary.status === "flex-too-low" ? "is-danger" : absenceSummary.flexOverLimitAfterMinutes > 0 ? "is-open" : "is-done"}>{formatSignedMinutes(absenceSummary.flexAfterMinutes)}</strong>
+              </div>
+            </div>
+          ) : null}
+        </Metric>
         <Metric
           title="Resturlaub"
           value={vacation ? formatWholeDays(vacation.remainingMinutes, dailyTargetMinutes) : "0 Tage"}
@@ -560,12 +595,34 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             </button>
           }
           progress={{ value: vacationEntitlementMinutes > 0 ? vacationRemainingMinutes / vacationEntitlementMinutes : 0, tone: "vacation" }}
-        />
+        >
+          {plannedVacationDays > 0 ? (
+            <div className="absence-metric-plan">
+              <div className="absence-metric-row">
+                <span>Nach Planung ({daysLabel(plannedVacationDays)})</span>
+                <strong className={absenceSummary.vacationAfterMinutes === 0 ? "is-done" : absenceSummary.vacationAfterMinutes < 0 ? "is-danger" : "is-open"}>
+                  {absenceSummary.vacationAfterMinutes >= 0 ? `${daysLabel(Math.round(absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} übrig` : `${daysLabel(Math.round(-absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} zu viel`}
+                </strong>
+              </div>
+            </div>
+          ) : null}
+        </Metric>
         <Metric
           title="Dieses Jahr verbrauchen"
           value={formatDays(requiredConsumption, dailyTargetMinutes)}
           detail={`Resturlaub ${formatDays(vacationRemainingMinutes, dailyTargetMinutes)} · Gleitzeit über Grenze ${formatDays(flexOverLimitMinutes, dailyTargetMinutes)}`}
-        />
+        >
+          <div className="absence-metric-plan">
+            <div className="absence-metric-row">
+              <span>Verplant <b>{formatDays(absenceSummary.scheduledMinutes, dailyTargetMinutes)}</b></span>
+              <span>Offen <b className={absenceSummary.openMinutes > 0 ? "is-open" : "is-done"}>{formatDays(absenceSummary.openMinutes, dailyTargetMinutes)}</b></span>
+            </div>
+            {absenceSummary.neededMinutes > 0 ? (
+              <PlanBar requested={absenceSummary.coveredRequestedMinutes} planned={absenceSummary.coveredPlannedMinutes} total={absenceSummary.neededMinutes} label={absenceHeadline.text} />
+            ) : null}
+            <Link className="link-button absence-metric-link" to="/urlaub">Zur Jahresplanung</Link>
+          </div>
+        </Metric>
       </section>
       <div className="dashboard-workflow">
         <form className={`panel day-card${selectedEntryMissingEnd ? " day-card-missing-end" : ""}`} aria-label="Tageserfassung" onSubmit={(event) => event.preventDefault()}>
@@ -573,6 +630,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             <span className="section-label">{isToday ? "Heute" : formatShortDayLabel(selectedDate)}</span>
             {entry ? <span className="day-card-saved"><Check size={14} weight="bold" />Gespeichert</span> : null}
           </div>
+          {selectedAbsence ? <PlannedDayNotice data={data} absence={selectedAbsence} showToast={showToast} /> : null}
           <DaySummary day={day} isToday={isToday} startTime={previewEntry.startTime} targetMinutes={previewEntry.targetMinutes} startPreview={startPreview} />
           <div className="day-card-times">
             <WorkTimeField
@@ -634,6 +692,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           currentDate={currentDate}
           nowMinutes={nowMinutes}
           weeklyTargetMinutes={weeklyTargetMinutes}
+          absencesByDate={absencePlanning.byDate}
           onSelectDate={selectDate}
           onWeekChange={(offsetDays) => selectDate(addDays(selectedDate, offsetDays))}
           onThisWeek={() => selectDate(currentDate)}
@@ -678,7 +737,9 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
       preferredWorkStartTime: normalizeTimeInput(form.preferredWorkStartTime) || null,
       preferredWorkEndTime: normalizeTimeInput(form.preferredWorkEndTime) || null,
       vacationEntitlementMinutes: form.vacationEntitlementMinutes === "" ? null : hoursToMinutes(form.vacationEntitlementMinutes),
-      vacationUsedMinutes: clampHoursToMinutes(form.vacationUsedMinutes, 0, 20000)
+      vacationUsedMinutes: clampHoursToMinutes(form.vacationUsedMinutes, 0, 20000),
+      absenceRequestLeadDays: parseIntegerInRange(form.absenceRequestLeadDays, 1, 90) ?? 14,
+      absenceRequestUrgentDays: parseIntegerInRange(form.absenceRequestUrgentDays, 0, 60) ?? 7
     });
     showToast("Einstellungen gespeichert.");
   }
@@ -729,6 +790,8 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
               </Field>
               <Field label="Urlaubsanspruch (Stunden)" error={settingsErrors.vacationEntitlementMinutes}><input type="number" step="0.25" value={form.vacationEntitlementMinutes} aria-invalid={Boolean(settingsErrors.vacationEntitlementMinutes)} onChange={(event) => updateSettingsField("vacationEntitlementMinutes", event.target.value)} placeholder="leer" /></Field>
               <Field label="Verbrauchter Urlaub (Stunden)" error={settingsErrors.vacationUsedMinutes}><input type="number" step="0.25" value={form.vacationUsedMinutes} aria-invalid={Boolean(settingsErrors.vacationUsedMinutes)} onChange={(event) => updateSettingsField("vacationUsedMinutes", event.target.value)} /></Field>
+              <Field label="Urlaubsantrag erinnern (Tage vorher)" error={settingsErrors.absenceRequestLeadDays}><input type="number" step="1" min="1" max="90" value={form.absenceRequestLeadDays} aria-invalid={Boolean(settingsErrors.absenceRequestLeadDays)} onChange={(event) => updateSettingsField("absenceRequestLeadDays", event.target.value)} /></Field>
+              <Field label="Antrag dringend ab (Tage vorher)" error={settingsErrors.absenceRequestUrgentDays}><input type="number" step="1" min="0" max="60" value={form.absenceRequestUrgentDays} aria-invalid={Boolean(settingsErrors.absenceRequestUrgentDays)} onChange={(event) => updateSettingsField("absenceRequestUrgentDays", event.target.value)} /></Field>
             </div>
             <button className="primary-button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
           </div>
@@ -3913,6 +3976,7 @@ function WeekTimeline({
   currentDate,
   nowMinutes,
   weeklyTargetMinutes,
+  absencesByDate,
   onSelectDate,
   onWeekChange,
   onThisWeek
@@ -3922,6 +3986,7 @@ function WeekTimeline({
   currentDate: string;
   nowMinutes: number;
   weeklyTargetMinutes: number;
+  absencesByDate?: Map<string, PlannedAbsence>;
   onSelectDate: (date: string) => void;
   onWeekChange: (offsetDays: number) => void;
   onThisWeek: () => void;
@@ -3953,6 +4018,7 @@ function WeekTimeline({
         </div>
         {lines.map(({ day, line }) => {
           const selected = day.date === selectedDate;
+          const absence = absencesByDate?.get(day.date);
           const startTime = day.entry?.startTime ?? "";
           const timeLabel = line.kind === "empty" ? "–" : line.kind === "complete" ? `${startTime}–${day.entry?.endTime ?? ""}` : line.kind === "running" ? `${startTime}–läuft` : `${startTime}–offen`;
           const tone = deltaTone(day.calculation.deltaMinutes);
@@ -3960,7 +4026,16 @@ function WeekTimeline({
             <button key={day.date} type="button" className={`week-line week-line-${line.kind}${selected ? " is-selected" : ""}`} aria-pressed={selected} onClick={() => onSelectDate(day.date)}>
               <span className="week-col-day">{formatShortDayLabel(day.date)}</span>
               <span className="week-col-time">{timeLabel}</span>
-              <span className="week-col-lane week-lane" aria-hidden="true"><WeekLaneBar line={line} /></span>
+              {absence && line.kind === "empty" ? (
+                <span className="week-col-lane week-lane week-lane-absence">
+                  <span className={`week-absence is-${absence.type} is-${absence.status}`}>
+                    <span className={`absence-letter is-${absence.type}`} aria-hidden="true">{ABSENCE_TYPE_LETTERS[absence.type]}</span>
+                    {ABSENCE_TYPE_LABELS[absence.type]} {absence.status === "booked" ? "gebucht" : absence.status === "requested" ? "beantragt" : "geplant"}
+                  </span>
+                </span>
+              ) : (
+                <span className="week-col-lane week-lane" aria-hidden="true"><WeekLaneBar line={line} /></span>
+              )}
               <span className="week-col-hours">{line.kind === "empty" || line.kind === "missing-end" ? "–" : formatMinutes(day.calculation.netMinutes)}</span>
               <span className="week-col-saldo">
                 {line.kind === "complete" ? <span className={`week-pill week-pill-${tone}`}>{formatSignedMinutes(day.calculation.deltaMinutes)}</span> : null}
@@ -4409,7 +4484,9 @@ export function settingsToForm(settings: Settings | null) {
     preferredWorkStartTime: settings?.preferredWorkStartTime ?? "",
     preferredWorkEndTime: settings?.preferredWorkEndTime ?? "",
     vacationEntitlementMinutes: settings?.vacationEntitlementMinutes === null || settings?.vacationEntitlementMinutes === undefined ? "" : minutesToHourInput(settings.vacationEntitlementMinutes),
-    vacationUsedMinutes: minutesToHourInput(settings?.vacationUsedMinutes ?? 0)
+    vacationUsedMinutes: minutesToHourInput(settings?.vacationUsedMinutes ?? 0),
+    absenceRequestLeadDays: String(settings?.absenceRequestLeadDays ?? 14),
+    absenceRequestUrgentDays: String(settings?.absenceRequestUrgentDays ?? 7)
   };
 }
 
@@ -4650,7 +4727,9 @@ export function validateSettingsForm(form: SettingsForm): SettingsErrors {
     ["preferredWorkStartTime", validateOptionalTimeField(form.preferredWorkStartTime)],
     ["preferredWorkEndTime", validateOptionalTimeField(form.preferredWorkEndTime)],
     ["vacationEntitlementMinutes", validateHourField(form.vacationEntitlementMinutes, 0, 20000, true)],
-    ["vacationUsedMinutes", validateHourField(form.vacationUsedMinutes, 0, 20000)]
+    ["vacationUsedMinutes", validateHourField(form.vacationUsedMinutes, 0, 20000)],
+    ["absenceRequestLeadDays", parseIntegerInRange(form.absenceRequestLeadDays, 1, 90) === null ? "Bitte 1 bis 90 Tage eingeben." : undefined],
+    ["absenceRequestUrgentDays", parseIntegerInRange(form.absenceRequestUrgentDays, 0, 60) === null ? "Bitte 0 bis 60 Tage eingeben." : undefined]
   ];
 
   for (const [field, error] of fields) {

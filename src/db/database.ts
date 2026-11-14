@@ -8,6 +8,9 @@ import {
   type AppMeta,
   type FlexCorrection,
   type OtherMeasure,
+  type PlannedAbsence,
+  type PlannedAbsenceStatus,
+  type PlannedAbsenceType,
   type SavedDestination,
   type Settings,
   type Todo,
@@ -22,6 +25,8 @@ import {
   defaultSettings
 } from "./schema";
 import { calculateAuditPointBreakdown } from "../modules/points/calculations";
+import { calculateFlexBalance, calculateNextVacationUsedMinutes, entriesForFlexBalance } from "../modules/time/calculations";
+import { absencesDueForBooking } from "../modules/time/absencePlanning";
 
 class WorkDashboardDb extends Dexie {
   settings!: Table<Settings, string>;
@@ -40,6 +45,7 @@ class WorkDashboardDb extends Dexie {
   otherMeasures!: Table<OtherMeasure, string>;
   todos!: Table<Todo, string>;
   todoProjects!: Table<TodoProject, string>;
+  plannedAbsences!: Table<PlannedAbsence, string>;
 
   constructor() {
     super("arbeits-dashboard");
@@ -228,6 +234,25 @@ class WorkDashboardDb extends Dexie {
         measure.manualPointsNote = normalizeManualPointsNote(measure.manualPointsNote, measure.manualPointsTenths);
       });
     });
+    this.version(13).stores({
+      settings: "id",
+      timeEntries: "id, &date",
+      flexCorrections: "id, date, createdAt",
+      vacationSummary: "id, year",
+      appMeta: "id",
+      trips: "id, date, done, transportType",
+      files: "id, tripId, type, createdAt",
+      savedDestinations: "id, name, updatedAt",
+      tripPayments: "id, year, date",
+      auditPointCases: "id, submissionMonth, status, category",
+      auditPointGoals: "id, &year",
+      usoCases: "id, submissionMonth, status",
+      usoGoals: "id, &year",
+      otherMeasures: "id, submissionMonth, status, measureType",
+      todos: "id, projectId, dueDate, completedAt, updatedAt",
+      todoProjects: "id, sortOrder, updatedAt",
+      plannedAbsences: "id, &date, status"
+    });
   }
 }
 
@@ -243,6 +268,8 @@ export async function ensureDefaults(): Promise<Settings> {
     settings.publicTransportTaxFreeYearLimitsCents === undefined
     || settings.preferredWorkStartTime === undefined
     || settings.preferredWorkEndTime === undefined
+    || settings.absenceRequestLeadDays === undefined
+    || settings.absenceRequestUrgentDays === undefined
   ) {
     settings = normalizeSettings(settings);
     await db.settings.put(settings);
@@ -616,6 +643,76 @@ export async function deleteTodoProject(id: string): Promise<void> {
   });
 }
 
+export async function listPlannedAbsences(): Promise<PlannedAbsence[]> {
+  return db.plannedAbsences.orderBy("date").toArray();
+}
+
+export async function setPlannedAbsence(date: string, type: PlannedAbsenceType): Promise<PlannedAbsence> {
+  return db.transaction("rw", db.plannedAbsences, async () => {
+    const existing = await db.plannedAbsences.where("date").equals(date).first();
+    if (existing?.status === "booked") return existing;
+    const now = new Date().toISOString();
+    const absence: PlannedAbsence = {
+      id: existing?.id ?? crypto.randomUUID(),
+      date,
+      type,
+      status: existing && existing.type === type ? existing.status : "planned",
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now
+    };
+    await db.plannedAbsences.put(absence);
+    return absence;
+  });
+}
+
+export async function deletePlannedAbsence(id: string): Promise<void> {
+  const existing = await db.plannedAbsences.get(id);
+  if (existing && existing.status !== "booked") await db.plannedAbsences.delete(id);
+}
+
+export async function setPlannedAbsenceStatus(ids: string[], status: Exclude<PlannedAbsenceStatus, "booked">): Promise<void> {
+  const now = new Date().toISOString();
+  await db.transaction("rw", db.plannedAbsences, async () => {
+    for (const id of ids) {
+      const existing = await db.plannedAbsences.get(id);
+      if (existing && existing.status !== "booked") await db.plannedAbsences.put({ ...existing, status, updatedAt: now });
+    }
+  });
+}
+
+export async function bookPlannedAbsences(ids: string[], today: string): Promise<PlannedAbsence[]> {
+  return db.transaction("rw", [db.settings, db.vacationSummary, db.appMeta, db.timeEntries, db.flexCorrections, db.plannedAbsences], async () => {
+    const absences = (await db.plannedAbsences.bulkGet(ids))
+      .filter((absence): absence is PlannedAbsence => Boolean(absence) && absence?.status !== "booked")
+      .sort((left, right) => left.date.localeCompare(right.date));
+    if (absences.length === 0) return [];
+    let settings = await ensureDefaults();
+    const entries = await db.timeEntries.toArray();
+    const booked: PlannedAbsence[] = [];
+    for (const absence of absences) {
+      const now = new Date().toISOString();
+      if (absence.type === "vacation") {
+        const nextUsed = calculateNextVacationUsedMinutes(settings.vacationEntitlementMinutes, settings.vacationUsedMinutes, settings.dailyTargetMinutes || 480);
+        if (nextUsed !== settings.vacationUsedMinutes) settings = await updateSettings({ vacationUsedMinutes: nextUsed });
+      } else {
+        const corrections = await db.flexCorrections.toArray();
+        const flex = calculateFlexBalance(settings.flexStartMinutes ?? 0, entriesForFlexBalance(entries, today), corrections);
+        await addFlexCorrection({ date: absence.date, oldValueMinutes: flex, newValueMinutes: flex - (settings.dailyTargetMinutes || 480), note: "Gleittag laut Planung" });
+      }
+      const next: PlannedAbsence = { ...absence, status: "booked", bookedAt: now, updatedAt: now };
+      await db.plannedAbsences.put(next);
+      booked.push(next);
+    }
+    return booked;
+  });
+}
+
+export async function bookDuePlannedAbsences(today: string): Promise<PlannedAbsence[]> {
+  const due = absencesDueForBooking(await listPlannedAbsences(), today);
+  if (due.length === 0) return [];
+  return bookPlannedAbsences(due.map((absence) => absence.id), today);
+}
+
 export async function readAllData(): Promise<BackupData> {
   await ensureDefaults();
   return {
@@ -634,13 +731,14 @@ export async function readAllData(): Promise<BackupData> {
     otherMeasures: (await db.otherMeasures.toArray()).map(normalizeOtherMeasure),
     todos: await db.todos.toArray(),
     todoProjects: await db.todoProjects.toArray(),
+    plannedAbsences: await db.plannedAbsences.toArray(),
     files: await db.files.toArray()
   };
 }
 
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals, db.otherMeasures, db.todos, db.todoProjects], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear(), db.otherMeasures.clear(), db.todos.clear(), db.todoProjects.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals, db.otherMeasures, db.todos, db.todoProjects, db.plannedAbsences], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear(), db.otherMeasures.clear(), db.todos.clear(), db.todoProjects.clear(), db.plannedAbsences.clear()]);
     if (data.settings) await db.settings.put(normalizeSettings(data.settings));
     await db.timeEntries.bulkPut(data.timeEntries);
     await db.flexCorrections.bulkPut(data.flexCorrections);
@@ -657,13 +755,14 @@ export async function replaceAllData(data: BackupData): Promise<void> {
     await db.otherMeasures.bulkPut((data.otherMeasures ?? []).map(normalizeOtherMeasure));
     await db.todos.bulkPut(data.todos ?? []);
     await db.todoProjects.bulkPut(data.todoProjects ?? []);
+    await db.plannedAbsences.bulkPut(data.plannedAbsences ?? []);
   });
   await ensureDefaults();
 }
 
 export async function deleteAllLocalData(): Promise<void> {
-  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals, db.otherMeasures, db.todos, db.todoProjects], async () => {
-    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear(), db.otherMeasures.clear(), db.todos.clear(), db.todoProjects.clear()]);
+  await db.transaction("rw", [db.settings, db.timeEntries, db.flexCorrections, db.vacationSummary, db.appMeta, db.trips, db.files, db.savedDestinations, db.tripPayments, db.auditPointCases, db.auditPointGoals, db.usoCases, db.usoGoals, db.otherMeasures, db.todos, db.todoProjects, db.plannedAbsences], async () => {
+    await Promise.all([db.settings.clear(), db.timeEntries.clear(), db.flexCorrections.clear(), db.vacationSummary.clear(), db.appMeta.clear(), db.trips.clear(), db.files.clear(), db.savedDestinations.clear(), db.tripPayments.clear(), db.auditPointCases.clear(), db.auditPointGoals.clear(), db.usoCases.clear(), db.usoGoals.clear(), db.otherMeasures.clear(), db.todos.clear(), db.todoProjects.clear(), db.plannedAbsences.clear()]);
   });
 }
 
@@ -692,6 +791,8 @@ function normalizeSettings(settings: Settings): Settings {
     ...settings,
     preferredWorkStartTime: settings.preferredWorkStartTime ?? null,
     preferredWorkEndTime: settings.preferredWorkEndTime ?? null,
+    absenceRequestLeadDays: settings.absenceRequestLeadDays ?? 14,
+    absenceRequestUrgentDays: settings.absenceRequestUrgentDays ?? 7,
     publicTransportTaxFreeYearLimitCents: undefined,
     publicTransportTaxFreeYearLimitsCents
   };

@@ -1,9 +1,9 @@
 import JSZip from "jszip";
 import { readAllData, replaceAllData } from "../db/database";
-import { APP_NAME, BACKUP_SCHEMA_VERSION, type AuditPointCase, type AuditPointGoal, type BackupData, type BackupManifest, type BackupPayload, type OtherMeasure, type Todo, type TodoProject, type UsoCase, type UsoGoal, type TravelExpensePayment, type TripFile } from "../db/schema";
+import { APP_NAME, BACKUP_SCHEMA_VERSION, type AuditPointCase, type AuditPointGoal, type BackupData, type BackupManifest, type BackupPayload, type OtherMeasure, type PlannedAbsence, type Todo, type TodoProject, type UsoCase, type UsoGoal, type TravelExpensePayment, type TripFile } from "../db/schema";
 
 type SerializedTripFile = Omit<TripFile, "dataUrl"> & ({ dataUrl: string; path?: never } | { path: string; dataUrl?: never });
-type SerializedBackupData = Omit<BackupData, "files" | "tripPayments" | "auditPointCases" | "auditPointGoals" | "usoCases" | "usoGoals" | "otherMeasures" | "todos" | "todoProjects"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[]; auditPointCases?: AuditPointCase[]; auditPointGoals?: AuditPointGoal[]; usoCases?: UsoCase[]; usoGoals?: UsoGoal[]; otherMeasures?: OtherMeasure[]; todos?: Todo[]; todoProjects?: TodoProject[] };
+type SerializedBackupData = Omit<BackupData, "files" | "tripPayments" | "auditPointCases" | "auditPointGoals" | "usoCases" | "usoGoals" | "otherMeasures" | "todos" | "todoProjects" | "plannedAbsences"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[]; auditPointCases?: AuditPointCase[]; auditPointGoals?: AuditPointGoal[]; usoCases?: UsoCase[]; usoGoals?: UsoGoal[]; otherMeasures?: OtherMeasure[]; todos?: Todo[]; todoProjects?: TodoProject[]; plannedAbsences?: PlannedAbsence[] };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -42,6 +42,7 @@ export async function exportBackup(): Promise<Blob> {
       otherMeasures: data.otherMeasures.length,
       todos: data.todos.length,
       todoProjects: data.todoProjects.length,
+      plannedAbsences: data.plannedAbsences.length,
       files: data.files.length,
       savedDestinations: data.savedDestinations.length
     }
@@ -111,6 +112,7 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   if (value.otherMeasures !== undefined && !Array.isArray(value.otherMeasures)) throw new Error("Sonstige Maßnahmen sind ungültig.");
   if (value.todos !== undefined && !Array.isArray(value.todos)) throw new Error("Aufgaben sind ungültig.");
   if (value.todoProjects !== undefined && !Array.isArray(value.todoProjects)) throw new Error("Aufgabenprojekte sind ungültig.");
+  if (value.plannedAbsences !== undefined && !Array.isArray(value.plannedAbsences)) throw new Error("Geplante Urlaubstage sind ungültig.");
   if (!Array.isArray(value.files)) throw new Error("Nachweise fehlen.");
   if (value.savedDestinations !== undefined && !Array.isArray(value.savedDestinations)) throw new Error("Gespeicherte Zieladressen sind ungültig.");
   if (value.settings !== null) validateSettings(value.settings);
@@ -126,6 +128,7 @@ function validateData(value: unknown): asserts value is SerializedBackupData {
   (value.otherMeasures ?? []).forEach(validateOtherMeasure);
   (value.todos ?? []).forEach(validateTodo);
   (value.todoProjects ?? []).forEach(validateTodoProject);
+  (value.plannedAbsences ?? []).forEach(validatePlannedAbsence);
   (value.savedDestinations ?? []).forEach(validateSavedDestination);
   value.files.forEach(validateTripFile);
 }
@@ -149,6 +152,8 @@ function validateSettings(value: unknown): void {
   requireOptionalNullableClockTime(value, "preferredWorkEndTime", "Schnellwahl Dienstende ist ungültig.");
   requireNullableNumber(value, "vacationEntitlementMinutes", "Urlaubsanspruch ist ungültig.");
   requireNumber(value, "vacationUsedMinutes", "Verbrauchter Urlaub fehlt.");
+  requireOptionalNullableNumber(value, "absenceRequestLeadDays", "Antragsvorlauf ist ungültig.");
+  requireOptionalNullableNumber(value, "absenceRequestUrgentDays", "Dringend-Schwelle ist ungültig.");
   requireOptionalNullableNumber(value, "publicTransportTaxFreeYearLimitCents", "Öffi-BEZU-Jahresdeckel ist ungültig.");
   requireOptionalNullableNumberRecord(value, "publicTransportTaxFreeYearLimitsCents", "Öffi-BEZU-Jahresdeckel je Jahr ist ungültig.");
   requireString(value, "updatedAt", "Einstellungs-Zeitstempel fehlt.");
@@ -322,6 +327,16 @@ function validateTodoProject(value: unknown): void {
   requireString(value, "updatedAt", "Aufgabenprojekt-Aktualisiert-Zeit fehlt.");
 }
 
+function validatePlannedAbsence(value: unknown): void {
+  if (!isObject(value)) throw new Error("Geplanter Urlaubstag ist ungültig.");
+  requireString(value, "id", "Geplanter Urlaubstag: ID fehlt.");
+  requireString(value, "date", "Geplanter Urlaubstag: Datum fehlt.");
+  if (value.type !== "vacation" && value.type !== "flex") throw new Error("Geplanter Urlaubstag: Art ist ungültig.");
+  if (value.status !== "planned" && value.status !== "requested" && value.status !== "booked") throw new Error("Geplanter Urlaubstag: Status ist ungültig.");
+  requireString(value, "createdAt", "Geplanter Urlaubstag: Erstellt-Zeit fehlt.");
+  requireString(value, "updatedAt", "Geplanter Urlaubstag: Aktualisiert-Zeit fehlt.");
+}
+
 function validateTripFile(value: unknown): void {
   if (!isObject(value)) throw new Error("Nachweis ist ungültig.");
   requireString(value, "id", "Nachweis-ID fehlt.");
@@ -369,7 +384,8 @@ async function hydrateBackupFiles(data: SerializedBackupData, zip: JSZip): Promi
     usoGoals: data.usoGoals ?? [],
     otherMeasures: (data.otherMeasures ?? []).map((measure) => ({ ...measure, manualPointsTenths: measure.manualPointsTenths ?? 0, manualPointsNote: measure.manualPointsNote ?? "" })),
     todos: data.todos ?? [],
-    todoProjects: data.todoProjects ?? []
+    todoProjects: data.todoProjects ?? [],
+    plannedAbsences: data.plannedAbsences ?? []
   };
 }
 

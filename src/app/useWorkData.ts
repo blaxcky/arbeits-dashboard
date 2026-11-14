@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addFlexCorrection,
+  bookDuePlannedAbsences,
+  bookPlannedAbsences,
+  deletePlannedAbsence,
+  listPlannedAbsences,
+  setPlannedAbsence,
+  setPlannedAbsenceStatus,
   addTripFile,
   deleteAuditPointCase,
   deleteOtherMeasure,
@@ -43,7 +49,7 @@ import {
   upsertTodo,
   upsertTodoProject
 } from "../db/database";
-import type { AuditPointCase, AuditPointGoal, FlexCorrection, OtherMeasure, SavedDestination, Settings, TimeEntry, Todo, TodoProject, Trip, TripFile, UsoCase, UsoGoal, TravelExpensePayment } from "../db/schema";
+import type { AuditPointCase, AuditPointGoal, FlexCorrection, OtherMeasure, PlannedAbsence, PlannedAbsenceType, SavedDestination, Settings, TimeEntry, Todo, TodoProject, Trip, TripFile, UsoCase, UsoGoal, TravelExpensePayment } from "../db/schema";
 import { todayKey } from "../lib/dates";
 
 export interface WorkDataState {
@@ -63,6 +69,8 @@ export interface WorkDataState {
   savedDestinations: SavedDestination[];
   todos: Todo[];
   todoProjects: TodoProject[];
+  plannedAbsences: PlannedAbsence[];
+  lastBookedAbsences: PlannedAbsence[];
 }
 
 export function useWorkData() {
@@ -82,15 +90,19 @@ export function useWorkData() {
     files: [],
     savedDestinations: [],
     todos: [],
-    todoProjects: []
+    todoProjects: [],
+    plannedAbsences: [],
+    lastBookedAbsences: []
   });
   const [clock, setClock] = useState(new Date());
 
   const refresh = useCallback(async () => {
     try {
+      await ensureDefaults();
+      const bookedAbsences = await bookDuePlannedAbsences(todayKey());
       const settings = await ensureDefaults();
-      const [timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, otherMeasures, files, savedDestinations, todos, todoProjects] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripPayments(), listAuditPointCases(), listAuditPointGoals(), listUsoCases(), listUsoGoals(), listOtherMeasures(), listTripFiles(), listSavedDestinations(), listTodos(), listTodoProjects()]);
-      setState({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, otherMeasures, files, savedDestinations, todos, todoProjects });
+      const [timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, otherMeasures, files, savedDestinations, todos, todoProjects, plannedAbsences] = await Promise.all([listTimeEntries(), listFlexCorrections(), listTrips(), listTripPayments(), listAuditPointCases(), listAuditPointGoals(), listUsoCases(), listUsoGoals(), listOtherMeasures(), listTripFiles(), listSavedDestinations(), listTodos(), listTodoProjects(), listPlannedAbsences()]);
+      setState((current) => ({ loading: false, error: null, settings, timeEntries, flexCorrections, trips, tripPayments, auditPointCases, auditPointGoals, usoCases, usoGoals, otherMeasures, files, savedDestinations, todos, todoProjects, plannedAbsences, lastBookedAbsences: bookedAbsences.length ? bookedAbsences : current.lastBookedAbsences }));
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Daten konnten nicht geladen werden." }));
     }
@@ -104,6 +116,12 @@ export function useWorkData() {
     const interval = window.setInterval(() => setClock(new Date()), 30000);
     return () => window.clearInterval(interval);
   }, []);
+
+  const currentDayKey = todayKey(clock);
+  useEffect(() => {
+    if (!state.loading) void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDayKey]);
 
   const entriesByDate = useMemo(() => new Map(state.timeEntries.map((entry) => [entry.date, entry])), [state.timeEntries]);
 
@@ -129,6 +147,23 @@ export function useWorkData() {
     addCorrection: async (input: Omit<FlexCorrection, "id" | "createdAt" | "diffMinutes">) => {
       await addFlexCorrection(input);
       await refresh();
+    },
+    planAbsence: async (date: string, type: PlannedAbsenceType) => {
+      await setPlannedAbsence(date, type);
+      await refresh();
+    },
+    removePlannedAbsence: async (id: string) => {
+      await deletePlannedAbsence(id);
+      await refresh();
+    },
+    setAbsenceStatus: async (ids: string[], status: "planned" | "requested") => {
+      await setPlannedAbsenceStatus(ids, status);
+      await refresh();
+    },
+    bookAbsences: async (ids: string[]) => {
+      const booked = await bookPlannedAbsences(ids, todayKey());
+      await refresh();
+      return booked;
     },
     removeCorrection: async (id: string) => {
       await deleteFlexCorrection(id);

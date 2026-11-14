@@ -132,6 +132,7 @@ function backupData(): BackupData {
     savedDestinations: [],
     todos: [],
     todoProjects: [],
+    plannedAbsences: [],
     files: [
       {
         id: "file-1",
@@ -196,14 +197,14 @@ describe("backup service", () => {
     expect(await zip.file("files/file-1-screenshot.png")?.async("uint8array")).toEqual(screenshotBytes);
   });
 
-  it("exports backup schema 1.12.0", async () => {
+  it("exports backup schema 1.13.0", async () => {
     dbMocks.readAllData.mockResolvedValue(backupData());
 
     const blob = await exportBackup();
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { schemaVersion: string };
 
-    expect(manifest.schemaVersion).toBe("1.12.0");
+    expect(manifest.schemaVersion).toBe("1.13.0");
   });
 
   it("exports trip payments in the backup counts and data", async () => {
@@ -280,6 +281,32 @@ describe("backup service", () => {
     const zip = await JSZip.loadAsync(blob);
     const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { todos: number; todoProjects: number } };
     expect(manifest.counts).toMatchObject({ todos: 1, todoProjects: 1 });
+  });
+
+  it("exports planned absences in the backup counts and data", async () => {
+    const data = backupData();
+    data.plannedAbsences = [{ id: "absence-1", date: "2026-12-21", type: "vacation", status: "requested", createdAt: "2026-11-15T08:00:00.000Z", updatedAt: "2026-11-15T08:00:00.000Z" }];
+    dbMocks.readAllData.mockResolvedValue(data);
+
+    const blob = await exportBackup();
+    const zip = await JSZip.loadAsync(blob);
+    const manifest = JSON.parse((await zip.file("manifest.json")?.async("string")) ?? "{}") as { counts: { plannedAbsences: number } };
+    const exported = JSON.parse((await zip.file("data.json")?.async("string")) ?? "{}") as { plannedAbsences: unknown[] };
+
+    expect(manifest.counts.plannedAbsences).toBe(1);
+    expect(exported.plannedAbsences).toEqual(data.plannedAbsences);
+  });
+
+  it("rejects planned absences with an unknown type", async () => {
+    const data = backupData();
+    const { dataUrl: _dataUrl, ...fileMetadata } = data.files[0];
+    const zip = new JSZip();
+    zip.file("manifest.json", JSON.stringify({ appName: "arbeits-dashboard", schemaVersion: "1.13.0", exportedAt: "2026-11-15T08:00:00.000Z", counts: {} }));
+    zip.file("data.json", JSON.stringify({ ...data, files: [{ ...fileMetadata, path: "files/file-1-screenshot.png" }], plannedAbsences: [{ id: "absence-1", date: "2026-12-21", type: "sick", status: "planned", createdAt: "x", updatedAt: "x" }] }));
+    zip.file("files/file-1-screenshot.png", screenshotBytes);
+    const file = new File([await zip.generateAsync({ type: "uint8array" })], "backup.zip", { type: "application/zip" });
+
+    await expect(inspectBackup(file)).rejects.toThrow("Geplanter Urlaubstag: Art ist ungültig.");
   });
 
   it("imports new backups and restores TripFile dataUrl for IndexedDB", async () => {
