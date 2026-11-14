@@ -298,7 +298,7 @@ describe("Google Maps route action", () => {
 
     fireEvent.change(screen.getByLabelText("Startort"), { target: { value: "Eisenstadt Finanzamt" } });
     fireEvent.change(screen.getByLabelText("Zieladresse"), { target: { value: "Stephansplatz 1, 1010 Wien" } });
-    fireEvent.change(screen.getByLabelText("Fahrtkostenart"), { target: { value: "dienstauto" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Dienstauto" }));
 
     const mapsButton = screen.getByRole("button", { name: "Google Maps öffnen" });
     expect(mapsButton).toBeInTheDocument();
@@ -336,29 +336,56 @@ describe("Google Maps route action", () => {
     expect(document.querySelector("iframe")).not.toBeInTheDocument();
   });
 
-  it("places the new-trip action in the Reisedaten heading and resets the form", () => {
+  it("places a labelled new-trip action in the page header and resets the form", () => {
     render(<App />);
 
-    const travelSection = screen.getByRole("heading", { name: "Reisedaten" }).closest("section") as HTMLElement;
-    const newTripButton = within(travelSection).getByRole("button", { name: "Neue Reise" });
+    const header = screen.getByRole("heading", { name: "Reise erfassen" }).closest("header") as HTMLElement;
+    const newTripButton = within(header).getByRole("button", { name: "Neue Reise" });
 
     expect(newTripButton).toHaveAttribute("type", "button");
-    expect(newTripButton).toHaveAttribute("title", "Neue Reise");
-    expect(newTripButton).toHaveClass("icon-button");
-    expect(newTripButton).toHaveTextContent("");
-    expect(newTripButton.querySelector("svg")).toHaveAttribute("width", "18");
-    expect(newTripButton.querySelector("svg")).toHaveAttribute("height", "18");
-    expect(newTripButton.closest(".form-section-header")).toContainElement(
-      screen.getByRole("heading", { name: "Reisedaten" })
-    );
-    expect(screen.queryByText("Neue Reise", { selector: ".section-label" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Neu", { exact: true })).not.toBeInTheDocument();
+    expect(newTripButton).toHaveClass("primary-button");
+    expect(newTripButton).toHaveTextContent("Neue Reise");
+    expect(within(header).getByRole("link", { name: "Reisen - Jahresübersicht" })).toHaveAttribute("href", "#/reisekosten/jahr");
+    expect(screen.getAllByRole("button", { name: "Neue Reise" })).toHaveLength(1);
 
     fireEvent.change(screen.getByLabelText("Zeit von"), { target: { value: "08:15" } });
     fireEvent.click(newTripButton);
 
     expect(screen.getByLabelText("Zeit von")).toHaveValue("");
-    expect(screen.queryByText("Neue Reise", { selector: ".section-label" })).not.toBeInTheDocument();
+  });
+
+  it("shows the default origin read-only until it is changed", () => {
+    render(<App />);
+
+    const origin = screen.getByLabelText("Startort");
+    expect(origin).toHaveAttribute("readonly");
+    expect((origin as HTMLTextAreaElement).value).toContain("Finanzamt Österreich");
+
+    fireEvent.click(screen.getByRole("button", { name: "Startort ändern" }));
+
+    expect(screen.getByLabelText("Startort")).not.toHaveAttribute("readonly");
+    expect(screen.queryByRole("button", { name: "Startort ändern" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Startort")).toHaveFocus();
+
+    fireEvent.blur(screen.getByLabelText("Startort"));
+
+    expect(screen.getByLabelText("Startort")).toHaveAttribute("readonly");
+    expect(screen.getByRole("button", { name: "Startort ändern" })).toBeInTheDocument();
+  });
+
+  it("chooses the transport type with labelled options and shows ticket fields only for public transport", () => {
+    render(<App />);
+
+    expect(screen.getByRole("group", { name: "Fahrtkostenart" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Kilometergeld" })).toBeChecked();
+    expect(screen.queryByLabelText("Ticketpreis je Richtung (EUR)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("ÖBB-Abfrage am")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Beförderungszuschuss Öffis" }));
+
+    expect(screen.getByRole("radio", { name: "Beförderungszuschuss Öffis" })).toBeChecked();
+    expect(screen.getByLabelText("Ticketpreis je Richtung (EUR)")).toBeEnabled();
+    expect(screen.getByLabelText("ÖBB-Abfrage am")).toBeEnabled();
   });
 });
 
@@ -442,11 +469,11 @@ describe("travel expense view", () => {
     expect(screen.getByRole("checkbox", { name: "Erledigt" })).toBeInTheDocument();
   });
 
-  it.each(["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"])(
+  it.each(["Kilometergeld", "Beförderungszuschuss", "Beförderungszuschuss Öffis", "Dienstauto", "Sonstige Kosten"])(
     "shows all three screenshot areas for transport type %s",
-    (transportType) => {
+    (transportLabel) => {
       render(<App />);
-      fireEvent.change(screen.getByLabelText("Fahrtkostenart"), { target: { value: transportType } });
+      fireEvent.click(screen.getByRole("radio", { name: transportLabel }));
 
       for (const name of ["Google Maps", "Ticketpreis", "Sonstige Screenshots"]) {
         expect(screen.getByRole("region", { name })).toBeInTheDocument();
@@ -569,39 +596,70 @@ describe("travel expense view", () => {
     unmount();
   });
 
-  it("renders aligned trip columns and keeps edit and worklist actions directly available", () => {
+  it("renders trip tabs with aligned columns, totals and directly available actions", () => {
     render(<App />);
 
     expect(screen.queryByRole("button", { name: "Als erledigt markieren" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Auf offen setzen" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(1);
     expect(screen.queryByRole("menuitem", { name: "Duplizieren" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Löschen" })).not.toBeInTheDocument();
 
+    const openTab = screen.getByRole("tab", { name: /Offene Reisen/ });
+    expect(openTab).toHaveAttribute("aria-selected", "true");
+    expect(openTab).toHaveTextContent("1");
+
     const openTripsTable = screen.getByRole("table", { name: "Offene Reisen" });
     expect(within(openTripsTable).getAllByRole("columnheader").map((heading) => heading.textContent)).toEqual([
-      "Reise", "Dauer", "Strecke", "Betrag", "Differenz", "Aktionen"
+      "Datum", "Reise", "Dauer", "Strecke", "Betrag", "Differenz", "Aktionen"
     ]);
-    expect(within(openTripsTable).getByText("Sa., 08.08.2026 · Besprechung")).toBeInTheDocument();
-    expect(within(openTripsTable).getByText("8:00 h")).toHaveAttribute("data-label", "Dauer");
-    expect(within(openTripsTable).getByText("100 km")).toHaveAttribute("data-label", "Strecke");
-    expect(within(openTripsTable).getByText("0,00 EUR")).toHaveAttribute("data-label", "Betrag");
-    expect(within(openTripsTable).getByText("20,00 EUR")).toHaveAttribute("data-label", "Differenz");
+    const row = within(openTripsTable).getByRole("row", { name: /Besprechung/ });
+    expect(within(row).getByText("08.08.2026")).toBeInTheDocument();
+    expect(within(row).getByText("Sa.")).toBeInTheDocument();
+    expect(within(row).getByText("8:00 h")).toHaveAttribute("data-label", "Dauer");
+    expect(within(row).getByText("100 km")).toHaveAttribute("data-label", "Strecke");
+    expect(within(row).getByText("0,00 EUR")).toHaveAttribute("data-label", "Betrag");
+    expect(within(row).getByText("20,00 EUR")).toHaveAttribute("data-label", "Differenz");
+    const totalRow = within(openTripsTable).getByRole("row", { name: /Summe/ });
+    expect(within(totalRow).getByText("1 Reise")).toBeInTheDocument();
+    expect(within(totalRow).getByText("20,00 EUR")).toBeInTheDocument();
 
-    const openTripsHeading = screen.getByText("Offene Reisen", { selector: ".section-label" }).closest(".panel-heading") as HTMLElement;
-    const worklistButton = within(openTripsHeading).getByRole("button", { name: "Offene Reisen abarbeiten" });
-
+    const worklistButton = screen.getByRole("button", { name: "Offene Reisen abarbeiten" });
     expect(worklistButton).toHaveAttribute("type", "button");
-    expect(worklistButton).toHaveAttribute("title", "Offene Reisen abarbeiten");
-    expect(worklistButton).toHaveClass("icon-button");
-    expect(worklistButton).toHaveTextContent("");
-    expect(within(openTripsHeading).getByText("1", { selector: "strong" })).toBeInTheDocument();
-    expect(document.querySelector(".trips-overview-actions")).not.toBeInTheDocument();
+    expect(worklistButton).toHaveTextContent("Offene Reisen abarbeiten");
     expect(screen.queryByText("1 offen")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Erledigte Reisen/ }));
+    const completedTable = screen.getByRole("table", { name: "Erledigte Reisen" });
+    expect(within(completedTable).getByText("Nachbesprechung")).toBeInTheDocument();
+    expect(within(completedTable).getByText("August 2026")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Offene Reisen" })).not.toBeInTheDocument();
 
     fireEvent.click(worklistButton);
 
     expect(screen.getByRole("button", { name: "Als erledigt markieren" })).toBeInTheDocument();
+  });
+
+  it("highlights the trip that is being edited", () => {
+    const { unmount } = render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
+
+    const row = within(screen.getByRole("table", { name: "Offene Reisen" })).getByRole("row", { name: /Besprechung/ });
+    expect(row).toHaveAttribute("aria-current", "true");
+    expect(screen.getByText("Sa., 08.08.2026 · Besprechung", { selector: ".trips-title-detail" })).toBeInTheDocument();
+    unmount();
+  });
+
+  it("shows open trip status figures above the form", () => {
+    render(<App />);
+
+    const metrics = screen.getByRole("region", { name: "Kennzahlen" });
+    expect(within(metrics).getByText("Offene Reisen")).toBeInTheDocument();
+    expect(within(metrics).getByText("0,00 EUR offen")).toBeInTheDocument();
+    expect(within(metrics).getByText("BEZU Jahresstand")).toBeInTheDocument();
+    fireEvent.click(within(metrics).getByRole("button", { name: "Abarbeiten" }));
+    expect(screen.getByRole("dialog", { name: "Offene Reisekosten abarbeiten" })).toBeInTheDocument();
   });
 
   it("operates and closes the accessible trip action menu", async () => {
@@ -642,6 +700,7 @@ describe("travel expense view", () => {
     render(<App />);
 
     expect(screen.getByText("Keine offenen Reisen.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /Erledigte Reisen/ }));
     expect(screen.getByText("Keine erledigten Reisen.")).toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Offene Reisen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();

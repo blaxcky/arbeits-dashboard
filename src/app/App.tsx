@@ -94,6 +94,7 @@ import {
   usoTargetForYear
 } from "../modules/points/calculations";
 import { downloadPointsYearWorkbook } from "../modules/points/yearExport";
+import { groupTripsByMonth, splitTripDateLabel, summarizeTripList, tripCostShares } from "../modules/expenses/tripOverview";
 import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
@@ -1901,6 +1902,8 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const focusedEvidenceZoneRef = useRef<TripEvidenceZone | null>(null);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
   const [municipalityError, setMunicipalityError] = useState<string | null>(null);
+  const [originEditing, setOriginEditing] = useState(false);
+  const [tripListTab, setTripListTab] = useState<"open" | "done">("open");
   const latestTripDraft = useRef({ form, editingId });
   const saveTripRef = useRef(data.saveTrip);
   const saveDestinationRef = useRef(data.saveDestination);
@@ -2151,6 +2154,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
 
   async function startNewTrip() {
     if (form.reason.trim()) await saveTrip(true);
+    setOriginEditing(false);
     setEditingId(null);
     setForm(tripToForm());
     setTripTimeErrors({});
@@ -2158,6 +2162,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   }
 
   function editTrip(trip: Trip) {
+    setOriginEditing(false);
     setEditingId(trip.id);
     setForm(tripToForm(trip));
     setTripTimeErrors({});
@@ -2296,238 +2301,288 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     showToast("Screenshot gelöscht.");
   }
 
+  const overviewYear = currentYear();
+  const overviewYearLimitCents = publicTransportTaxFreeYearLimitForYear(data.settings, overviewYear);
+  const yearSummary = summarizeTripsByYear(data.trips, overviewYear, data.tripPayments, overviewYearLimitCents);
+  const yearTransportSubsidyRemainingCents = remainingTransportSubsidyYearLimitCents(yearSummary.transportSubsidyCents, overviewYearLimitCents);
+  const yearTransportSubsidyLimitCents = Math.max(overviewYearLimitCents ?? 0, 0);
+  const openTotals = summarizeTripList(openTrips);
+  const originReadOnly = !originEditing && Boolean(form.origin.trim());
+  const evidenceDisabledText = !editingTrip
+    ? "Reise zuerst speichern, dann Screenshots hinzufügen."
+    : "Bitte zuerst ein gültiges Reisedatum eingeben und speichern.";
+
   return (
-    <section className="page-stack">
-      <Header eyebrow="Reisekosten" title={editingId ? "Reise bearbeiten" : "Reise erfassen"} />
-      <div className="split-grid trips-layout">
-        <div className="trip-form-stack">
-          <div className="trip-form-grid">
-            <FormSection
-              id="trip-section-dates"
-              title="Reisedaten"
-              icon={CalendarBlank}
-              headerAction={(
-                <button
-                  className="icon-button form-section-header-button"
-                  type="button"
-                  title="Neue Reise"
-                  aria-label="Neue Reise"
-                  onClick={() => void startNewTrip()}
-                >
-                  <Plus size={18} weight="bold" aria-hidden="true" />
-                </button>
-              )}
-            >
-              <Field label="Grund" className="field-wide"><input value={form.reason} onChange={(event) => updateTripField("reason", event.target.value)} /></Field>
-              <Field label="Datum" error={tripDateError}>
-                <input type="date" value={form.date} aria-invalid={Boolean(tripDateError)} onChange={(event) => updateTripField("date", event.target.value)} />
-              </Field>
-              <Field label="Zeit von" error={tripTimeErrors.startTime}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="07:30"
-                  value={form.startTime}
-                  aria-invalid={Boolean(tripTimeErrors.startTime)}
-                  onChange={(event) => updateTripField("startTime", event.target.value)}
-                  onBlur={(event) => handleTripTimeBlur("startTime", event.target.value)}
-                />
-              </Field>
-              <Field label="Zeit bis" error={tripTimeErrors.endTime}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="15:30"
-                  value={form.endTime}
-                  aria-invalid={Boolean(tripTimeErrors.endTime)}
-                  onChange={(event) => updateTripField("endTime", event.target.value)}
-                  onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
-                />
-              </Field>
-            </FormSection>
-            <FormSection id="trip-section-route" title="Route" icon={MapTrifold}>
-              <Field label="Startort" className="trip-field-half"><AutoFitInput value={form.origin} onChange={(value) => updateTripField("origin", value)} /></Field>
-              <Field label="Zieladresse" className="trip-field-half">
-                <div className="input-with-button">
-                  <AutoFitInput value={form.destination} onChange={(value) => updateTripField("destination", value)} />
-                  <button className="icon-button" type="button" title="Zieladressen öffnen" aria-label="Zieladressen öffnen" onClick={() => setDestinationPickerOpen(true)}>
-                    <MapPin size={18} />
-                  </button>
+    <section className="page-stack dashboard-page trips-page">
+      <header className="dashboard-header">
+        <div className="trips-title">
+          <span className="section-label">Reisekosten</span>
+          <h1>{editingId ? "Reise bearbeiten" : "Reise erfassen"}</h1>
+          {editingTrip ? <span className="trips-title-detail">{formatDateKey(editingTrip.date)} · {editingTrip.reason || "Ohne Grund"}</span> : null}
+        </div>
+        <div className="trips-header-actions">
+          <Link className="secondary-button" to="/reisekosten/jahr"><CalendarCheck size={17} aria-hidden="true" />Reisen - Jahresübersicht</Link>
+          <button className="primary-button" type="button" onClick={() => void startNewTrip()}><Plus size={17} weight="bold" aria-hidden="true" />Neue Reise</button>
+        </div>
+      </header>
+      <section className="dashboard-metrics" aria-label="Kennzahlen">
+        <Metric
+          title="Offene Reisen"
+          value={String(openTrips.length)}
+          detail={`${formatEuroCents(openTotals.totalCents)} offen`}
+          action={(
+            <button className="secondary-button metric-action" type="button" title="Offene Reisen abarbeiten" disabled={openTrips.length === 0} onClick={() => setOpenTripsDialogOpen(true)}>
+              <ListChecks size={16} aria-hidden="true" />
+              Abarbeiten
+            </button>
+          )}
+        />
+        <Metric
+          title={`Reisekosten gesamt ${overviewYear}`}
+          value={formatEuroCents(yearSummary.totalCents)}
+          detail={`${yearSummary.count} ${yearSummary.count === 1 ? "Reise" : "Reisen"} · ${formatKilometers(yearSummary.kilometers)}`}
+        />
+        <Metric
+          title="BEZU Jahresstand"
+          value={formatEuroCents(yearSummary.transportSubsidyCents)}
+          detail={`BEZU Restgrenze ${formatEuroCents(yearTransportSubsidyRemainingCents)}`}
+          tone={yearTransportSubsidyRemainingCents < 0 ? "warning" : "default"}
+          progress={{
+            value: yearTransportSubsidyLimitCents > 0 ? yearSummary.transportSubsidyCents / yearTransportSubsidyLimitCents : 0,
+            tone: yearTransportSubsidyRemainingCents < 0 ? "warning" : "default"
+          }}
+        />
+        <Metric
+          title={`Differenz gesamt ${overviewYear}`}
+          value={formatEuroCents(yearSummary.differentialCents)}
+          detail={`Diäten ${formatEuroCents(yearSummary.perDiemDifferentialCents)} · Werbungskosten ${formatEuroCents(yearSummary.transportDifferentialCents + yearSummary.otherCostsDifferentialCents)}`}
+        />
+      </section>
+      <div className="trips-workspace">
+        <div className="trips-main-column">
+          <section className="panel trip-entry" aria-label="Reise">
+            <section className="trip-entry-block" aria-labelledby="trip-section-dates">
+              <h2 id="trip-section-dates" className="trip-entry-heading"><CalendarBlank size={18} weight="duotone" aria-hidden="true" />Reisedaten</h2>
+              <div className="trip-entry-grid trip-entry-grid-dates">
+                <Field label="Grund"><FitTextArea value={form.reason} baseSize={15} wrapSize={12} onChange={(value) => updateTripField("reason", value)} /></Field>
+                <Field label="Datum" error={tripDateError}>
+                  <input type="date" value={form.date} aria-invalid={Boolean(tripDateError)} onChange={(event) => updateTripField("date", event.target.value)} />
+                </Field>
+                <Field label="Zeit von" error={tripTimeErrors.startTime}>
+                  <input
+                    className="trip-time-input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="07:30"
+                    value={form.startTime}
+                    aria-invalid={Boolean(tripTimeErrors.startTime)}
+                    onChange={(event) => updateTripField("startTime", event.target.value)}
+                    onBlur={(event) => handleTripTimeBlur("startTime", event.target.value)}
+                  />
+                </Field>
+                <Field label="Zeit bis" error={tripTimeErrors.endTime}>
+                  <input
+                    className="trip-time-input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="15:30"
+                    value={form.endTime}
+                    aria-invalid={Boolean(tripTimeErrors.endTime)}
+                    onChange={(event) => updateTripField("endTime", event.target.value)}
+                    onBlur={(event) => handleTripTimeBlur("endTime", event.target.value)}
+                  />
+                </Field>
+              </div>
+            </section>
+            <section className="trip-entry-block" aria-labelledby="trip-section-route">
+              <h2 id="trip-section-route" className="trip-entry-heading"><MapTrifold size={18} weight="duotone" aria-hidden="true" />Route</h2>
+              <div className="trip-entry-grid trip-entry-grid-halves">
+                <div className="field">
+                  <span className="field-label-row">
+                    <span id="trip-origin-label">Startort</span>
+                    {originReadOnly ? <button className="link-button" type="button" aria-label="Startort ändern" onClick={() => setOriginEditing(true)}>Ändern</button> : null}
+                  </span>
+                  <FitTextArea
+                    value={form.origin}
+                    labelledBy="trip-origin-label"
+                    readOnly={originReadOnly}
+                    autoFocus={originEditing}
+                    tall
+                    onChange={(value) => updateTripField("origin", value)}
+                    onBlur={() => setOriginEditing(false)}
+                  />
                 </div>
-              </Field>
-              <Field label="Gemeindekennzahl" className="trip-field-half">
-                <div className="input-with-button">
-                  <input value={form.municipalityCode} onChange={(event) => updateTripField("municipalityCode", event.target.value)} />
-                  <button className="icon-button" type="button" title="Ortschaft suchen" aria-label="Ortschaft suchen" onClick={() => setMunicipalityPickerOpen(true)}>
-                    <MagnifyingGlass size={18} />
-                  </button>
+                <Field label="Zieladresse">
+                  <div className="input-with-button">
+                    <FitTextArea value={form.destination} tall onChange={(value) => updateTripField("destination", value)} />
+                    <button className="icon-button" type="button" title="Zieladressen öffnen" aria-label="Zieladressen öffnen" onClick={() => setDestinationPickerOpen(true)}>
+                      <MapPin size={18} />
+                    </button>
+                  </div>
+                </Field>
+                <Field label="Gemeindekennzahl">
+                  <div className="input-with-button">
+                    <input value={form.municipalityCode} onChange={(event) => updateTripField("municipalityCode", event.target.value)} />
+                    <button className="icon-button" type="button" title="Ortschaft suchen" aria-label="Ortschaft suchen" onClick={() => setMunicipalityPickerOpen(true)}>
+                      <MagnifyingGlass size={18} />
+                    </button>
+                  </div>
+                </Field>
+                <Field label="Einfache Strecke (km)">
+                  <div className="input-with-button">
+                    <input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} />
+                    <button className="icon-button" type="button" title="Google Maps öffnen" aria-label="Google Maps öffnen" disabled={!mapsUrl} onClick={openGoogleMaps}>
+                      <MapTrifold size={18} />
+                    </button>
+                  </div>
+                </Field>
+              </div>
+            </section>
+            <section className="trip-entry-block" aria-labelledby="trip-section-costs">
+              <h2 id="trip-section-costs" className="trip-entry-heading"><Car size={18} weight="duotone" aria-hidden="true" />Fahrtkosten</h2>
+              <fieldset className="choice-group">
+                <legend>Fahrtkostenart</legend>
+                <div className="choice-pills">
+                  {transportOptions.map((option) => (
+                    <label key={option} className={`choice-pill${form.transportType === option ? " is-selected" : ""}`}>
+                      <input type="radio" name="trip-transport-type" value={option} checked={form.transportType === option} onChange={() => updateTripField("transportType", option)} />
+                      {TRANSPORT_LABELS[option]}
+                    </label>
+                  ))}
                 </div>
-              </Field>
-              <Field label="Einfache Strecke (km)" className="trip-field-half">
-                <div className="input-with-button">
-                  <input inputMode="decimal" placeholder="0" value={form.oneWayKilometers} onChange={(event) => updateTripField("oneWayKilometers", event.target.value)} />
-                  <button className="icon-button" type="button" title="Google Maps öffnen" aria-label="Google Maps öffnen" disabled={!mapsUrl} onClick={openGoogleMaps}>
-                    <MapTrifold size={18} />
-                  </button>
+              </fieldset>
+              {form.transportType === "oeffi-zuschuss" ? (
+                <div className="trip-entry-grid trip-entry-grid-halves">
+                  <div className="field-stack">
+                    <Field label="Ticketpreis je Richtung (EUR)">
+                      <input inputMode="decimal" value={form.ticketPriceEuros} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} />
+                    </Field>
+                    <span className="field-help">Einzelpreis erfassen; Hin- und Rückreise gelten jeweils mit diesem Preis.</span>
+                  </div>
+                  <Field label="ÖBB-Abfrage am">
+                    <input type="date" value={form.publicTransportTicketQueryDate} onChange={(event) => updateTripField("publicTransportTicketQueryDate", event.target.value)} />
+                  </Field>
                 </div>
-              </Field>
-            </FormSection>
-            <FormSection id="trip-section-costs" title="Fahrtkosten" icon={Car} className="form-section-split">
-              <Field label="Fahrtkostenart" className="trip-field-half">
-                <select value={form.transportType} onChange={(event) => updateTripField("transportType", event.target.value as TripTransportType)}>
-                  {transportOptions.map((option) => <option key={option} value={option}>{TRANSPORT_LABELS[option]}</option>)}
-                </select>
-              </Field>
-              <Field label="Ticketpreis je Richtung (EUR)" className="trip-field-half trip-cost-field">
-                <input inputMode="decimal" value={form.ticketPriceEuros} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("ticketPriceEuros", event.target.value)} />
-                {form.transportType === "oeffi-zuschuss" ? <span className="field-help">Einzelpreis erfassen; Hin- und Rückreise gelten jeweils mit diesem Preis.</span> : null}
-              </Field>
-              <Field label="ÖBB-Abfrage am" className="trip-field-half">
-                <input type="date" value={form.publicTransportTicketQueryDate} disabled={form.transportType !== "oeffi-zuschuss"} onChange={(event) => updateTripField("publicTransportTicketQueryDate", event.target.value)} />
-              </Field>
-            </FormSection>
-            <FormSection id="trip-section-other" title="Sonstiges" icon={Receipt} className="form-section-split">
-              <Field label="Sonstige Kosten (EUR)" className="trip-field-half"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
-              <Field label="Beschreibung sonstige Kosten" className="trip-field-half"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
-              <label className="check-row field-wide"><input type="checkbox" checked={form.employerDoesNotReimburseCosts} onChange={(event) => updateTripField("employerDoesNotReimburseCosts", event.target.checked)} /> Arbeitgeber ersetzt keine Kosten</label>
-            </FormSection>
-            <FormSection id="trip-section-notes" title="Zusätzliche Notizen" icon={NotePencil}>
-              <Field label="Notiz" className="field-wide"><textarea value={form.note} rows={3} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
-            </FormSection>
-          </div>
+              ) : null}
+            </section>
+            <section className="trip-entry-block" aria-labelledby="trip-section-other">
+              <h2 id="trip-section-other" className="trip-entry-heading"><Receipt size={18} weight="duotone" aria-hidden="true" />Sonstiges</h2>
+              <div className="trip-entry-grid trip-entry-grid-other">
+                <Field label="Sonstige Kosten (EUR)"><input inputMode="decimal" value={form.otherCostsEuros} onChange={(event) => updateTripField("otherCostsEuros", event.target.value)} /></Field>
+                <Field label="Beschreibung sonstige Kosten"><input value={form.otherCostsDescription} onChange={(event) => updateTripField("otherCostsDescription", event.target.value)} /></Field>
+              </div>
+              <label className="check-row"><input type="checkbox" checked={form.employerDoesNotReimburseCosts} onChange={(event) => updateTripField("employerDoesNotReimburseCosts", event.target.checked)} /> Arbeitgeber ersetzt keine Kosten</label>
+            </section>
+            <section className="trip-entry-block" aria-labelledby="trip-section-notes">
+              <h2 id="trip-section-notes" className="trip-entry-heading"><NotePencil size={18} weight="duotone" aria-hidden="true" />Zusätzliche Notizen</h2>
+              <Field label="Notiz"><textarea value={form.note} rows={2} onChange={(event) => updateTripField("note", event.target.value)} /></Field>
+            </section>
+          </section>
           {publicTicketAboveSubsidy ? <Notice tone="warning" title="Ticketpreise liegen über dem Öffi-BEZU" text="Es wird der Ticketpreis für Hin- und Rückreise ersetzt; dadurch entsteht kein steuerpflichtiger Öffi-BEZU." /> : null}
-          <div className="trip-evidence-zones" aria-label="Screenshots und Nachweise">
-            {TRIP_EVIDENCE_ZONES.map((zone) => {
-              const ZoneIcon = zone.icon;
-              const zoneFiles = evidenceFilesByZone[zone.key];
-              const isActive = hoveredEvidenceZone === zone.key || (!hoveredEvidenceZone && focusedEvidenceZone === zone.key);
-              const disabledText = !editingTrip
-                ? "Reise zuerst speichern, dann Screenshots hinzufügen."
-                : "Bitte zuerst ein gültiges Reisedatum eingeben und speichern.";
-              return (
-                <section
-                  key={zone.key}
-                  className={`trip-form-evidence trip-form-evidence-${zone.key} ${evidenceUploadsEnabled ? "" : "trip-form-evidence-disabled"} ${isActive ? "trip-form-evidence-active" : ""}`.trim()}
-                  aria-labelledby={`trip-form-evidence-${zone.key}-title`}
-                  tabIndex={evidenceUploadsEnabled ? 0 : -1}
-                  onMouseEnter={() => setEvidenceZoneHovered(zone.key)}
-                  onMouseLeave={() => setEvidenceZoneHovered(null)}
-                  onFocus={() => setEvidenceZoneFocused(zone.key)}
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget)) setEvidenceZoneFocused(null);
-                  }}
-                >
-                  <div className="trip-evidence-heading">
-                    <div>
-                      <span id={`trip-form-evidence-${zone.key}-title`} className="section-label trip-evidence-title">
-                        <ZoneIcon size={18} weight="duotone" aria-hidden="true" />
+          <section className="panel trip-evidence-card" aria-label="Screenshots und Nachweise">
+            <div className="trip-evidence-card-heading">
+              <h2 className="trip-entry-heading">Screenshots und Nachweise</h2>
+              <p className="muted">{evidenceUploadsEnabled ? "Mit Strg+V oder Cmd+V hier einfügen." : evidenceDisabledText}</p>
+            </div>
+            <div className="trip-evidence-zones">
+              {TRIP_EVIDENCE_ZONES.map((zone) => {
+                const ZoneIcon = zone.icon;
+                const zoneFiles = evidenceFilesByZone[zone.key];
+                const isActive = hoveredEvidenceZone === zone.key || (!hoveredEvidenceZone && focusedEvidenceZone === zone.key);
+                return (
+                  <section
+                    key={zone.key}
+                    className={`trip-form-evidence trip-form-evidence-${zone.key} ${evidenceUploadsEnabled ? "" : "trip-form-evidence-disabled"} ${isActive ? "trip-form-evidence-active" : ""}`.trim()}
+                    aria-labelledby={`trip-form-evidence-${zone.key}-title`}
+                    tabIndex={evidenceUploadsEnabled ? 0 : -1}
+                    onMouseEnter={() => setEvidenceZoneHovered(zone.key)}
+                    onMouseLeave={() => setEvidenceZoneHovered(null)}
+                    onFocus={() => setEvidenceZoneFocused(zone.key)}
+                    onBlur={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) setEvidenceZoneFocused(null);
+                    }}
+                  >
+                    <div className="trip-evidence-heading">
+                      <span id={`trip-form-evidence-${zone.key}-title`} className="trip-evidence-title">
+                        <ZoneIcon size={17} weight="duotone" aria-hidden="true" />
                         {zone.title}
                       </span>
-                      <p className="muted">{evidenceUploadsEnabled ? "Mit Strg+V oder Cmd+V hier einfügen." : disabledText}</p>
+                      <label
+                        className={`icon-button trip-evidence-icon-button file-upload-button ${evidenceUploadsEnabled ? "" : "file-upload-button-disabled"}`.trim()}
+                        title={`${zone.title}: Datei auswählen`}
+                      >
+                        <UploadSimple size={16} aria-hidden="true" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={!evidenceUploadsEnabled}
+                          aria-label={`${zone.title}: Datei auswählen`}
+                          onChange={(event) => {
+                            void uploadTripScreenshot(editingTrip, event.target.files, zone.key);
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
                     </div>
-                    <label
-                      className={`icon-button trip-evidence-icon-button file-upload-button ${evidenceUploadsEnabled ? "" : "file-upload-button-disabled"}`.trim()}
-                      title={`${zone.title}: Datei auswählen`}
-                    >
-                      <UploadSimple size={17} aria-hidden="true" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        disabled={!evidenceUploadsEnabled}
-                        aria-label={`${zone.title}: Datei auswählen`}
-                        onChange={(event) => {
-                          void uploadTripScreenshot(editingTrip, event.target.files, zone.key);
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-                  </div>
-                  {zoneFiles.length === 0 ? <span className="muted trip-evidence-empty">{zone.emptyText}</span> : null}
-                  {zoneFiles.map((file) => (
-                    <div key={file.id} className="trip-evidence-item">
-                      <button className="trip-evidence-preview-button" type="button" onClick={() => setPreviewFile(file)}>
-                        <img src={file.dataUrl} alt="" />
-                        <span>
-                          <strong>{displayedTripFileName(file)}</strong>
-                          <small>{tripFileTypeLabel(file.type)} · {formatFileSize(file.size)}</small>
-                        </span>
-                      </button>
-                      <div className="trip-evidence-actions">
-                        <button className="icon-button trip-evidence-icon-button" type="button" title="Herunterladen" aria-label="Herunterladen" onClick={() => downloadTripFile(file)}>
-                          <DownloadSimple size={17} aria-hidden="true" />
+                    {zoneFiles.length === 0 ? <span className="muted trip-evidence-empty">{zone.emptyText}</span> : null}
+                    {zoneFiles.map((file) => (
+                      <div key={file.id} className="trip-evidence-item">
+                        <button className="trip-evidence-preview-button" type="button" onClick={() => setPreviewFile(file)}>
+                          <img src={file.dataUrl} alt="" />
+                          <span>
+                            <strong>{displayedTripFileName(file)}</strong>
+                            <small>{tripFileTypeLabel(file.type)} · {formatFileSize(file.size)}</small>
+                          </span>
                         </button>
-                        <button className="icon-button trip-evidence-icon-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeTripFile(file)}>
-                          <Trash size={17} aria-hidden="true" />
-                        </button>
+                        <div className="trip-evidence-actions">
+                          <button className="icon-button trip-evidence-icon-button" type="button" title="Herunterladen" aria-label="Herunterladen" onClick={() => downloadTripFile(file)}>
+                            <DownloadSimple size={16} aria-hidden="true" />
+                          </button>
+                          <button className="icon-button trip-evidence-icon-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeTripFile(file)}>
+                            <Trash size={16} aria-hidden="true" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </section>
-              );
-            })}
-          </div>
-          <label className="check-row"><input type="checkbox" checked={form.done} onChange={(event) => updateTripField("done", event.target.checked)} /> Erledigt</label>
-          <div className="button-row trip-save-actions">
-            <button className="primary-button" onClick={() => void saveTrip(false)}>{editingId ? "Änderungen speichern" : "Reise speichern"}</button>
-            <button className="secondary-button" onClick={() => void saveTrip(true)}>Speichern und Schließen</button>
-          </div>
-        </div>
-        <div className="trip-side-layout">
-          <TripCostPanel
-            durationMinutes={previewDurationMinutes}
-            kilometers={previewTripCosts.oneWayKilometers * 2}
-            totalCents={calculateTripTotalCents(previewTripCosts)}
-            travelCostCents={previewPayoutCents}
-            perDiemCents={previewTripCosts.perDiemCents}
-            otherCostsCents={previewTripCosts.otherCostsCents}
-            taxPerDiemCents={previewTaxPerDiemCents}
-            taxableTransportSubsidyCents={previewTaxableTransportSubsidyCents}
-            perDiemDifferentialCents={previewPerDiemDifferentialCents}
-            transportDifferentialCents={previewTransportDifferentialCents}
-            otherCostsDifferentialCents={previewOtherCostsDifferentialCents}
-            differentialCents={previewDifferentialCents}
-          />
-        </div>
-      </div>
-      <div className="panel">
-        <div className="panel-heading">
-          <span className="section-label">Offene Reisen</span>
-          <div className="open-trips-heading-actions">
-            <strong>{openTrips.length}</strong>
-            <button
-              className="icon-button"
-              type="button"
-              title="Offene Reisen abarbeiten"
-              aria-label="Offene Reisen abarbeiten"
-              onClick={() => setOpenTripsDialogOpen(true)}
-            >
-              <ListChecks size={18} aria-hidden="true" />
-            </button>
+                    ))}
+                  </section>
+                );
+              })}
+            </div>
+          </section>
+          <div className="panel trip-save-bar">
+            <label className="check-row"><input type="checkbox" checked={form.done} onChange={(event) => updateTripField("done", event.target.checked)} /> Erledigt</label>
+            <div className="trip-save-actions">
+              <button className="secondary-button" type="button" onClick={() => void saveTrip(true)}>Speichern und Schließen</button>
+              <button className="primary-button" type="button" onClick={() => void saveTrip(false)}>{editingId ? "Änderungen speichern" : "Reise speichern"}</button>
+            </div>
           </div>
         </div>
-        <TripList
-          trips={openTrips}
-          emptyText="Keine offenen Reisen."
-          label="Offene Reisen"
-          onEdit={editTrip}
-          onDuplicate={duplicateTrip}
-          onDelete={(trip) => removeTrip(trip.id)}
+        <TripCostPanel
+          durationMinutes={previewDurationMinutes}
+          kilometers={previewTripCosts.oneWayKilometers * 2}
+          totalCents={calculateTripTotalCents(previewTripCosts)}
+          travelCostCents={previewPayoutCents}
+          perDiemCents={previewTripCosts.perDiemCents}
+          otherCostsCents={previewTripCosts.otherCostsCents}
+          taxPerDiemCents={previewTaxPerDiemCents}
+          taxableTransportSubsidyCents={previewTaxableTransportSubsidyCents}
+          perDiemDifferentialCents={previewPerDiemDifferentialCents}
+          transportDifferentialCents={previewTransportDifferentialCents}
+          otherCostsDifferentialCents={previewOtherCostsDifferentialCents}
+          differentialCents={previewDifferentialCents}
         />
       </div>
-      <div className="panel">
-        <div className="panel-heading">
-          <span className="section-label">Erledigte Reisen</span>
-          <strong>{completedTrips.length}</strong>
-        </div>
-        <TripList
-          trips={completedTrips}
-          emptyText="Keine erledigten Reisen."
-          label="Erledigte Reisen"
-          onEdit={editTrip}
-          onDuplicate={duplicateTrip}
-          onDelete={(trip) => removeTrip(trip.id)}
-        />
-      </div>
+      <TripTablePanel
+        openTrips={openTrips}
+        completedTrips={completedTrips}
+        tab={tripListTab}
+        selectedId={editingId}
+        onTabChange={setTripListTab}
+        onWorklist={() => setOpenTripsDialogOpen(true)}
+        onEdit={editTrip}
+        onDuplicate={duplicateTrip}
+        onDelete={(trip) => removeTrip(trip.id)}
+      />
       {openTripsDialogOpen ? (
         <OpenTripsDialog
           trips={openTrips}
@@ -2601,44 +2656,110 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
   );
 }
 
-type TripListProps = {
-  trips: Trip[];
-  emptyText: string;
-  label: string;
+type TripTableActions = {
   onEdit: (trip: Trip) => void;
   onDuplicate: (trip: Trip) => void | Promise<void>;
   onDelete: (trip: Trip) => void | Promise<void>;
 };
 
-function TripList({ trips, emptyText, label, onEdit, onDuplicate, onDelete }: TripListProps) {
-  if (trips.length === 0) return <div className="trip-list"><p className="muted">{emptyText}</p></div>;
+function TripTablePanel({
+  openTrips,
+  completedTrips,
+  tab,
+  selectedId,
+  onTabChange,
+  onWorklist,
+  onEdit,
+  onDuplicate,
+  onDelete
+}: {
+  openTrips: Trip[];
+  completedTrips: Trip[];
+  tab: "open" | "done";
+  selectedId: string | null;
+  onTabChange: (tab: "open" | "done") => void;
+  onWorklist: () => void;
+} & TripTableActions) {
+  const openTotals = summarizeTripList(openTrips);
+  const completedGroups = groupTripsByMonth(completedTrips);
+  const actions = { onEdit, onDuplicate, onDelete };
 
   return (
-    <div className="trip-list" role="table" aria-label={label}>
-      <div className="trip-list-header" role="row">
-        {(["Reise", "Dauer", "Strecke", "Betrag", "Differenz", "Aktionen"] as const).map((heading) => (
-          <span key={heading} role="columnheader">{heading}</span>
-        ))}
+    <section className="panel trip-table-panel" aria-label="Reisen">
+      <div className="trip-table-toolbar">
+        <div className="trip-tabs" role="tablist" aria-label="Reisen">
+          <button type="button" role="tab" id="trip-tab-open" aria-selected={tab === "open"} aria-controls="trip-tabpanel" onClick={() => onTabChange("open")}>
+            Offene Reisen <span className="trip-tab-count">{openTrips.length}</span>
+          </button>
+          <button type="button" role="tab" id="trip-tab-done" aria-selected={tab === "done"} aria-controls="trip-tabpanel" onClick={() => onTabChange("done")}>
+            Erledigte Reisen <span className="trip-tab-count">{completedTrips.length}</span>
+          </button>
+        </div>
+        <button className="secondary-button" type="button" disabled={openTrips.length === 0} onClick={onWorklist}>
+          <ListChecks size={17} aria-hidden="true" />
+          Offene Reisen abarbeiten
+        </button>
       </div>
-      {trips.map((trip) => (
-        <TripListRow
-          key={trip.id}
-          trip={trip}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
-        />
-      ))}
+      <div id="trip-tabpanel" role="tabpanel" aria-labelledby={tab === "open" ? "trip-tab-open" : "trip-tab-done"}>
+        {tab === "open" ? (
+          openTrips.length === 0 ? <p className="muted trip-table-empty">Keine offenen Reisen.</p> : (
+            <div className="trip-table" role="table" aria-label="Offene Reisen">
+              <TripTableHeader />
+              {openTrips.map((trip) => <TripTableRow key={trip.id} trip={trip} selected={trip.id === selectedId} {...actions} />)}
+              <div className="trip-table-row trip-table-total" role="row">
+                <span className="trip-table-date" role="cell">Summe</span>
+                <span className="trip-table-journey muted" role="cell">{openTotals.count} {openTotals.count === 1 ? "Reise" : "Reisen"}</span>
+                <span className="trip-table-value trip-table-duration" role="cell">{formatMinutes(openTotals.durationMinutes)}</span>
+                <span className="trip-table-value trip-table-distance" role="cell">{formatKilometers(openTotals.kilometers)}</span>
+                <span className="trip-table-value" role="cell">{formatEuroCents(openTotals.totalCents)}</span>
+                <span className="trip-table-value trip-table-differential" role="cell">{formatEuroCents(openTotals.differentialCents)}</span>
+                <span role="cell" />
+              </div>
+            </div>
+          )
+        ) : (
+          completedTrips.length === 0 ? <p className="muted trip-table-empty">Keine erledigten Reisen.</p> : (
+            <div className="trip-table" role="table" aria-label="Erledigte Reisen">
+              <TripTableHeader />
+              {completedGroups.map((group) => (
+                <div key={group.monthKey} className="trip-table-group" role="rowgroup" aria-label={group.label}>
+                  <div className="trip-table-month" role="row">
+                    <span role="cell">{group.label}</span>
+                    <span role="cell">{formatEuroCents(group.totalCents)}</span>
+                  </div>
+                  {group.trips.map((trip) => <TripTableRow key={trip.id} trip={trip} selected={trip.id === selectedId} {...actions} />)}
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TripTableHeader() {
+  return (
+    <div className="trip-table-row trip-table-head" role="row">
+      <span className="trip-table-date" role="columnheader">Datum</span>
+      <span className="trip-table-journey" role="columnheader">Reise</span>
+      <span className="trip-table-value trip-table-duration" role="columnheader">Dauer</span>
+      <span className="trip-table-value trip-table-distance" role="columnheader">Strecke</span>
+      <span className="trip-table-value" role="columnheader">Betrag</span>
+      <span className="trip-table-value trip-table-differential" role="columnheader">Differenz</span>
+      <span role="columnheader"><span className="sr-only">Aktionen</span></span>
     </div>
   );
 }
 
-function TripListRow({ trip, onEdit, onDuplicate, onDelete }: { trip: Trip } & Pick<TripListProps, "onEdit" | "onDuplicate" | "onDelete">) {
+function TripTableRow({ trip, selected, onEdit, onDuplicate, onDelete }: { trip: Trip; selected: boolean } & TripTableActions) {
   const [menuOpen, setMenuOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const tripName = `${formatDateKey(trip.date)} · ${trip.reason || "Ohne Grund"}`;
   const origin = formatTripOrigin(trip.origin);
+  const dateLabel = splitTripDateLabel(trip.date);
+  const incomplete = isTripIncomplete(trip);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -2667,23 +2788,32 @@ function TripListRow({ trip, onEdit, onDuplicate, onDelete }: { trip: Trip } & P
   };
 
   return (
-    <article className={`trip-row ${trip.done ? "trip-row-done" : ""} ${isTripIncomplete(trip) ? "trip-row-incomplete" : ""}`} role="row">
-      <div className="trip-list-journey" role="cell">
-        <div className="trip-list-title-line">
-          <strong>{tripName}</strong>
-          {isTripIncomplete(trip) ? <span className="trip-incomplete-badge">Unvollständig</span> : null}
+    <article
+      className={`trip-table-row trip-table-trip${trip.done ? " trip-row-done" : ""}${incomplete ? " trip-row-incomplete" : ""}${selected ? " is-selected" : ""}`}
+      role="row"
+      aria-current={selected ? "true" : undefined}
+    >
+      <span className="trip-table-date" role="cell" data-label="Datum">
+        <span>{dateLabel.date}</span>
+        <small>{dateLabel.weekday}</small>
+      </span>
+      <div className="trip-table-journey" role="cell">
+        <div className="trip-table-title">
+          <strong>{trip.reason || "Ohne Grund"}</strong>
+          {incomplete ? <span className="trip-incomplete-badge">Unvollständig</span> : null}
         </div>
-        <span className="trip-list-meta" title={trip.note || undefined}>
+        <span className="trip-table-meta" title={trip.note || undefined}>
+          <span className="trip-table-inline-date">{dateLabel.date} · </span>
           {origin}{origin ? " → " : ""}{trip.destination || "-"} · {TRANSPORT_LABELS[trip.transportType]}
           {trip.note ? ` · ${trip.note}` : ""}
         </span>
       </div>
-      <span className="trip-list-value" data-label="Dauer" role="cell">{formatMinutes(trip.durationMinutes)}</span>
-      <span className="trip-list-value" data-label="Strecke" role="cell">{(trip.oneWayKilometers * 2).toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</span>
-      <strong className="trip-list-value" data-label="Betrag" role="cell">{formatEuroCents(calculateTripTotalCents(trip))}</strong>
-      <span className="trip-list-value" data-label="Differenz" role="cell">{formatEuroCents(calculateTripDifferentialCents(trip))}</span>
+      <span className="trip-table-value trip-table-duration" data-label="Dauer" role="cell">{formatMinutes(trip.durationMinutes)}</span>
+      <span className="trip-table-value trip-table-distance" data-label="Strecke" role="cell">{formatKilometers(trip.oneWayKilometers * 2)}</span>
+      <strong className="trip-table-value" data-label="Betrag" role="cell">{formatEuroCents(calculateTripTotalCents(trip))}</strong>
+      <span className="trip-table-value trip-table-differential" data-label="Differenz" role="cell">{formatEuroCents(calculateTripDifferentialCents(trip))}</span>
       <div className="trip-actions" role="cell" ref={actionsRef}>
-        <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => onEdit(trip)}>
+        <button className={`icon-button trip-action-button${selected ? " is-active" : ""}`} type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => onEdit(trip)}>
           <PencilSimple size={17} aria-hidden="true" />
         </button>
         <button
@@ -2742,40 +2872,63 @@ function TripCostPanel({
   otherCostsDifferentialCents: number;
   differentialCents: number;
 }) {
+  const shares = tripCostShares(perDiemCents, travelCostCents, otherCostsCents);
+  const costRow = (label: string, cents: number, swatch?: string) => (
+    <div className={cents === 0 ? "is-zero" : undefined}>
+      <dt>{swatch ? <i className={`trip-cost-swatch trip-cost-swatch-${swatch}`} aria-hidden="true" /> : null}{label}</dt>
+      <dd>{formatEuroCents(cents)}</dd>
+    </div>
+  );
+
   return (
-    <div className="panel trip-cost-panel">
+    <aside className="panel trip-cost-panel" aria-label="Aktuelle Kostenauswertung">
       <span className="section-label">Aktuelle Kostenauswertung</span>
-      <div className="trip-preview trip-preview-side">
-        <div className="trip-preview-group trip-preview-group-primary">
-          <span className="trip-preview-title">Reise</span>
-          <dl className="trip-preview-list">
-            <div><dt>Dauer</dt><dd>{formatMinutes(durationMinutes)}</dd></div>
-            <div><dt>Kilometer gesamt</dt><dd>{kilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 })} km</dd></div>
-            <div className="trip-preview-total"><dt>Gesamt</dt><dd>{formatEuroCents(totalCents)}</dd></div>
-          </dl>
+      <div className="trip-cost-hero">
+        <div className={totalCents === 0 ? "is-zero" : undefined}>
+          <span>Gesamt</span>
+          <strong>{formatEuroAmount(totalCents)}</strong>
+          <small>EUR</small>
         </div>
-        <div className="trip-preview-group">
-          <span className="trip-preview-title">Kosten</span>
-          <dl className="trip-preview-list">
-            <div><dt>Diäten Arbeitgeber</dt><dd>{formatEuroCents(perDiemCents)}</dd></div>
-            <div><dt>Fahrtkosten</dt><dd>{formatEuroCents(travelCostCents)}</dd></div>
-            <div><dt>Sonstige Kosten</dt><dd>{formatEuroCents(otherCostsCents)}</dd></div>
-          </dl>
-        </div>
-        <div className="trip-preview-group trip-preview-group-tax">
-          <span className="trip-preview-title">Steuer & Differenz</span>
-          <dl className="trip-preview-list">
-            <div><dt>Diäten steuerlich</dt><dd>{formatEuroCents(taxPerDiemCents)}</dd></div>
-            <div><dt>Steuerpfl. Öffi-BEZU</dt><dd>{formatEuroCents(taxableTransportSubsidyCents)}</dd></div>
-            <div className="trip-preview-separator" aria-hidden="true" />
-            <div><dt>Differenz Diäten</dt><dd>{formatEuroCents(perDiemDifferentialCents)}</dd></div>
-            <div><dt>Werbungskosten Fahrtkosten</dt><dd>{formatEuroCents(transportDifferentialCents)}</dd></div>
-            <div><dt>Werbungskosten Sonstiges</dt><dd>{formatEuroCents(otherCostsDifferentialCents)}</dd></div>
-            <div className="trip-preview-grand-total"><dt>Differenz gesamt</dt><dd>{formatEuroCents(differentialCents)}</dd></div>
-          </dl>
+        <div className={`trip-cost-hero-accent${differentialCents === 0 ? " is-zero" : ""}`}>
+          <span>Differenz gesamt</span>
+          <strong>{formatEuroAmount(differentialCents)}</strong>
+          <small>EUR</small>
         </div>
       </div>
-    </div>
+      <div className="trip-cost-facts">
+        <span>Dauer <b>{formatMinutes(durationMinutes)}</b></span>
+        <span>Kilometer gesamt <b>{formatKilometers(kilometers)}</b></span>
+      </div>
+      <div className="trip-cost-group">
+        <span className="trip-cost-group-title">Kosten</span>
+        <div
+          className="trip-cost-bar"
+          role="img"
+          aria-label={`Diäten Arbeitgeber ${formatEuroCents(perDiemCents)}, Fahrtkosten ${formatEuroCents(travelCostCents)}, Sonstige Kosten ${formatEuroCents(otherCostsCents)}`}
+        >
+          <span className="trip-cost-swatch-per-diem" style={{ width: `${shares.perDiem}%` }} />
+          <span className="trip-cost-swatch-travel" style={{ width: `${shares.travel}%` }} />
+          <span className="trip-cost-swatch-other" style={{ width: `${shares.other}%` }} />
+        </div>
+        <dl className="trip-cost-list">
+          {costRow("Diäten Arbeitgeber", perDiemCents, "per-diem")}
+          {costRow("Fahrtkosten", travelCostCents, "travel")}
+          {costRow("Sonstige Kosten", otherCostsCents, "other")}
+        </dl>
+      </div>
+      <details className="trip-cost-details" open>
+        <summary>Steuer &amp; Differenz</summary>
+        <dl className="trip-cost-list">
+          {costRow("Diäten steuerlich", taxPerDiemCents)}
+          {costRow("Steuerpfl. Öffi-BEZU", taxableTransportSubsidyCents)}
+          <div className="trip-cost-separator" aria-hidden="true" />
+          {costRow("Differenz Diäten", perDiemDifferentialCents)}
+          {costRow("Werbungskosten Fahrtkosten", transportDifferentialCents)}
+          {costRow("Werbungskosten Sonstiges", otherCostsDifferentialCents)}
+          <div className="trip-cost-grand-total"><dt>Differenz gesamt</dt><dd>{formatEuroCents(differentialCents)}</dd></div>
+        </dl>
+      </details>
+    </aside>
   );
 }
 
@@ -3700,48 +3853,88 @@ function FormSection({ id, title, icon: IconComponent, className = "", headerAct
   );
 }
 
-function AutoFitInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+const FIT_TEXT_LINE_HEIGHT = 1.3;
+
+function FitTextArea({
+  value,
+  onChange,
+  onBlur,
+  labelledBy,
+  readOnly = false,
+  autoFocus = false,
+  tall = false,
+  baseSize = 14,
+  wrapSize = 13,
+  minSize = 10
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+  labelledBy?: string;
+  readOnly?: boolean;
+  autoFocus?: boolean;
+  tall?: boolean;
+  baseSize?: number;
+  wrapSize?: number;
+  minSize?: number;
+}) {
+  const boxRef = useRef<HTMLSpanElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const measureRef = useRef<HTMLSpanElement>(null);
-  const [fontSize, setFontSize] = useState(16);
-  const [multiLine, setMultiLine] = useState(false);
+  const [layout, setLayout] = useState({ fontSize: baseSize, lines: 1 });
 
   useLayoutEffect(() => {
+    const box = boxRef.current;
     const input = inputRef.current;
-    const measure = measureRef.current;
-    if (!input || !measure) return;
+    if (!box || !input) return;
 
-    const updateFontSize = () => {
-      const styles = window.getComputedStyle(input);
-      const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
-      const availableWidth = input.clientWidth - horizontalPadding;
-      if (availableWidth <= 0) return;
-      measure.textContent = value || input.placeholder || "";
-      const fullSizeWidth = measure.scrollWidth;
-      const singleLineFontSize = fullSizeWidth > availableWidth ? Math.floor((availableWidth / fullSizeWidth) * 16) : 16;
-      const shouldUseTwoLines = singleLineFontSize < 11 && fullSizeWidth > availableWidth * 1.35;
-      setMultiLine(shouldUseTwoLines);
-      setFontSize(shouldUseTwoLines ? 12 : Math.max(11, singleLineFontSize));
+    const measure = () => {
+      const linesAt = (size: number) => {
+        input.style.fontSize = `${size}px`;
+        input.style.height = "auto";
+        const lineHeight = size * FIT_TEXT_LINE_HEIGHT;
+        return lineHeight > 0 ? Math.round(input.scrollHeight / lineHeight) : 1;
+      };
+      let next = { fontSize: baseSize, lines: 1 };
+      if (linesAt(baseSize) > 1) {
+        let size = wrapSize;
+        while (size > minSize && linesAt(size) > 2) size -= 0.5;
+        next = { fontSize: size, lines: Math.min(Math.max(linesAt(size), 1), 2) };
+      }
+      input.style.fontSize = `${next.fontSize}px`;
+      input.style.height = `${Math.ceil(next.lines * next.fontSize * FIT_TEXT_LINE_HEIGHT)}px`;
+      setLayout((current) => (current.fontSize === next.fontSize && current.lines === next.lines ? current : next));
     };
 
-    updateFontSize();
-    const observer = new ResizeObserver(updateFontSize);
-    observer.observe(input);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
     return () => observer.disconnect();
-  }, [value]);
+  }, [value, baseSize, wrapSize, minSize]);
+
+  useEffect(() => {
+    if (autoFocus && !readOnly) {
+      const input = inputRef.current;
+      input?.focus();
+      input?.setSelectionRange(input.value.length, input.value.length);
+    }
+  }, [autoFocus, readOnly]);
 
   return (
-    <span className="auto-fit-input-wrap">
+    <span ref={boxRef} className={`fit-text${tall ? " fit-text-tall" : ""}${readOnly ? " fit-text-readonly" : ""}`}>
       <textarea
         ref={inputRef}
-        className={`auto-fit-input ${multiLine ? "auto-fit-input-multiline" : ""}`.trim()}
-        style={{ fontSize: `${fontSize}px` }}
         value={value}
+        rows={1}
         title={value}
-        rows={multiLine ? 2 : 1}
+        readOnly={readOnly}
+        aria-labelledby={labelledBy}
+        style={{ fontSize: `${layout.fontSize}px`, height: `${Math.ceil(layout.lines * layout.fontSize * FIT_TEXT_LINE_HEIGHT)}px` }}
         onChange={(event) => onChange(event.target.value.replace(/\s*\n+\s*/g, " "))}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.preventDefault();
+        }}
+        onBlur={onBlur}
       />
-      <span ref={measureRef} className="auto-fit-measure" aria-hidden="true" />
     </span>
   );
 }
@@ -4096,6 +4289,14 @@ function centsToEuroInput(cents: number): string {
 
 function formatEuroCents(cents: number): string {
   return `${(cents / 100).toLocaleString("de-AT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`;
+}
+
+function formatEuroAmount(cents: number): string {
+  return (cents / 100).toLocaleString("de-AT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatKilometers(kilometers: number): string {
+  return `${kilometers.toLocaleString("de-AT", { maximumFractionDigits: 1 })} km`;
 }
 
 function formatEuroSymbolCents(cents: number): string {
