@@ -373,10 +373,26 @@ describe("settings layout", () => {
     expect(Array.from(document.querySelectorAll(".section-label"), (label) => label.textContent)).toEqual([
       "Arbeitszeit",
       "Gleitzeitkorrekturen",
+      "Fahrtkosten",
       "Backup",
       "Status",
       "Reset"
     ]);
+  });
+
+  it("disables a transport subsidy for trips from the travel expense settings", async () => {
+    workData.saveSettings.mockReset();
+    workData.saveSettings.mockResolvedValue(undefined);
+    render(<App />);
+
+    const tripGroup = screen.getByRole("region", { name: "Reiserechnungen" });
+    const standardSubsidy = within(tripGroup).getByRole("checkbox", { name: "Beförderungszuschuss" });
+    expect(standardSubsidy).toBeChecked();
+    expect(within(tripGroup).getByRole("checkbox", { name: "Beförderungszuschuss Öffis" })).toBeChecked();
+
+    fireEvent.click(standardSubsidy);
+
+    await waitFor(() => expect(workData.saveSettings).toHaveBeenCalledWith({ disabledTransportTypes: ["befoerderungszuschuss"] }));
   });
 });
 
@@ -491,6 +507,19 @@ describe("Google Maps route action", () => {
     expect(screen.getByRole("radio", { name: "Beförderungszuschuss Öffis" })).toBeChecked();
     expect(screen.getByLabelText("Ticketpreis je Richtung (EUR)")).toBeEnabled();
     expect(screen.getByLabelText("ÖBB-Abfrage am")).toBeEnabled();
+  });
+
+  it("hides transport types disabled in the settings", () => {
+    Object.assign(workData.settings, { disabledTransportTypes: ["befoerderungszuschuss"] });
+    try {
+      render(<App />);
+
+      expect(screen.queryByRole("radio", { name: "Beförderungszuschuss" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Beförderungszuschuss Öffis" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Kilometergeld" })).toBeChecked();
+    } finally {
+      Object.assign(workData.settings, { disabledTransportTypes: undefined });
+    }
   });
 });
 
@@ -754,6 +783,22 @@ describe("travel expense view", () => {
     expect(row).toHaveAttribute("aria-current", "true");
     expect(screen.getByText("Sa., 08.08.2026 · Besprechung", { selector: ".trips-title-detail" })).toBeInTheDocument();
     unmount();
+  });
+
+  it("keeps a disabled transport type selected when editing an existing trip", () => {
+    workData.trips = [{ ...baseTrip, transportType: "befoerderungszuschuss" }];
+    Object.assign(workData.settings, { disabledTransportTypes: ["befoerderungszuschuss"] });
+    try {
+      const { unmount } = render(<App />);
+      expect(screen.queryByRole("radio", { name: "Beförderungszuschuss" })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
+
+      expect(screen.getByRole("radio", { name: "Beförderungszuschuss" })).toBeChecked();
+      unmount();
+    } finally {
+      Object.assign(workData.settings, { disabledTransportTypes: undefined });
+    }
   });
 
   it("shows open trip status figures above the form", () => {

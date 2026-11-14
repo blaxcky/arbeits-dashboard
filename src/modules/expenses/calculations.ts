@@ -8,6 +8,18 @@ export const TRANSPORT_LABELS: Record<TripTransportType, string> = {
   sonstige: "Sonstige Kosten"
 };
 
+export const TRANSPORT_TYPES: TripTransportType[] = ["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"];
+
+export const DISABLEABLE_TRANSPORT_TYPES: TripTransportType[] = ["befoerderungszuschuss", "oeffi-zuschuss"];
+
+export function isTransportTypeEnabled(transportType: TripTransportType, disabledTransportTypes: readonly TripTransportType[] = []): boolean {
+  return !DISABLEABLE_TRANSPORT_TYPES.includes(transportType) || !disabledTransportTypes.includes(transportType);
+}
+
+export function selectableTransportTypes(disabledTransportTypes: readonly TripTransportType[] = [], keptTransportTypes: readonly (TripTransportType | undefined)[] = []): TripTransportType[] {
+  return TRANSPORT_TYPES.filter((transportType) => keptTransportTypes.includes(transportType) || isTransportTypeEnabled(transportType, disabledTransportTypes));
+}
+
 export const TRIP_RULES = {
   kilometerAllowanceCents: 50,
   standardTransportSubsidy: {

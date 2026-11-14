@@ -40,6 +40,7 @@ export interface Settings {
   absenceRequestUrgentDays?: number;
   publicTransportTaxFreeYearLimitCents?: number | null;
   publicTransportTaxFreeYearLimitsCents: Record<string, number | null>;
+  disabledTransportTypes?: TripTransportType[];
   updatedAt: string;
 }
 

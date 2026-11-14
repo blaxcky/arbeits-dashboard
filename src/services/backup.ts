@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { readAllData, replaceAllData } from "../db/database";
 import { APP_NAME, BACKUP_SCHEMA_VERSION, type AuditPointCase, type AuditPointGoal, type BackupData, type BackupManifest, type BackupPayload, type OtherMeasure, type PlannedAbsence, type Todo, type TodoProject, type UsoCase, type UsoGoal, type TravelExpensePayment, type TripFile } from "../db/schema";
+import { TRANSPORT_TYPES } from "../modules/expenses/calculations";
 
 type SerializedTripFile = Omit<TripFile, "dataUrl"> & ({ dataUrl: string; path?: never } | { path: string; dataUrl?: never });
 type SerializedBackupData = Omit<BackupData, "files" | "tripPayments" | "auditPointCases" | "auditPointGoals" | "usoCases" | "usoGoals" | "otherMeasures" | "todos" | "todoProjects" | "plannedAbsences"> & { files: SerializedTripFile[]; tripPayments?: TravelExpensePayment[]; auditPointCases?: AuditPointCase[]; auditPointGoals?: AuditPointGoal[]; usoCases?: UsoCase[]; usoGoals?: UsoGoal[]; otherMeasures?: OtherMeasure[]; todos?: Todo[]; todoProjects?: TodoProject[]; plannedAbsences?: PlannedAbsence[] };
@@ -156,6 +157,7 @@ function validateSettings(value: unknown): void {
   requireOptionalNullableNumber(value, "absenceRequestUrgentDays", "Dringend-Schwelle ist ungültig.");
   requireOptionalNullableNumber(value, "publicTransportTaxFreeYearLimitCents", "Öffi-BEZU-Jahresdeckel ist ungültig.");
   requireOptionalNullableNumberRecord(value, "publicTransportTaxFreeYearLimitsCents", "Öffi-BEZU-Jahresdeckel je Jahr ist ungültig.");
+  requireOptionalTransportTypeList(value, "disabledTransportTypes", "Deaktivierte Fahrtkostenarten sind ungültig.");
   requireString(value, "updatedAt", "Einstellungs-Zeitstempel fehlt.");
 }
 
@@ -480,6 +482,12 @@ function requireOptionalNullableNumberRecord(value: Record<string, unknown>, key
       throw new Error(message);
     }
   });
+}
+
+function requireOptionalTransportTypeList(value: Record<string, unknown>, key: string, message: string): void {
+  const list = value[key];
+  if (list === undefined) return;
+  if (!Array.isArray(list) || list.some((item) => typeof item !== "string" || !(TRANSPORT_TYPES as string[]).includes(item))) throw new Error(message);
 }
 
 function requireOptionalBoolean(value: Record<string, unknown>, key: string, message: string): void {

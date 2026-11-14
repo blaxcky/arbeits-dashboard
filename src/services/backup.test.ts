@@ -358,6 +358,14 @@ describe("backup service", () => {
     await expect(inspectBackup(await makeZip(invalidData, "1.9.0"))).rejects.toThrow("Schnellwahl Dienstbeginn ist ungültig.");
   });
 
+  it("accepts disabled transport types and rejects unknown ones", async () => {
+    const validData = { ...backupData(), settings: { ...backupSettings(), disabledTransportTypes: ["befoerderungszuschuss" as const] } };
+    await expect(inspectBackup(await makeZip(validData, "1.13.0"))).resolves.toMatchObject({ data: validData });
+
+    const invalidData = { ...validData, settings: { ...backupSettings(), disabledTransportTypes: ["office"] } };
+    await expect(inspectBackup(await makeZip(invalidData, "1.13.0"))).rejects.toThrow("Deaktivierte Fahrtkostenarten sind ungültig.");
+  });
+
   it("normalizes old backups without trip payments to an empty list", async () => {
     const { tripPayments: _tripPayments, ...oldData } = backupData();
 

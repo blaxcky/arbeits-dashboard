@@ -71,6 +71,9 @@ import {
   summarizeTripsByYear,
   summarizeTripsByYearMonth,
   TRIP_RULES,
+  DISABLEABLE_TRANSPORT_TYPES,
+  isTransportTypeEnabled,
+  selectableTransportTypes,
   TRANSPORT_LABELS
 } from "../modules/expenses/calculations";
 import { buildTripAdvertisingCostsExportRows, buildTripAdvertisingCostsPrintHtml, summarizeTripAdvertisingCostsExport } from "../modules/expenses/advertisingCostsExport";
@@ -753,6 +756,10 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
             <button className="primary-button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
           </div>
           <CorrectionsPanel data={data} />
+          <section className="settings-column" aria-labelledby="settings-trips-title">
+            <h2 id="settings-trips-title" className="settings-group-title">Reiserechnungen</h2>
+            <TripSettingsPanel data={data} showToast={showToast} />
+          </section>
         </section>
         <section className="settings-column" aria-labelledby="settings-system-title">
           <h2 id="settings-system-title" className="settings-group-title">Daten &amp; System</h2>
@@ -762,6 +769,37 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
         </section>
       </div>
     </section>
+  );
+}
+
+function TripSettingsPanel({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
+  const disabledTransportTypes = data.settings?.disabledTransportTypes ?? [];
+
+  async function toggleTransportType(transportType: TripTransportType, enabled: boolean) {
+    const nextDisabled = enabled
+      ? disabledTransportTypes.filter((type) => type !== transportType)
+      : [...disabledTransportTypes.filter((type) => type !== transportType), transportType];
+    await data.saveSettings({ disabledTransportTypes: nextDisabled });
+    showToast(`${TRANSPORT_LABELS[transportType]} ${enabled ? "aktiviert" : "deaktiviert"}.`);
+  }
+
+  return (
+    <div className="panel form-panel">
+      <span className="section-label">Fahrtkosten</span>
+      <p className="muted">Deaktivierte Fahrtkostenarten stehen bei neuen Reiserechnungen nicht mehr zur Auswahl. Bestehende Reiserechnungen bleiben unverändert.</p>
+      <div className="settings-check-list">
+        {DISABLEABLE_TRANSPORT_TYPES.map((transportType) => (
+          <label key={transportType} className="check-row">
+            <input
+              type="checkbox"
+              checked={isTransportTypeEnabled(transportType, disabledTransportTypes)}
+              onChange={(event) => void toggleTransportType(transportType, event.target.checked)}
+            />
+            {TRANSPORT_LABELS[transportType]}
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -2121,8 +2159,6 @@ function PointsYearRemainder({ summary, formatValue, showCaseValues }: { summary
   );
 }
 
-const transportOptions: TripTransportType[] = ["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"];
-
 function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(() => tripToForm());
@@ -2198,6 +2234,7 @@ function TripsView({ data, showToast }: { data: WorkData; showToast: ShowToast }
     return grouped;
   }, [data.files]);
   const currentTripFiles = editingTrip ? filesByTripId.get(editingTrip.id) ?? [] : [];
+  const transportOptions = selectableTransportTypes(data.settings?.disabledTransportTypes, [editingTrip?.transportType, form.transportType]);
   const evidenceUploadsEnabled = Boolean(editingTrip && isValidDateKey(form.date));
   const evidenceFilesByZone = useMemo(() => ({
     "google-maps": currentTripFiles.filter((file) => evidenceZoneForFile(file) === "google-maps"),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  selectableTransportTypes,
   calculateDomesticPerDiemCents,
   calculatePublicTransportPayoutCents,
   calculatePublicTransportYearBreakdown,
@@ -299,5 +300,25 @@ describe("expense calculations", () => {
     const summary = summarizeTripsByYear([baseTrip], 2026, [{ ...basePayment, amountCents: 3000 }]);
 
     expect(summary.remainingPayoutCents).toBe(-300);
+  });
+});
+
+describe("selectableTransportTypes", () => {
+  it("offers all transport types without a setting", () => {
+    expect(selectableTransportTypes()).toEqual(["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"]);
+    expect(selectableTransportTypes([])).toEqual(["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"]);
+  });
+
+  it("hides disabled transport subsidies", () => {
+    expect(selectableTransportTypes(["befoerderungszuschuss"])).toEqual(["kilometergeld", "oeffi-zuschuss", "dienstauto", "sonstige"]);
+    expect(selectableTransportTypes(["befoerderungszuschuss", "oeffi-zuschuss"])).toEqual(["kilometergeld", "dienstauto", "sonstige"]);
+  });
+
+  it("keeps a disabled transport type that an existing trip still uses", () => {
+    expect(selectableTransportTypes(["befoerderungszuschuss"], [undefined, "befoerderungszuschuss"])).toEqual(["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"]);
+  });
+
+  it("never hides transport types that cannot be disabled", () => {
+    expect(selectableTransportTypes(["kilometergeld", "sonstige"])).toEqual(["kilometergeld", "befoerderungszuschuss", "oeffi-zuschuss", "dienstauto", "sonstige"]);
   });
 });

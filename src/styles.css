@@ -1023,6 +1023,11 @@ button:disabled {
   align-content: start;
 }
 
+.settings-check-list {
+  display: grid;
+  gap: 10px;
+}
+
 .settings-group-title {
   margin: 0;
   color: var(--muted);
