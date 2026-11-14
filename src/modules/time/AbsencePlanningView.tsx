@@ -461,14 +461,18 @@ function readStoredMode(): PlannedAbsenceType {
   }
 }
 
+export function rememberAbsencePlanMode(mode: PlannedAbsenceType): void {
+  try {
+    window.localStorage.setItem(MODE_STORAGE_KEY, mode);
+  } catch {
+    // Speicher nicht verfügbar – Auswahl gilt nur für diese Sitzung.
+  }
+}
+
 function useModeState(): [PlannedAbsenceType, (mode: PlannedAbsenceType) => void] {
   const [mode, setMode] = useState<PlannedAbsenceType>(readStoredMode);
   return [mode, (next) => {
     setMode(next);
-    try {
-      window.localStorage.setItem(MODE_STORAGE_KEY, next);
-    } catch {
-      // Speicher nicht verfügbar – Auswahl gilt nur für diese Sitzung.
-    }
+    rememberAbsencePlanMode(next);
   }];
 }

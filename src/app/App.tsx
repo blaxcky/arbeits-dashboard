@@ -48,7 +48,6 @@ import { formatAbsoluteMinutes, formatDays, formatMinutes, formatSignedMinutes, 
 import {
   calculateDay,
   calculateFlexBalance,
-  calculateNextFlexDayBalance,
   calculateRequiredYearConsumption,
   calculateVacation,
   calculateWeek,
@@ -100,7 +99,7 @@ import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalityS
 import { APP_VERSION } from "../db/schema";
 import { useWorkData } from "./useWorkData";
 import { TodosView } from "../modules/todos/TodosView";
-import { AbsencePlanningView, AbsenceRequestAlert, absencePlanHeadline, computeAbsencePlanning, daysLabel, PlannedDayNotice, PlanBar } from "../modules/time/AbsencePlanningView";
+import { AbsencePlanningView, AbsenceRequestAlert, absencePlanHeadline, computeAbsencePlanning, daysLabel, PlannedDayNotice, PlanBar, rememberAbsencePlanMode } from "../modules/time/AbsencePlanningView";
 import { ABSENCE_TYPE_LABELS, ABSENCE_TYPE_LETTERS } from "../modules/time/absencePlanning";
 import {
   applyPointFormStatus,
@@ -357,8 +356,6 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
   const flexDistanceToLimit = flexLimitMinutes - flex;
   const vacationEntitlementMinutes = vacation?.entitlementMinutes ?? 0;
   const dailyTargetMinutes = settings?.dailyTargetMinutes ?? 480;
-  const nextFlexDayBalance = settings ? calculateNextFlexDayBalance(flex, settings.dailyTargetMinutes) : null;
-  const canBookFlexDay = Boolean(settings && nextFlexDayBalance !== null);
   const currentDate = todayKey(data.clock);
   const selectedEntryMissingEnd = isOverdueWeekdayMissingEnd(previewEntry, currentDate);
   const absencePlanning = computeAbsencePlanning(data);
@@ -439,22 +436,6 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
     showToast("Zeiteintrag gelöscht.");
   }
 
-  async function bookFlexDay() {
-    if (!settings) return;
-    const nextBalance = calculateNextFlexDayBalance(flex, settings.dailyTargetMinutes);
-    if (nextBalance === null) {
-      showToast("Gleittag nicht möglich: maximal 10:00 h Minusstunden.");
-      return;
-    }
-    await data.addCorrection({
-      date: selectedDate,
-      oldValueMinutes: flex,
-      newValueMinutes: nextBalance,
-      note: "Gleittag vorgemerkt"
-    });
-    showToast(`Gleittag mit ${formatMinutes(settings.dailyTargetMinutes)} gebucht.`);
-  }
-
   async function saveVacationRemaining() {
     if (vacationEditValue === null || !settings) return;
     const remainingMinutes = parseHoursToMinutes(vacationEditValue);
@@ -522,10 +503,10 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           value={formatSignedMinutes(flex)}
           detail={flexDistanceToLimit >= 0 ? `noch ${formatMinutes(flexDistanceToLimit)} bis Grenze` : `${formatMinutes(Math.abs(flexDistanceToLimit))} über Grenze`}
           action={
-            <button className="secondary-button metric-action" type="button" title={canBookFlexDay ? "Gleittag buchen" : "Gleittag nicht möglich: maximal 10:00 h Minusstunden"} onClick={() => void bookFlexDay()} disabled={!canBookFlexDay}>
+            <Link className="secondary-button metric-action" to="/urlaub" title="Gleittage werden in der Jahresplanung pro Tag eingetragen und am Tag selbst gebucht" onClick={() => rememberAbsencePlanMode("flex")}>
               <CalendarPlus size={16} />
-              Gleittag buchen
-            </button>
+              Gleittag planen
+            </Link>
           }
           tone={settings && flex > settings.flexLimitMinutes ? "warning" : "default"}
           progress={{
@@ -576,7 +557,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
             setVacationEditError(undefined);
           }}
           action={
-            <Link className="secondary-button metric-action" to="/urlaub" title="Urlaubstage werden in der Jahresplanung pro Tag eingetragen und am Tag selbst gebucht">
+            <Link className="secondary-button metric-action" to="/urlaub" title="Urlaubstage werden in der Jahresplanung pro Tag eingetragen und am Tag selbst gebucht" onClick={() => rememberAbsencePlanMode("vacation")}>
               <CalendarPlus size={16} />
               Urlaub planen
             </Link>
