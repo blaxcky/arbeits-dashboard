@@ -92,10 +92,13 @@ import {
   formatMonthName,
   isAuditPointCategory,
   pointsForAuditCase,
+  pointsForOtherMeasure,
+  pointsForUsoCase,
   summarizeAuditPoints,
   usoTargetForYear
 } from "../modules/points/calculations";
 import { downloadPointsYearWorkbook } from "../modules/points/yearExport";
+import { formatPointMonthLabel, groupPointCasesByMonth, summarizePointCaseOverview } from "../modules/points/overview";
 import { formatTripMonthName, groupTripsByMonth, splitTripDateLabel, summarizeTripList, tripCostShares, tripSubmissionStatus } from "../modules/expenses/tripOverview";
 import { findMunicipalityForAddress, municipalityQueryFromAddress, municipalitySearchText, parseMunicipalitiesXml, type Municipality } from "../modules/expenses/municipalities";
 import { APP_VERSION } from "../db/schema";
@@ -989,14 +992,8 @@ function writePointsListVisibility(visibility: PointsListVisibility) {
 interface CollapsiblePointListsProps {
   counts: Record<PointsListKey, number>;
   content: Record<PointsListKey, ReactNode>;
-}
-
-interface PointCaseStatusGroupsProps {
-  listKey: PointsListKey;
-  openCount: number;
-  completedCount: number;
-  openCases: ReactNode;
-  completedCases: ReactNode;
+  toolbarStart?: ReactNode;
+  panelProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
 interface PointCollapseProps {
@@ -1036,7 +1033,7 @@ const pointFormTabs: { key: PointsListKey; label: string }[] = [
   { key: "other", label: "Sonstige Maßnahme" }
 ];
 
-export function CollapsiblePointLists({ counts, content }: CollapsiblePointListsProps) {
+export function CollapsiblePointLists({ counts, content, toolbarStart, panelProps }: CollapsiblePointListsProps) {
   const [visibility, setVisibility] = useState<PointsListVisibility>(readPointsListVisibility);
   const allExpanded = Object.values(visibility).every(Boolean);
 
@@ -1056,10 +1053,12 @@ export function CollapsiblePointLists({ counts, content }: CollapsiblePointLists
   return (
     <div className="points-lists">
       <div className="points-lists-toolbar">
+        {toolbarStart}
         <button className="secondary-button points-lists-toggle-all" type="button" onClick={toggleAllLists}>
           {allExpanded ? "Alle einklappen" : "Alle ausklappen"}
         </button>
       </div>
+      <div className="points-lists-panels" {...panelProps}>
       {(Object.keys(pointListLabels) as PointsListKey[]).map((list) => {
         const expanded = visibility[list];
         const label = pointListLabels[list];
@@ -1087,44 +1086,7 @@ export function CollapsiblePointLists({ counts, content }: CollapsiblePointLists
           </section>
         );
       })}
-    </div>
-  );
-}
-
-function PointCaseStatusGroups({ listKey, openCount, completedCount, openCases, completedCases }: PointCaseStatusGroupsProps) {
-  const [completedExpanded, setCompletedExpanded] = useState(false);
-  const completedContentId = `points-list-${listKey}-completed-content`;
-
-  return (
-    <div className="point-status-groups">
-      <section className="point-status-group point-status-open" aria-labelledby={`points-list-${listKey}-open-heading`}>
-        <div className="point-status-heading">
-          <h3 id={`points-list-${listKey}-open-heading`}>Offen</h3>
-          <strong aria-label={pointCaseStatusCountLabel(openCount, "open")}>{openCount}</strong>
-        </div>
-        {openCount === 0 ? <p className="muted point-status-empty">Keine offenen Fälle.</p> : openCases}
-      </section>
-      <section className="point-status-group point-status-completed">
-        <button
-          className="point-status-completed-toggle"
-          type="button"
-          aria-expanded={completedExpanded}
-          aria-controls={completedContentId}
-          onClick={() => setCompletedExpanded((current) => !current)}
-        >
-          <span className="point-status-completed-title">
-            <CheckCircle size={18} weight="fill" aria-hidden="true" />
-            <span role="heading" aria-level={3}>Erledigt</span>
-          </span>
-          <span className="point-status-completed-meta">
-            <strong aria-label={pointCaseStatusCountLabel(completedCount, "completed")}>{completedCount}</strong>
-            <CaretDown className="point-status-caret" size={18} weight="bold" aria-hidden="true" />
-          </span>
-        </button>
-        <PointCollapse id={completedContentId} expanded={completedExpanded}>
-          {completedCount === 0 ? <p className="muted point-status-empty">Keine erledigten Fälle.</p> : completedCases}
-        </PointCollapse>
-      </section>
+      </div>
     </div>
   );
 }
@@ -1152,6 +1114,8 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
   const completedUsoCases = sortedUsoCases.filter((usoCase) => usoCase.status === "completed");
   const openOtherMeasures = sortedOtherMeasures.filter((measure) => measure.status !== "completed");
   const completedOtherMeasures = sortedOtherMeasures.filter((measure) => measure.status === "completed");
+  const [listTab, setListTab] = useState<"open" | "done">("open");
+  const overview = summarizePointCaseOverview(data.auditPointCases, data.usoCases, data.otherMeasures, todayKey().slice(0, 7));
 
   function handleFormTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, tabIndex: number) {
     let nextIndex: number | null = null;
@@ -1324,209 +1288,265 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
     showToast("Sonstige Maßnahme gelöscht.");
   }
 
-  function renderAuditCases(cases: AuditPointCase[]) {
+  function pointCaseRowClass(status: string, editing: boolean) {
+    return `point-case-row${status === "completed" ? " is-done" : ""}${editing ? " is-editing" : ""}`;
+  }
+
+  function renderCaseActions(onEdit: () => void, onRemove: () => void) {
     return (
-      <div className="trip-list">
-        {cases.map((pointCase) => (
-          <article key={pointCase.id} className={`trip-row point-case-row audit-point-row ${pointCase.status === "completed" ? "trip-row-done" : ""}`}>
-            <div className="point-case-data">
-              <strong>{pointCase.name}{pointCase.taxNumber ? ` · ${pointCase.taxNumber}` : ""}</strong>
-              <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}-{pointCase.periodEndYear}</span>
-              {pointCase.manualPointsTenths && pointCase.manualPointsNote ? <span className="point-case-manual-note">Zusatzpunkte: {pointCase.manualPointsNote}</span> : null}
-              {pointCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
-            </div>
-            <div className="trip-row-metrics point-case-metrics">
-              <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
-              <span>{formatEuroCents(pointCase.additionalResultCents)}</span>
-              {pointCase.manualPointsTenths ? <small>davon manuell {formatPointTenths(pointCase.manualPointsTenths)}</small> : null}
-              <small>{pointCase.section99 ? "§99" : "ohne §99"}</small>
-            </div>
-            <div className="trip-actions point-case-actions">
-              <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editCase(pointCase)}>
-                <PencilSimple size={17} />
-              </button>
-              <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeCase(pointCase)}>
-                <Trash size={17} />
-              </button>
-            </div>
-          </article>
-        ))}
+      <div className="trip-actions point-case-actions">
+        <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={onEdit}>
+          <PencilSimple size={17} />
+        </button>
+        <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={onRemove}>
+          <Trash size={17} />
+        </button>
       </div>
     );
   }
 
-  function renderUsoCases(cases: UsoCase[]) {
+  function renderManualPointsMetric(manualPointsTenths: number | undefined, manualPointsNote: string | undefined) {
+    if (!manualPointsTenths) {
+      return <div className="point-case-metrics is-empty"><strong>–</strong><small className="sr-only">Keine Zusatzpunkte</small></div>;
+    }
     return (
-      <div className="trip-list">
-        {cases.map((usoCase) => (
-          <article key={usoCase.id} className={`trip-row point-case-row ${usoCase.status === "completed" ? "trip-row-done" : ""}`}>
-            <div className="point-case-data">
-              <strong>{usoCase.title}</strong>
-              <span>{usoCase.submissionMonth || "Kein Abgabemonat"}</span>
-              {usoCase.manualPointsTenths && usoCase.manualPointsNote ? <span className="point-case-manual-note">Zusatzpunkte: {usoCase.manualPointsNote}</span> : null}
-              {usoCase.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
-            </div>
-            <div className="trip-row-metrics point-case-metrics">
-              {usoCase.manualPointsTenths ? <div className="point-case-additional-metric"><strong>{formatPointTenths(usoCase.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
-            </div>
-            <div className="trip-actions point-case-actions">
-              <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editUsoCase(usoCase)}>
-                <PencilSimple size={17} />
-              </button>
-              <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeUsoCase(usoCase)}>
-                <Trash size={17} />
-              </button>
-            </div>
-          </article>
-        ))}
+      <div className="point-case-metrics">
+        <strong>{formatPointTenths(manualPointsTenths)}</strong>
+        <small>Zusatzpunkte</small>
+        {manualPointsNote ? <span className="point-case-extra">{manualPointsNote}</span> : null}
       </div>
     );
   }
 
-  function renderOtherMeasures(measures: OtherMeasure[]) {
+  function renderMonthGroups<T extends { id: string; submissionMonth: string }>(cases: T[], pointsFor: (pointCase: T) => number, renderRow: (pointCase: T) => ReactNode) {
+    if (cases.length === 0) {
+      return <p className="muted point-status-empty">{listTab === "open" ? "Keine offenen Fälle." : "Keine erledigten Fälle."}</p>;
+    }
+
     return (
-      <div className="trip-list">
-        {measures.map((measure) => (
-          <article key={measure.id} className={`trip-row point-case-row ${measure.status === "completed" ? "trip-row-done" : ""}`}>
-            <div className="point-case-data">
-              <strong>{measure.title}</strong>
-              <span>{measure.measureType} · {measure.submissionMonth || "Kein Abgabemonat"}</span>
-              {measure.manualPointsTenths && measure.manualPointsNote ? <span className="point-case-manual-note">Zusatzpunkte: {measure.manualPointsNote}</span> : null}
-              {measure.submissionMonth === "" ? <span className="trip-badges"><em>ohne Abgabemonat</em></span> : null}
-            </div>
-            <div className="trip-row-metrics point-case-metrics">
-              {measure.manualPointsTenths ? <div className="point-case-additional-metric"><strong>{formatPointTenths(measure.manualPointsTenths)}</strong><small>Zusatzpunkte</small></div> : null}
-            </div>
-            <div className="trip-actions point-case-actions">
-              <button className="icon-button trip-action-button" type="button" title="Bearbeiten" aria-label="Bearbeiten" onClick={() => editOtherMeasure(measure)}>
-                <PencilSimple size={17} />
-              </button>
-              <button className="icon-button trip-action-button danger-icon-button" type="button" title="Löschen" aria-label="Löschen" onClick={() => void removeOtherMeasure(measure)}>
-                <Trash size={17} />
-              </button>
-            </div>
-          </article>
-        ))}
+      <div className="point-month-groups">
+        {groupPointCasesByMonth(cases, listTab === "open" ? "asc" : "desc", pointsFor).map((group) => {
+          const label = group.month ? formatPointMonthLabel(group.month) || group.month : "ohne Abgabemonat";
+          return (
+            <section key={group.month || "ohne"} className={`point-month-group${group.month ? "" : " is-without-month"}`} aria-label={label}>
+              <div className="point-month-heading">
+                <strong>{group.month ? null : <Warning size={15} weight="bold" aria-hidden="true" />}{label}</strong>
+                {group.pointsTenths > 0 ? <span>{formatPointTenths(group.pointsTenths)} Punkte</span> : null}
+              </div>
+              <div className="point-case-list">{group.cases.map(renderRow)}</div>
+            </section>
+          );
+        })}
       </div>
     );
   }
+
+  function renderAuditRow(pointCase: AuditPointCase) {
+    const manualPointsTenths = pointCase.manualPointsTenths ?? 0;
+    return (
+      <article key={pointCase.id} className={pointCaseRowClass(pointCase.status, editingId === pointCase.id)}>
+        <div className="point-case-data">
+          <strong>{pointCase.name}{pointCase.taxNumber ? ` · ${pointCase.taxNumber}` : ""}</strong>
+          <span>{pointCase.firm || "Keine Kanzlei"} · {pointCase.category} · {pointCase.periodStartYear}–{pointCase.periodEndYear}</span>
+        </div>
+        <span className="point-case-result">{formatEuroCents(pointCase.additionalResultCents)}</span>
+        <div className="point-case-metrics">
+          <strong>{formatPointTenths(pointsForAuditCase(pointCase))}</strong>
+          <small>Punkte</small>
+          {pointCase.section99 ? <span className="point-case-extra">inkl. §99</span> : null}
+          {manualPointsTenths > 0 ? <span className="point-case-extra">+{formatPointTenths(manualPointsTenths)} {pointCase.manualPointsNote || "Zusatzpunkte"}</span> : null}
+        </div>
+        {renderCaseActions(() => editCase(pointCase), () => void removeCase(pointCase))}
+      </article>
+    );
+  }
+
+  function renderUsoRow(usoCase: UsoCase) {
+    return (
+      <article key={usoCase.id} className={pointCaseRowClass(usoCase.status, usoEditingId === usoCase.id)}>
+        <div className="point-case-data">
+          <strong>{usoCase.title}</strong>
+          <span>{formatPointMonthLabel(usoCase.submissionMonth) || "Kein Abgabemonat"}</span>
+        </div>
+        <span className="point-case-result" aria-hidden="true" />
+        {renderManualPointsMetric(usoCase.manualPointsTenths, usoCase.manualPointsNote)}
+        {renderCaseActions(() => editUsoCase(usoCase), () => void removeUsoCase(usoCase))}
+      </article>
+    );
+  }
+
+  function renderOtherRow(measure: OtherMeasure) {
+    return (
+      <article key={measure.id} className={pointCaseRowClass(measure.status, otherEditingId === measure.id)}>
+        <div className="point-case-data">
+          <strong>{measure.title}</strong>
+          <span>{measure.measureType} · {formatPointMonthLabel(measure.submissionMonth) || "Kein Abgabemonat"}</span>
+        </div>
+        <span className="point-case-result" aria-hidden="true" />
+        {renderManualPointsMetric(measure.manualPointsTenths, measure.manualPointsNote)}
+        {renderCaseActions(() => editOtherMeasure(measure), () => void removeOtherMeasure(measure))}
+      </article>
+    );
+  }
+
+  function renderEditorToolbar(label: string, editingTitle: string | undefined, onNew: () => void) {
+    return (
+      <div className="form-toolbar points-editor-toolbar">
+        <span className="points-editor-title">
+          <span className="section-label">{label}</span>
+          {editingTitle ? <strong>{editingTitle}</strong> : null}
+        </span>
+        <button className="secondary-button" type="button" onClick={onNew}>Neu</button>
+      </div>
+    );
+  }
+
+  const listCounts = listTab === "open"
+    ? { audit: openAuditCases.length, uso: openUsoCases.length, other: openOtherMeasures.length }
+    : { audit: completedAuditCases.length, uso: completedUsoCases.length, other: completedOtherMeasures.length };
+  const completedTotal = completedAuditCases.length + completedUsoCases.length + completedOtherMeasures.length;
+  const openTotal = openAuditCases.length + openUsoCases.length + openOtherMeasures.length;
+  const currentMonthLabel = formatPointMonthLabel(overview.currentMonth.month);
+  const withoutMonthDetail = overview.withoutMonth.count === 0
+    ? ""
+    : `${overview.withoutMonth.title ? `${overview.withoutMonth.title} · ` : ""}${formatPointTenths(overview.withoutMonth.pointsTenths)} Punkte`;
+  const yearProgress = overview.year.totalPointsTenths > 0 ? overview.year.completedPointsTenths / overview.year.totalPointsTenths : 0;
+  const editingAuditCase = data.auditPointCases.find((pointCase) => pointCase.id === editingId);
+  const editingUsoCase = data.usoCases.find((usoCase) => usoCase.id === usoEditingId);
+  const editingOtherMeasure = data.otherMeasures.find((measure) => measure.id === otherEditingId);
+  const listTabs = (
+    <div className="trip-tabs" role="tablist" aria-label="Fälle">
+      <button type="button" role="tab" id="points-tab-open" aria-selected={listTab === "open"} aria-controls="points-tabpanel" onClick={() => setListTab("open")}>
+        Offene Fälle <span className="trip-tab-count">{openTotal}</span>
+      </button>
+      <button type="button" role="tab" id="points-tab-done" aria-selected={listTab === "done"} aria-controls="points-tabpanel" onClick={() => setListTab("done")}>
+        Erledigte Fälle <span className="trip-tab-count">{completedTotal}</span>
+      </button>
+    </div>
+  );
 
   return (
-    <section className="page-stack">
+    <section className="page-stack dashboard-page points-page">
       <Header eyebrow="Betriebsprüfungen" title="Punkte" />
-      <div className="points-form-workspace">
-        <div className="points-form-tabs" role="tablist" aria-label="Falltyp auswählen">
-          {pointFormTabs.map((tab, tabIndex) => {
-            const selected = activeForm === tab.key;
-            return (
-              <button
-                key={tab.key}
-                ref={(element) => { formTabRefs.current[tabIndex] = element; }}
-                id={`points-form-tab-${tab.key}`}
-                className="points-form-tab"
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                aria-controls={`points-form-panel-${tab.key}`}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => setActiveForm(tab.key)}
-                onKeyDown={(event) => handleFormTabKeyDown(event, tabIndex)}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        {activeForm === "audit" ? (
-        <section
-          className="points-form-stack"
-          id="points-form-panel-audit"
-          role="tabpanel"
-          aria-labelledby="points-form-tab-audit"
-        >
-          <div className="form-toolbar">
-            <span className="section-label">{editingId ? "Fall bearbeiten" : "Neuer Fall"}</span>
-            <button className="secondary-button" type="button" onClick={() => {
-              setEditingId(null);
-              setForm(auditPointCaseToForm());
-              setErrors({});
-            }}>Neu</button>
+      <section className="dashboard-metrics points-metrics" aria-label="Kennzahlen">
+        <Metric
+          title="Offene Fälle"
+          value={String(overview.openCount)}
+          detail={`${overview.openCounts.audit} ${overview.openCounts.audit === 1 ? "Betriebsprüfung" : "Betriebsprüfungen"} · ${overview.openCounts.uso} USO · ${overview.openCounts.other} Sonstige`}
+        />
+        <Metric
+          title={`Abgabe ${currentMonthLabel}`}
+          value={`${formatPointTenths(overview.currentMonth.openPointsTenths)} Punkte`}
+          detail={pointCaseStatusCountLabel(overview.currentMonth.openCount, "open")}
+        />
+        <Metric
+          title="Ohne Abgabemonat"
+          tone={overview.withoutMonth.count > 0 ? "warning" : "default"}
+          value={overview.withoutMonth.count === 1 ? "1 Fall" : `${overview.withoutMonth.count} Fälle`}
+          detail={withoutMonthDetail}
+        />
+        <Metric
+          title={`Punkte ${overview.year.year}`}
+          value={formatPointTenths(overview.year.totalPointsTenths)}
+          progress={{ value: yearProgress }}
+          detail={`${formatPointTenths(overview.year.completedPointsTenths)} erledigt · ${formatPointTenths(overview.year.openPointsTenths)} offen`}
+        />
+      </section>
+      <div className="points-workspace">
+        <section className="panel points-editor" aria-label="Fall erfassen">
+          <div className="points-form-tabs" role="tablist" aria-label="Falltyp auswählen">
+            {pointFormTabs.map((tab, tabIndex) => {
+              const selected = activeForm === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  ref={(element) => { formTabRefs.current[tabIndex] = element; }}
+                  id={`points-form-tab-${tab.key}`}
+                  className="points-form-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls={`points-form-panel-${tab.key}`}
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => setActiveForm(tab.key)}
+                  onKeyDown={(event) => handleFormTabKeyDown(event, tabIndex)}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
-          <div className="points-form-grid points-form-grid-audit">
-            <FormSection id="audit-section-details" title="Falldaten" icon={ClipboardText} className="points-form-card points-form-card-details">
-              <Field label="Name" className="field-wide" error={errors.name}>
-                <input value={form.name} aria-invalid={Boolean(errors.name)} onChange={(event) => updateField("name", event.target.value)} />
-              </Field>
-              <Field label="Steuernummer" error={errors.taxNumber}>
-                <input value={form.taxNumber} aria-invalid={Boolean(errors.taxNumber)} onChange={(event) => updateField("taxNumber", event.target.value)} />
-              </Field>
-              <Field label="Kanzlei">
-                <input value={form.firm} onChange={(event) => updateField("firm", event.target.value)} />
-              </Field>
-              <Field label="Betriebskategorie" error={errors.category}>
-                <select value={form.category} aria-invalid={Boolean(errors.category)} onChange={(event) => updateField("category", event.target.value)}>
-                  {AUDIT_POINT_CATEGORIES.map((category) => (
-                    <option key={category} value={category}>{AUDIT_POINT_CATEGORY_RULES[category].label}</option>
-                  ))}
-                </select>
-              </Field>
-            </FormSection>
-            <FormSection id="audit-section-scope" title="Prüfungsumfang" icon={ChartBar} className="points-form-card points-form-card-scope">
-              <Field label="Zeitraum von" error={errors.periodStartYear}>
-                <input inputMode="numeric" value={form.periodStartYear} aria-invalid={Boolean(errors.periodStartYear)} onChange={(event) => updateField("periodStartYear", event.target.value)} />
-              </Field>
-              <Field label="Zeitraum bis" error={errors.periodEndYear}>
-                <input inputMode="numeric" value={form.periodEndYear} aria-invalid={Boolean(errors.periodEndYear)} onChange={(event) => updateField("periodEndYear", event.target.value)} />
-              </Field>
-              <Field label="Mehrergebnis (EUR)" className="field-wide" error={errors.additionalResultEuros}>
-                <input inputMode="decimal" placeholder="0,00" value={form.additionalResultEuros} aria-invalid={Boolean(errors.additionalResultEuros)} onChange={(event) => updateField("additionalResultEuros", event.target.value)} />
-              </Field>
-              <Field label="Zusatzpunkte (manuell)" className="field-wide" error={errors.manualPoints}>
-                <input inputMode="decimal" placeholder="0,0" value={form.manualPoints} aria-invalid={Boolean(errors.manualPoints)} onChange={(event) => updateField("manualPoints", event.target.value)} />
-              </Field>
-              {manualPointsInputIsPositive(form.manualPoints) ? (
-                <Field label="Hinweis zu Zusatzpunkten" className="field-wide">
-                  <input placeholder="z. B. COFAG" value={form.manualPointsNote} onChange={(event) => updateField("manualPointsNote", event.target.value)} />
+          {activeForm === "audit" ? (
+            <section className="points-form-stack" id="points-form-panel-audit" role="tabpanel" aria-labelledby="points-form-tab-audit">
+              {renderEditorToolbar(editingId ? "Fall bearbeiten" : "Neuer Fall", editingAuditCase?.name, () => {
+                setEditingId(null);
+                setForm(auditPointCaseToForm());
+                setErrors({});
+              })}
+              <FormSection id="audit-section-details" title="Falldaten" icon={ClipboardText} className="points-editor-section">
+                <Field label="Name" className="field-wide" error={errors.name}>
+                  <input value={form.name} aria-invalid={Boolean(errors.name)} onChange={(event) => updateField("name", event.target.value)} />
                 </Field>
-              ) : null}
-              <label className="check-row field-wide"><input type="checkbox" checked={form.section99} onChange={(event) => updateField("section99", event.target.checked)} /> §99-Zuschlag</label>
-            </FormSection>
-            <FormSection id="audit-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card points-form-card-submission">
-              <Field label="Abgabemonat" error={errors.submissionMonth}>
-                <input type="month" value={form.submissionMonth} aria-invalid={Boolean(errors.submissionMonth)} onChange={(event) => updateField("submissionMonth", event.target.value)} />
-              </Field>
-              <Field label="Status">
-                <select value={form.status} onChange={(event) => updateStatus(event.target.value as PointFormStatus)}>
-                  <option value="in_progress">Offen</option>
-                  <option value="completed">Erledigt</option>
-                  <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
-                </select>
-              </Field>
-            </FormSection>
-          </div>
-          <AuditPointBreakdownPreview breakdown={previewBreakdown} />
-          <div className="button-row trip-save-actions">
-            <button className="primary-button" type="button" onClick={() => void saveCase()}>{editingId ? "Änderungen speichern" : "Fall speichern"}</button>
-          </div>
-        </section>
-        ) : null}
-        {activeForm === "uso" ? (
-          <section
-            className="points-form-stack"
-            id="points-form-panel-uso"
-            role="tabpanel"
-            aria-labelledby="points-form-tab-uso"
-          >
-            <div className="form-toolbar">
-              <span className="section-label">{usoEditingId ? "USO-Fall bearbeiten" : "Neuer USO-Fall"}</span>
-              <button className="secondary-button" type="button" onClick={() => {
+                <Field label="Steuernummer" error={errors.taxNumber}>
+                  <input value={form.taxNumber} aria-invalid={Boolean(errors.taxNumber)} onChange={(event) => updateField("taxNumber", event.target.value)} />
+                </Field>
+                <Field label="Kanzlei">
+                  <input value={form.firm} onChange={(event) => updateField("firm", event.target.value)} />
+                </Field>
+                <Field label="Betriebskategorie" className="field-wide" error={errors.category}>
+                  <select value={form.category} aria-invalid={Boolean(errors.category)} onChange={(event) => updateField("category", event.target.value)}>
+                    {AUDIT_POINT_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>{AUDIT_POINT_CATEGORY_RULES[category].label}</option>
+                    ))}
+                  </select>
+                </Field>
+              </FormSection>
+              <FormSection id="audit-section-scope" title="Prüfungsumfang" icon={ChartBar} className="points-editor-section">
+                <Field label="Zeitraum von" error={errors.periodStartYear}>
+                  <input inputMode="numeric" value={form.periodStartYear} aria-invalid={Boolean(errors.periodStartYear)} onChange={(event) => updateField("periodStartYear", event.target.value)} />
+                </Field>
+                <Field label="Zeitraum bis" error={errors.periodEndYear}>
+                  <input inputMode="numeric" value={form.periodEndYear} aria-invalid={Boolean(errors.periodEndYear)} onChange={(event) => updateField("periodEndYear", event.target.value)} />
+                </Field>
+                <Field label="Mehrergebnis (EUR)" error={errors.additionalResultEuros}>
+                  <input inputMode="decimal" placeholder="0,00" value={form.additionalResultEuros} aria-invalid={Boolean(errors.additionalResultEuros)} onChange={(event) => updateField("additionalResultEuros", event.target.value)} />
+                </Field>
+                <Field label="Zusatzpunkte (manuell)" error={errors.manualPoints}>
+                  <input inputMode="decimal" placeholder="0,0" value={form.manualPoints} aria-invalid={Boolean(errors.manualPoints)} onChange={(event) => updateField("manualPoints", event.target.value)} />
+                </Field>
+                {manualPointsInputIsPositive(form.manualPoints) ? (
+                  <Field label="Hinweis zu Zusatzpunkten" className="field-wide">
+                    <input placeholder="z. B. COFAG" value={form.manualPointsNote} onChange={(event) => updateField("manualPointsNote", event.target.value)} />
+                  </Field>
+                ) : null}
+                <label className="check-row field-wide"><input type="checkbox" checked={form.section99} onChange={(event) => updateField("section99", event.target.checked)} /> §99-Zuschlag</label>
+              </FormSection>
+              <FormSection id="audit-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-editor-section">
+                <Field label="Abgabemonat" error={errors.submissionMonth}>
+                  <input type="month" value={form.submissionMonth} aria-invalid={Boolean(errors.submissionMonth)} onChange={(event) => updateField("submissionMonth", event.target.value)} />
+                </Field>
+                <Field label="Status">
+                  <select value={form.status} onChange={(event) => updateStatus(event.target.value as PointFormStatus)}>
+                    <option value="in_progress">Offen</option>
+                    <option value="completed">Erledigt</option>
+                    <option value={COMPLETED_CURRENT_MONTH}>{completedCurrentMonthLabel()}</option>
+                  </select>
+                </Field>
+              </FormSection>
+              <AuditPointBreakdownPreview breakdown={previewBreakdown} category={form.category} />
+              <div className="points-editor-actions">
+                <button className="primary-button" type="button" onClick={() => void saveCase()}>{editingId ? "Änderungen speichern" : "Fall speichern"}</button>
+              </div>
+            </section>
+          ) : null}
+          {activeForm === "uso" ? (
+            <section className="points-form-stack" id="points-form-panel-uso" role="tabpanel" aria-labelledby="points-form-tab-uso">
+              {renderEditorToolbar(usoEditingId ? "USO-Fall bearbeiten" : "Neuer USO-Fall", editingUsoCase?.title, () => {
                 setUsoEditingId(null);
                 setUsoForm(usoCaseToForm());
                 setUsoErrors({});
-              }}>Neu</button>
-            </div>
-            <div className="points-form-grid points-form-grid-simple">
-              <FormSection id="uso-section-details" title="Falldaten" icon={ClipboardText} className="points-form-card">
+              })}
+              <FormSection id="uso-section-details" title="Falldaten" icon={ClipboardText} className="points-editor-section">
                 <Field label="Titel" className="field-wide" error={usoErrors.title}>
                   <input value={usoForm.title} aria-invalid={Boolean(usoErrors.title)} onChange={(event) => updateUsoField("title", event.target.value)} />
                 </Field>
@@ -1539,7 +1559,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                   </Field>
                 ) : null}
               </FormSection>
-              <FormSection id="uso-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card">
+              <FormSection id="uso-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-editor-section">
                 <Field label="Abgabemonat" error={usoErrors.submissionMonth}>
                   <input type="month" value={usoForm.submissionMonth} aria-invalid={Boolean(usoErrors.submissionMonth)} onChange={(event) => updateUsoField("submissionMonth", event.target.value)} />
                 </Field>
@@ -1551,27 +1571,19 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                   </select>
                 </Field>
               </FormSection>
-            </div>
-            <button className="primary-button trip-payment-save" type="button" onClick={() => void saveUsoCase()}>{usoEditingId ? "Änderungen speichern" : "USO-Fall speichern"}</button>
-          </section>
-        ) : null}
-        {activeForm === "other" ? (
-          <section
-            className="points-form-stack"
-            id="points-form-panel-other"
-            role="tabpanel"
-            aria-labelledby="points-form-tab-other"
-          >
-            <div className="form-toolbar">
-              <span className="section-label">{otherEditingId ? "Sonstige Maßnahme bearbeiten" : "Neue sonstige Maßnahme"}</span>
-              <button className="secondary-button" type="button" onClick={() => {
+              <div className="points-editor-actions">
+                <button className="primary-button" type="button" onClick={() => void saveUsoCase()}>{usoEditingId ? "Änderungen speichern" : "USO-Fall speichern"}</button>
+              </div>
+            </section>
+          ) : null}
+          {activeForm === "other" ? (
+            <section className="points-form-stack" id="points-form-panel-other" role="tabpanel" aria-labelledby="points-form-tab-other">
+              {renderEditorToolbar(otherEditingId ? "Sonstige Maßnahme bearbeiten" : "Neue sonstige Maßnahme", editingOtherMeasure?.title, () => {
                 setOtherEditingId(null);
                 setOtherForm(otherMeasureToForm());
                 setOtherErrors({});
-              }}>Neu</button>
-            </div>
-            <div className="points-form-grid points-form-grid-simple">
-              <FormSection id="other-section-details" title="Falldaten" icon={ClipboardText} className="points-form-card">
+              })}
+              <FormSection id="other-section-details" title="Falldaten" icon={ClipboardText} className="points-editor-section">
                 <Field label="Titel" className="field-wide" error={otherErrors.title}>
                   <input value={otherForm.title} aria-invalid={Boolean(otherErrors.title)} onChange={(event) => updateOtherField("title", event.target.value)} />
                 </Field>
@@ -1592,7 +1604,7 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                   </Field>
                 ) : null}
               </FormSection>
-              <FormSection id="other-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-form-card">
+              <FormSection id="other-section-submission" title="Abgabe & Status" icon={CalendarCheck} className="points-editor-section">
                 <Field label="Abgabemonat" error={otherErrors.submissionMonth}>
                   <input type="month" value={otherForm.submissionMonth} aria-invalid={Boolean(otherErrors.submissionMonth)} onChange={(event) => updateOtherField("submissionMonth", event.target.value)} />
                 </Field>
@@ -1604,72 +1616,45 @@ export function AuditPointsView({ data, showToast }: { data: WorkData; showToast
                   </select>
                 </Field>
               </FormSection>
-            </div>
-            <button className="primary-button trip-payment-save" type="button" onClick={() => void saveOtherMeasure()}>{otherEditingId ? "Änderungen speichern" : "Maßnahme speichern"}</button>
-          </section>
-        ) : null}
+              <div className="points-editor-actions">
+                <button className="primary-button" type="button" onClick={() => void saveOtherMeasure()}>{otherEditingId ? "Änderungen speichern" : "Maßnahme speichern"}</button>
+              </div>
+            </section>
+          ) : null}
+        </section>
+        <div className="points-lists-column">
+          <CollapsiblePointLists
+            counts={listCounts}
+            toolbarStart={listTabs}
+            panelProps={{ id: "points-tabpanel", role: "tabpanel", "aria-labelledby": listTab === "open" ? "points-tab-open" : "points-tab-done" }}
+            content={{
+              audit: renderMonthGroups(listTab === "open" ? openAuditCases : completedAuditCases, pointsForAuditCase, renderAuditRow),
+              uso: renderMonthGroups(listTab === "open" ? openUsoCases : completedUsoCases, pointsForUsoCase, renderUsoRow),
+              other: renderMonthGroups(listTab === "open" ? openOtherMeasures : completedOtherMeasures, pointsForOtherMeasure, renderOtherRow)
+            }}
+          />
+        </div>
       </div>
-      <CollapsiblePointLists
-        counts={{ audit: sortedAuditCases.length, uso: sortedUsoCases.length, other: sortedOtherMeasures.length }}
-        content={{
-          audit: (
-            <PointCaseStatusGroups
-              listKey="audit"
-              openCount={openAuditCases.length}
-              completedCount={completedAuditCases.length}
-              openCases={renderAuditCases(openAuditCases)}
-              completedCases={renderAuditCases(completedAuditCases)}
-            />
-          ),
-          uso: (
-            <PointCaseStatusGroups
-              listKey="uso"
-              openCount={openUsoCases.length}
-              completedCount={completedUsoCases.length}
-              openCases={renderUsoCases(openUsoCases)}
-              completedCases={renderUsoCases(completedUsoCases)}
-            />
-          ),
-          other: (
-            <PointCaseStatusGroups
-              listKey="other"
-              openCount={openOtherMeasures.length}
-              completedCount={completedOtherMeasures.length}
-              openCases={renderOtherMeasures(openOtherMeasures)}
-              completedCases={renderOtherMeasures(completedOtherMeasures)}
-            />
-          )
-        }}
-      />
     </section>
   );
 }
 
-function AuditPointBreakdownPreview({ breakdown }: { breakdown: ReturnType<typeof calculateAuditPointBreakdown> | null }) {
+function AuditPointBreakdownPreview({ breakdown, category }: { breakdown: ReturnType<typeof calculateAuditPointBreakdown> | null; category: string }) {
+  const value = (tenths: number | undefined) => (breakdown && tenths !== undefined ? formatPointTenths(tenths) : "-");
+  const rowClass = (tenths: number | undefined) => (breakdown && tenths === 0 ? "is-zero" : undefined);
+  const categoryLabel = isAuditPointCategory(category) ? AUDIT_POINT_CATEGORY_RULES[category].label : category;
+
   return (
-    <section className="trip-preview audit-point-preview" aria-label="Punkte-Vorschau">
-      <div className="trip-preview-group trip-preview-group-primary">
-        <span className="trip-preview-title">Punkte</span>
-        <dl className="trip-preview-list">
-          <div><dt>Gesamt</dt><dd>{breakdown ? formatPointTenths(breakdown.totalTenths) : "-"}</dd></div>
-          {breakdown && breakdown.manualPointsTenths > 0 ? <div><dt>Zusatzpunkte (manuell)</dt><dd>{formatPointTenths(breakdown.manualPointsTenths)}</dd></div> : null}
-          <div><dt>Jahre</dt><dd>{breakdown ? breakdown.cappedYears : "-"}</dd></div>
-        </dl>
-      </div>
-      <div className="trip-preview-group">
-        <span className="trip-preview-title">Regel</span>
-        <dl className="trip-preview-list">
-          <div><dt>Kategorie</dt><dd>{breakdown ? formatPointTenths(breakdown.categoryTenths) : "-"}</dd></div>
-          <div><dt>Zeitraum</dt><dd>{breakdown ? formatPointTenths(breakdown.periodTenths) : "-"}</dd></div>
-        </dl>
-      </div>
-      <div className="trip-preview-group trip-preview-group-tax">
-        <span className="trip-preview-title">Zuschläge</span>
-        <dl className="trip-preview-list">
-          <div><dt>§99</dt><dd>{breakdown ? formatPointTenths(breakdown.section99Tenths) : "-"}</dd></div>
-          <div><dt>Mehrergebnis</dt><dd>{breakdown ? formatPointTenths(breakdown.additionalResultTenths) : "-"}</dd></div>
-        </dl>
-      </div>
+    <section className="points-calc" aria-label="Punkte-Vorschau">
+      <h3 className="points-calc-title">Punkte</h3>
+      <dl>
+        <div><span aria-hidden="true" /><dt>Kategorie {categoryLabel}</dt><dd>{value(breakdown?.categoryTenths)}</dd></div>
+        <div><span aria-hidden="true">+</span><dt>Zeitraum{breakdown ? ` · ${breakdown.cappedYears} ${breakdown.cappedYears === 1 ? "Jahr" : "Jahre"}` : ""}</dt><dd>{value(breakdown?.periodTenths)}</dd></div>
+        <div className={rowClass(breakdown?.section99Tenths)}><span aria-hidden="true">+</span><dt>§99</dt><dd>{value(breakdown?.section99Tenths)}</dd></div>
+        <div className={rowClass(breakdown?.additionalResultTenths)}><span aria-hidden="true">+</span><dt>Mehrergebnis</dt><dd>{value(breakdown?.additionalResultTenths)}</dd></div>
+        <div className={rowClass(breakdown?.manualPointsTenths)}><span aria-hidden="true">+</span><dt>Zusatzpunkte (manuell)</dt><dd>{value(breakdown?.manualPointsTenths)}</dd></div>
+        <div className="points-calc-total"><span aria-hidden="true">=</span><dt>Gesamt</dt><dd>{value(breakdown?.totalTenths)}</dd></div>
+      </dl>
     </section>
   );
 }

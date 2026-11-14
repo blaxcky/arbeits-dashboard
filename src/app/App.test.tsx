@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { OtherMeasure, Trip, UsoCase } from "../db/schema";
 import { auditPointMonthOptions, AuditPointsView, automaticDestinationDraft, CollapsiblePointLists, destinationImportDraft, duplicatedTripDraft, formatAuditTaxNumber, formatDateOnly, formatTripCopyDateTime, normalizeTimeInput, openTripFields, parseEuroCentsInput, parsePointTenthsInput, PointsYearView, pointYearOptions, preferredTimeEntryDate, publicTransportDestinationPlace, publicTransportTaxFreeYearLimitForYear, publicTransportYearLimitToForm, settingsToForm, sortedOpenTrips, stripTripMeta, tripToForm, tripYearOptions, validateAuditPointCaseForm, validateOtherMeasureForm, validateSettingsForm, validateUsoCaseForm, WorkTimeField, yearFromUrlParam } from "./App";
@@ -345,7 +345,7 @@ describe("AuditPointsView form tabs", () => {
 
     expect(screen.getByRole("tab", { name: "Betriebsprüfung" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel", { name: "Betriebsprüfung" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(within(screen.getByRole("region", { name: "Fall erfassen" })).getAllByRole("tabpanel")).toHaveLength(1);
     expect(screen.getByText("Neuer Fall")).toBeInTheDocument();
     expect(screen.queryByText("Neuer USO-Fall")).not.toBeInTheDocument();
     expect(screen.queryByText("Neue sonstige Maßnahme")).not.toBeInTheDocument();
@@ -488,9 +488,13 @@ describe("AuditPointsView form tabs", () => {
   });
 });
 
-describe("point case list status presentation", () => {
+describe("point case lists", () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   function statusGroupData() {
@@ -543,51 +547,56 @@ describe("point case list status presentation", () => {
     } as unknown as Parameters<typeof AuditPointsView>[0]["data"];
   }
 
-  it("groups every point case type into visible open and initially hidden completed cases with counts", () => {
+  const listNames = ["Betriebsprüfungen", "USO-Fälle", "Sonstige Maßnahmen"];
+  const openTitles = ["BP offen", "USO offen", "Maßnahme offen"];
+  const completedTitles = ["BP erledigt", "USO erledigt", "Maßnahme erledigt"];
+
+  it("switches between open and completed cases with tabs and shows counts per list", () => {
     render(<AuditPointsView data={statusGroupData()} showToast={vi.fn()} />);
 
-    const listNames = ["Betriebsprüfungen", "USO-Fälle", "Sonstige Maßnahmen"];
-    const openTitles = ["BP offen", "USO offen", "Maßnahme offen"];
-    const completedTitles = ["BP erledigt", "USO erledigt", "Maßnahme erledigt"];
+    const openTab = screen.getByRole("tab", { name: /Offene Fälle/ });
+    const doneTab = screen.getByRole("tab", { name: /Erledigte Fälle/ });
+    expect(openTab).toHaveAttribute("aria-selected", "true");
+    expect(openTab).toHaveTextContent("3");
+    expect(doneTab).toHaveTextContent("3");
+    expect(screen.getByRole("tabpanel", { name: /Offene Fälle/ })).toHaveAttribute("id", "points-tabpanel");
 
     listNames.forEach((listName, index) => {
-      const listPanel = screen.getByRole("button", { name: `${listName} einklappen` }).closest("section") as HTMLElement;
-      expect(within(listPanel).getByRole("heading", { name: "Offen" })).toBeInTheDocument();
-      expect(within(listPanel).getByLabelText("1 offener Fall")).toBeInTheDocument();
+      const toggle = screen.getByRole("button", { name: `${listName} einklappen` });
+      expect(toggle).toHaveTextContent("1");
+      const listPanel = toggle.closest("section") as HTMLElement;
       expect(within(listPanel).getByText(openTitles[index], { selector: "strong" })).toBeVisible();
-
-      const completedToggle = within(listPanel).getByRole("button", { name: /Erledigt/ });
-      expect(within(completedToggle).getByRole("heading", { name: "Erledigt" })).toBeInTheDocument();
-      expect(completedToggle).toHaveAttribute("aria-expanded", "false");
-      expect(completedToggle).toHaveAttribute("aria-controls", expect.stringMatching(/^points-list-.+-completed-content$/));
-      expect(within(completedToggle).getByLabelText("1 erledigter Fall")).toBeInTheDocument();
-      const completedContent = document.getElementById(completedToggle.getAttribute("aria-controls") ?? "");
-      expect(completedContent).toHaveAttribute("aria-hidden", "true");
-      expect(completedContent).toHaveAttribute("inert");
-      expect(completedContent).toContainElement(within(listPanel).getByText(completedTitles[index], { selector: "strong" }));
+      expect(within(listPanel).queryByText(completedTitles[index], { selector: "strong" })).not.toBeInTheDocument();
     });
+
+    fireEvent.click(doneTab);
+    expect(doneTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: /Erledigte Fälle/ })).toBeInTheDocument();
+    completedTitles.forEach((title) => expect(screen.getByText(title, { selector: "strong" })).toBeVisible());
+    openTitles.forEach((title) => expect(screen.queryByText(title, { selector: "strong" })).not.toBeInTheDocument());
   });
 
-  it("expands completed cases by pointer and keyboard-generated activation while updating ARIA", () => {
-    render(<AuditPointsView data={statusGroupData()} showToast={vi.fn()} />);
-    const toggles = screen.getAllByRole("button", { name: /Erledigt/ });
+  it("groups cases by submission month with cases without month last and no badge in the row", () => {
+    const data = statusGroupData();
+    const [auditCase] = data.auditPointCases;
+    data.auditPointCases = [
+      { ...auditCase, id: "audit-june", name: "BP Juni", submissionMonth: "2026-06" },
+      { ...auditCase, id: "audit-empty", name: "BP ohne Monat", submissionMonth: "" },
+      auditCase
+    ];
 
-    fireEvent.click(toggles[0]);
-    expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
-    const auditCompletedContent = document.getElementById(toggles[0].getAttribute("aria-controls") ?? "");
-    expect(auditCompletedContent).toHaveAttribute("aria-hidden", "false");
-    expect(auditCompletedContent).not.toHaveAttribute("inert");
-    expect(screen.getByText("BP erledigt", { selector: "strong" })).toBeVisible();
+    render(<AuditPointsView data={data} showToast={vi.fn()} />);
 
-    toggles[1].focus();
-    fireEvent.keyDown(toggles[1], { key: "Enter", code: "Enter" });
-    fireEvent.click(toggles[1], { detail: 0 });
-    expect(toggles[1]).toHaveFocus();
-    expect(toggles[1]).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("USO erledigt", { selector: "strong" })).toBeVisible();
+    const auditPanel = screen.getByRole("button", { name: "Betriebsprüfungen einklappen" }).closest("section") as HTMLElement;
+    const groups = within(auditPanel).getAllByRole("region");
+    expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual(["Mai 2026", "Juni 2026", "ohne Abgabemonat"]);
+    expect(groups[0]).toHaveTextContent("8,5 Punkte");
+    expect(within(groups[2]).getByText("BP ohne Monat", { selector: "strong" })).toBeInTheDocument();
+    const rowWithoutMonth = within(groups[2]).getByText("BP ohne Monat", { selector: "strong" }).closest("article") as HTMLElement;
+    expect(rowWithoutMonth).not.toHaveTextContent("ohne Abgabemonat");
   });
 
-  it("shows explicit empty states with zero counts", () => {
+  it("shows explicit empty states with zero counts in both tabs", () => {
     const data = statusGroupData();
     data.auditPointCases = [];
     data.usoCases = [];
@@ -596,76 +605,91 @@ describe("point case list status presentation", () => {
     render(<AuditPointsView data={data} showToast={vi.fn()} />);
 
     expect(screen.getAllByText("Keine offenen Fälle.")).toHaveLength(3);
-    expect(screen.getAllByLabelText("0 offene Fälle")).toHaveLength(3);
-    const completedToggles = screen.getAllByRole("button", { name: /Erledigt/ });
-    completedToggles.forEach((toggle) => fireEvent.click(toggle));
+    listNames.forEach((listName) => expect(screen.getByRole("button", { name: `${listName} einklappen` })).toHaveTextContent("0"));
+    fireEvent.click(screen.getByRole("tab", { name: /Erledigte Fälle/ }));
     expect(screen.getAllByText("Keine erledigten Fälle.")).toHaveLength(3);
-    expect(screen.getAllByLabelText("0 erledigte Fälle")).toHaveLength(3);
   });
 
   it("offers only edit and delete actions for open and completed cases", () => {
-    const data = statusGroupData();
-    render(<AuditPointsView data={data} showToast={vi.fn()} />);
-
-    screen.getAllByRole("button", { name: /Erledigt/ }).forEach((toggle) => fireEvent.click(toggle));
+    render(<AuditPointsView data={statusGroupData()} showToast={vi.fn()} />);
 
     expect(screen.queryByRole("button", { name: "Als erledigt markieren" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Auf offen setzen" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(6);
-    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(6);
+    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("tab", { name: /Erledigte Fälle/ }));
+    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(3);
+    within(screen.getByRole("tabpanel", { name: /Erledigte Fälle/ })).getAllByRole("article").forEach((row) => expect(row).toHaveClass("is-done"));
   });
 
-  it("keeps one row, metrics and action-column contract with and without additional points", () => {
+  it("shows §99 and additional points below the points of each case", () => {
     const data = statusGroupData();
     const [auditCase] = data.auditPointCases;
     const [usoCase] = data.usoCases;
     const [otherMeasure] = data.otherMeasures;
-
     data.auditPointCases = [
-      { ...auditCase, id: "audit-without-points", name: "BP ohne Zusatzpunkte", manualPointsTenths: 0 },
-      { ...auditCase, id: "audit-with-points", name: "BP mit Zusatzpunkten", manualPointsTenths: 15, manualPointsNote: "COFAG" }
+      { ...auditCase, id: "audit-plain", name: "BP ohne Zuschläge" },
+      { ...auditCase, id: "audit-extra", name: "BP mit Zuschlägen", section99: true, manualPointsTenths: 15, manualPointsNote: "COFAG" }
     ];
     data.usoCases = [
-      { ...usoCase, id: "uso-without-points", title: "USO ohne Zusatzpunkte", manualPointsTenths: 0 },
-      { ...usoCase, id: "uso-with-points", title: "USO mit Zusatzpunkten", manualPointsTenths: 10, manualPointsNote: "Amtshilfe" }
+      { ...usoCase, id: "uso-plain", title: "USO ohne Zusatzpunkte", manualPointsTenths: 0 },
+      { ...usoCase, id: "uso-extra", title: "USO mit Zusatzpunkten", manualPointsTenths: 10, manualPointsNote: "Amtshilfe" }
     ];
-    data.otherMeasures = [
-      { ...otherMeasure, id: "other-without-points", title: "Maßnahme ohne Zusatzpunkte", manualPointsTenths: 0 },
-      { ...otherMeasure, id: "other-with-points", title: "Maßnahme mit Zusatzpunkten", manualPointsTenths: 20, manualPointsNote: "Sonderauftrag" }
-    ];
+    data.otherMeasures = [{ ...otherMeasure, id: "other-extra", title: "Maßnahme mit Zusatzpunkten", manualPointsTenths: 20, manualPointsNote: "Sonderauftrag" }];
 
     render(<AuditPointsView data={data} showToast={vi.fn()} />);
+    const metricsFor = (title: string) => (screen.getByText(title, { selector: "strong" }).closest("article") as HTMLElement).querySelector(".point-case-metrics") as HTMLElement;
 
-    const rows = [
-      ["BP ohne Zusatzpunkte", false],
-      ["BP mit Zusatzpunkten", false],
-      ["USO ohne Zusatzpunkte", false],
-      ["USO mit Zusatzpunkten", true],
-      ["Maßnahme ohne Zusatzpunkte", false],
-      ["Maßnahme mit Zusatzpunkten", true]
-    ] as const;
+    expect(metricsFor("BP ohne Zuschläge")).toHaveTextContent(/^8,5Punkte$/);
+    expect(metricsFor("BP mit Zuschlägen")).toHaveTextContent("Punkte");
+    expect(within(metricsFor("BP mit Zuschlägen")).getByText("inkl. §99")).toBeInTheDocument();
+    expect(within(metricsFor("BP mit Zuschlägen")).getByText("+1,5 COFAG")).toBeInTheDocument();
+    expect(metricsFor("USO ohne Zusatzpunkte")).toHaveClass("is-empty");
+    expect(metricsFor("USO mit Zusatzpunkten")).toHaveTextContent("1Zusatzpunkte");
+    expect(within(metricsFor("USO mit Zusatzpunkten")).getByText("Amtshilfe")).toBeInTheDocument();
+    expect(within(metricsFor("Maßnahme mit Zusatzpunkten")).getByText("Sonderauftrag")).toBeInTheDocument();
+    expect(screen.getByText("CLO-Anfrage · Mai 2026")).toBeInTheDocument();
+  });
 
-    rows.forEach(([title, showsCompactMetric]) => {
-      const row = screen.getByText(title, { selector: "strong" }).closest("article") as HTMLElement;
+  it("marks the case being edited and names it above the form", () => {
+    render(<AuditPointsView data={statusGroupData()} showToast={vi.fn()} />);
+    const row = screen.getByText("BP offen", { selector: "strong" }).closest("article") as HTMLElement;
 
-      expect(row).toHaveClass("point-case-row");
-      expect(row.querySelector(".point-case-data")).toBeInTheDocument();
-      expect(row.querySelector(".point-case-metrics")).toBeInTheDocument();
-      expect(row.querySelector(".point-case-actions")).toBeInTheDocument();
-      expect(row.querySelectorAll(".point-case-actions .trip-action-button")).toHaveLength(2);
-      expect(row.querySelector(".point-case-additional-metric") !== null).toBe(showsCompactMetric);
-    });
-    expect(screen.getByText("Zusatzpunkte: COFAG")).toBeInTheDocument();
-    expect(screen.getByText("Zusatzpunkte: Amtshilfe")).toBeInTheDocument();
-    expect(screen.getByText("Zusatzpunkte: Sonderauftrag")).toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: "Bearbeiten" }));
+
+    expect(row).toHaveClass("is-editing");
+    const editor = screen.getByRole("region", { name: "Fall erfassen" });
+    expect(within(editor).getByText("Fall bearbeiten")).toBeInTheDocument();
+    expect(within(editor).getByText("BP offen", { selector: "strong" })).toBeInTheDocument();
+  });
+
+  it("summarizes open cases, the current submission month and the year in the key figures", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-15T10:00:00Z"));
+    const data = statusGroupData();
+    const [auditCase] = data.auditPointCases;
+    data.auditPointCases = [...data.auditPointCases, { ...auditCase, id: "audit-empty", name: "BP ohne Monat", submissionMonth: "" }];
+
+    render(<AuditPointsView data={data} showToast={vi.fn()} />);
+    const metrics = screen.getByRole("region", { name: "Kennzahlen" });
+
+    expect(metrics).toHaveTextContent("Offene Fälle4");
+    expect(metrics).toHaveTextContent("2 Betriebsprüfungen · 1 USO · 1 Sonstige");
+    expect(metrics).toHaveTextContent("Abgabe Mai 20268,5 Punkte");
+    expect(metrics).toHaveTextContent("3 offene Fälle");
+    expect(metrics).toHaveTextContent("Ohne Abgabemonat1 Fall");
+    expect(metrics).toHaveTextContent("BP ohne Monat · 8,5 Punkte");
+    expect(metrics).toHaveTextContent("Punkte 202614,5");
+    expect(metrics).toHaveTextContent("6 erledigt · 8,5 offen");
   });
 
   it("changes every case type between completed and open through its edit form", async () => {
     const data = statusGroupData();
     render(<AuditPointsView data={data} showToast={vi.fn()} />);
-    screen.getAllByRole("button", { name: /Erledigt/ }).forEach((toggle) => fireEvent.click(toggle));
 
-    const changeStatus = async (title: string, status: "completed" | "in_progress") => {
+    const changeStatus = async (title: string, status: "completed" | "in_progress", tab: RegExp) => {
+      fireEvent.click(screen.getByRole("tab", { name: tab }));
       const row = screen.getByText(title, { selector: "strong" }).closest("article") as HTMLElement;
       fireEvent.click(within(row).getByRole("button", { name: "Bearbeiten" }));
       fireEvent.change(screen.getByLabelText("Status"), { target: { value: status } });
@@ -674,107 +698,20 @@ describe("point case list status presentation", () => {
       });
     };
 
-    await changeStatus("BP offen", "completed");
+    await changeStatus("BP offen", "completed", /Offene Fälle/);
     await waitFor(() => expect(data.saveAuditPointCase).toHaveBeenCalledWith(expect.objectContaining({ id: "audit-open", status: "completed" })));
-    await changeStatus("BP erledigt", "in_progress");
+    await changeStatus("BP erledigt", "in_progress", /Erledigte Fälle/);
     await waitFor(() => expect(data.saveAuditPointCase).toHaveBeenCalledWith(expect.objectContaining({ id: "audit-done", status: "in_progress" })));
 
-    await changeStatus("USO offen", "completed");
+    await changeStatus("USO offen", "completed", /Offene Fälle/);
     await waitFor(() => expect(data.saveUsoCase).toHaveBeenCalledWith(expect.objectContaining({ id: "uso-open", status: "completed" })));
-    await changeStatus("USO erledigt", "in_progress");
+    await changeStatus("USO erledigt", "in_progress", /Erledigte Fälle/);
     await waitFor(() => expect(data.saveUsoCase).toHaveBeenCalledWith(expect.objectContaining({ id: "uso-done", status: "in_progress" })));
 
-    await changeStatus("Maßnahme offen", "completed");
+    await changeStatus("Maßnahme offen", "completed", /Offene Fälle/);
     await waitFor(() => expect(data.saveOtherMeasure).toHaveBeenCalledWith(expect.objectContaining({ id: "other-open", status: "completed" })));
-    await changeStatus("Maßnahme erledigt", "in_progress");
+    await changeStatus("Maßnahme erledigt", "in_progress", /Erledigte Fälle/);
     await waitFor(() => expect(data.saveOtherMeasure).toHaveBeenCalledWith(expect.objectContaining({ id: "other-done", status: "in_progress" })));
-  });
-
-  it("shows only missing-month warnings and marks only completed cases", () => {
-    const timestamp = "2026-05-01T08:00:00.000Z";
-    const auditCase = {
-      id: "audit-open-month",
-      name: "BP offen mit Monat",
-      taxNumber: "",
-      firm: "",
-      category: "M1" as const,
-      periodStartYear: 2024,
-      periodEndYear: 2025,
-      additionalResultCents: 0,
-      section99: false,
-      submissionMonth: "2026-05",
-      status: "in_progress" as const,
-      submittedPointsTenths: null,
-      submittedAt: null,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    };
-    const usoCase = {
-      id: "uso-open-month",
-      title: "USO offen mit Monat",
-      submissionMonth: "2026-05",
-      status: "in_progress" as const,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    };
-    const otherMeasure = {
-      id: "other-open-month",
-      title: "Maßnahme offen mit Monat",
-      measureType: "CLO-Anfrage",
-      submissionMonth: "2026-05",
-      status: "in_progress" as const,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    };
-    const data = {
-      auditPointCases: [
-        auditCase,
-        { ...auditCase, id: "audit-done-month", name: "BP erledigt mit Monat", status: "completed" as const, submittedPointsTenths: 60, submittedAt: timestamp },
-        { ...auditCase, id: "audit-open-empty", name: "BP offen ohne Monat", submissionMonth: "" },
-        { ...auditCase, id: "audit-done-empty", name: "BP erledigt ohne Monat", submissionMonth: "", status: "completed" as const, submittedPointsTenths: 60, submittedAt: timestamp }
-      ],
-      usoCases: [
-        usoCase,
-        { ...usoCase, id: "uso-done-month", title: "USO erledigt mit Monat", status: "completed" as const },
-        { ...usoCase, id: "uso-open-empty", title: "USO offen ohne Monat", submissionMonth: "" },
-        { ...usoCase, id: "uso-done-empty", title: "USO erledigt ohne Monat", submissionMonth: "", status: "completed" as const }
-      ],
-      otherMeasures: [
-        otherMeasure,
-        { ...otherMeasure, id: "other-done-month", title: "Maßnahme erledigt mit Monat", status: "completed" as const },
-        { ...otherMeasure, id: "other-open-empty", title: "Maßnahme offen ohne Monat", submissionMonth: "" },
-        { ...otherMeasure, id: "other-done-empty", title: "Maßnahme erledigt ohne Monat", submissionMonth: "", status: "completed" as const }
-      ],
-      saveAuditPointCase: vi.fn(),
-      removeAuditPointCase: vi.fn(),
-      saveUsoCase: vi.fn(),
-      removeUsoCase: vi.fn(),
-      saveOtherMeasure: vi.fn(),
-      removeOtherMeasure: vi.fn()
-    } as unknown as Parameters<typeof AuditPointsView>[0]["data"];
-
-    render(<AuditPointsView data={data} showToast={vi.fn()} />);
-
-    const rowFor = (title: string) => screen.getByText(title, { selector: "strong" }).closest("article");
-
-    for (const title of ["BP offen mit Monat", "USO offen mit Monat", "Maßnahme offen mit Monat", "BP erledigt mit Monat", "USO erledigt mit Monat", "Maßnahme erledigt mit Monat"]) {
-      expect(rowFor(title)?.querySelector(".trip-badges")).not.toBeInTheDocument();
-    }
-
-    for (const title of ["BP offen mit Monat", "USO offen mit Monat", "Maßnahme offen mit Monat", "BP offen ohne Monat", "USO offen ohne Monat", "Maßnahme offen ohne Monat"]) {
-      expect(rowFor(title)).not.toHaveClass("trip-row-done");
-    }
-
-    for (const title of ["BP erledigt mit Monat", "USO erledigt mit Monat", "Maßnahme erledigt mit Monat", "BP erledigt ohne Monat", "USO erledigt ohne Monat", "Maßnahme erledigt ohne Monat"]) {
-      expect(rowFor(title)).toHaveClass("trip-row-done");
-    }
-
-    for (const title of ["BP offen ohne Monat", "USO offen ohne Monat", "Maßnahme offen ohne Monat", "BP erledigt ohne Monat", "USO erledigt ohne Monat", "Maßnahme erledigt ohne Monat"]) {
-      const row = rowFor(title);
-      expect(row?.querySelectorAll(".trip-badges em")).toHaveLength(1);
-      expect(row?.querySelector(".trip-badges")).toHaveTextContent("ohne Abgabemonat");
-      expect(row?.querySelector(".trip-badges")).not.toHaveTextContent(/Offen|Erledigt|fixiert/);
-    }
   });
 });
 
