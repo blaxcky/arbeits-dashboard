@@ -4810,6 +4810,14 @@ button.week-line:focus-visible {
   color: #5c1f1a;
 }
 
+.workspace > .deadline-alert {
+  margin-bottom: 18px;
+}
+
+.workspace:has(.todos-shell) > .deadline-alert {
+  margin: 16px 20px;
+}
+
 .deadline-alert strong {
   color: #8f2219;
   font-size: 1rem;

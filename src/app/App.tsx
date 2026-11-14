@@ -249,6 +249,7 @@ function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToas
         {sidebarCollapsed ? <button ref={sidebarRevealRef} className="sidebar-reveal" type="button" aria-label="Dashboard-Navigation ausklappen" aria-controls="dashboard-navigation" aria-expanded="false" title="Dashboard-Menü ausklappen" onClick={() => setSidebarCollapsed(false)}><CaretDoubleRight /></button> : null}
         {updateAvailable ? <PwaUpdateNotice updateServiceWorker={updateServiceWorker} showToast={showToast} /> : null}
         {data.error ? <Notice tone="danger" title="Datenfehler" text={data.error} /> : null}
+        <TripDeadlineAlert trips={data.trips} today={todayKey(data.clock)} />
         <Routes>
           <Route path="/" element={<Dashboard data={data} showToast={showToast} />} />
           <Route path="/reisekosten" element={<TripsView data={data} showToast={showToast} />} />
@@ -2954,9 +2955,6 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
   const yearIndex = yearOptions.indexOf(year);
   const previousYear = yearIndex >= 0 ? yearOptions[yearIndex + 1] : undefined;
   const nextYear = yearIndex > 0 ? yearOptions[yearIndex - 1] : undefined;
-  const lateOpenTrips = data.trips
-    .filter((trip) => !trip.done && (tripSubmissionStatus(trip.date, today)?.level ?? "ok") !== "ok")
-    .sort((left, right) => left.date.localeCompare(right.date));
   const oldestOpenStatus = summary.oldestOpenTrip ? tripSubmissionStatus(summary.oldestOpenTrip.date, today) : null;
   const oldestOpenLate = Boolean(oldestOpenStatus && oldestOpenStatus.level !== "ok");
   const paidShare = summary.totalCents > 0 ? Math.min(Math.max(summary.paidCents / summary.totalCents, 0), 1) * 100 : 0;
@@ -3083,8 +3081,6 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
           </div>
         </div>
       </header>
-
-      {lateOpenTrips.length > 0 ? <TripDeadlineAlert trip={lateOpenTrips[0]} today={today} moreCount={lateOpenTrips.length - 1} /> : null}
 
       <section className="dashboard-metrics" aria-label="Kennzahlen">
         <Metric
@@ -3341,9 +3337,14 @@ function TripsYearView({ data, showToast }: { data: WorkData; showToast: ShowToa
   );
 }
 
-function TripDeadlineAlert({ trip, today, moreCount }: { trip: Trip; today: string; moreCount: number }) {
-  const status = tripSubmissionStatus(trip.date, today);
-  if (!status) return null;
+function TripDeadlineAlert({ trips, today }: { trips: Trip[]; today: string }) {
+  const lateOpenTrips = trips
+    .filter((trip) => !trip.done && (tripSubmissionStatus(trip.date, today)?.level ?? "ok") !== "ok")
+    .sort((left, right) => left.date.localeCompare(right.date));
+  const trip = lateOpenTrips[0];
+  const status = trip ? tripSubmissionStatus(trip.date, today) : null;
+  if (!trip || !status) return null;
+  const moreCount = lateOpenTrips.length - 1;
   const overdue = status.level === "overdue";
   const deadline = splitTripDateLabel(status.deadline).date;
   const deadlineText = overdue

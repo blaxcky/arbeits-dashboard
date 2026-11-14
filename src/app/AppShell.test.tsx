@@ -877,6 +877,22 @@ describe("travel expense year overview", () => {
     expect(within(months).getAllByRole("row")).toHaveLength(10);
   });
 
+  it("shows the deadline warning on every page", () => {
+    vi.stubGlobal("ResizeObserver", class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    for (const hash of ["#/", "#/reisekosten", "#/punkte", "#/einstellungen"]) {
+      window.location.hash = hash;
+      const { unmount } = render(<App />);
+      expect(screen.getByRole("alert")).toHaveTextContent("Älteste offene Reise ist über 5 Monate alt");
+      unmount();
+    }
+    vi.unstubAllGlobals();
+  });
+
   it("does not warn for recent open trips", () => {
     workData.trips = [{ ...yearTrip, date: "2026-07-01" }];
     render(<App />);
