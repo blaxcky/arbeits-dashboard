@@ -252,7 +252,7 @@ function AppShell({ data, toasts, updateAvailable, updateServiceWorker, showToas
           ))}
         </nav>
         {setupMissing.length ? (
-          <Link className="setup-card" to="/einstellungen">
+          <Link className="setup-card" to="/einstellungen" state={{ focusSetup: true }}>
             <span className="setup-card-title"><strong>Einrichtung offen</strong><span>{setupMissing.length} offen</span></span>
             <span className="setup-card-text">{setupMissing.join(" und ")} {setupMissing.length === 1 ? "fehlt" : "fehlen"} noch.</span>
           </Link>
@@ -664,14 +664,20 @@ export function consumptionDetail(vacationRemainingMinutes: number, flexOverLimi
 
 function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
   const settings = data.settings;
+  const location = useLocation();
   const [importPreview, setImportPreview] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const flexStartRef = useRef<HTMLInputElement>(null);
+  const vacationEntitlementRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState(() => settingsToForm(settings));
+  const [disabledTransportTypes, setDisabledTransportTypes] = useState<TripTransportType[]>(() => settings?.disabledTransportTypes ?? []);
   const [settingsErrors, setSettingsErrors] = useState<SettingsErrors>({});
   const [storageEstimate, setStorageEstimate] = useState<StorageEstimate | null>(null);
+  const focusSetup = Boolean((location.state as { focusSetup?: boolean } | null)?.focusSetup);
 
   useEffect(() => {
     setForm(settingsToForm(settings));
+    setDisabledTransportTypes(settings?.disabledTransportTypes ?? []);
     setSettingsErrors({});
   }, [settings]);
 
@@ -680,7 +686,22 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
     void navigator.storage.estimate().then(setStorageEstimate).catch(() => setStorageEstimate(null));
   }, [data.timeEntries.length, data.flexCorrections.length, settings?.updatedAt]);
 
+  const flexStartMissing = settings?.flexStartMinutes === null;
+  const vacationEntitlementMissing = settings?.vacationEntitlementMinutes === null;
+
+  useEffect(() => {
+    if (!focusSetup || !settings) return;
+    const target = flexStartMissing ? flexStartRef.current : vacationEntitlementMissing ? vacationEntitlementRef.current : null;
+    target?.focus();
+  }, [focusSetup, settings, flexStartMissing, vacationEntitlementMissing]);
+
   if (!settings) return <SkeletonRows />;
+
+  const savedForm = settingsToForm(settings);
+  const savedDisabled = settings.disabledTransportTypes ?? [];
+  const changedFields = new Set((Object.keys(form) as Array<keyof SettingsForm>).filter((field) => form[field] !== savedForm[field]));
+  const transportChanged = DISABLEABLE_TRANSPORT_TYPES.some((type) => disabledTransportTypes.includes(type) !== savedDisabled.includes(type));
+  const dirty = changedFields.size > 0 || transportChanged;
 
   async function saveSettings() {
     const nextErrors = validateSettingsForm(form);
@@ -699,9 +720,16 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
       vacationEntitlementMinutes: form.vacationEntitlementMinutes === "" ? null : hoursToMinutes(form.vacationEntitlementMinutes),
       vacationUsedMinutes: clampHoursToMinutes(form.vacationUsedMinutes, 0, 20000),
       absenceRequestLeadDays: parseIntegerInRange(form.absenceRequestLeadDays, 1, 90) ?? 14,
-      absenceRequestUrgentDays: parseIntegerInRange(form.absenceRequestUrgentDays, 0, 60) ?? 7
+      absenceRequestUrgentDays: parseIntegerInRange(form.absenceRequestUrgentDays, 0, 60) ?? 7,
+      disabledTransportTypes
     });
     showToast("Einstellungen gespeichert.");
+  }
+
+  function discardChanges() {
+    setForm(savedForm);
+    setDisabledTransportTypes(savedDisabled);
+    setSettingsErrors({});
   }
 
   function updateSettingsField(field: keyof SettingsForm, value: string) {
@@ -719,12 +747,48 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
     setForm((current) => ({ ...current, [field]: normalized }));
   }
 
+  function toggleTransportType(transportType: TripTransportType, enabled: boolean) {
+    setDisabledTransportTypes((current) => (enabled ? current.filter((type) => type !== transportType) : [...current.filter((type) => type !== transportType), transportType]));
+  }
+
+  function numberField(field: keyof SettingsForm, label: string, unit: string, options: { step?: string; min?: string; max?: string; placeholder?: string; missing?: boolean; inputRef?: React.Ref<HTMLInputElement> } = {}) {
+    const error = settingsErrors[field];
+    return (
+      <Field label={label} error={error} missing={options.missing} className={changedFields.has(field) ? "is-changed" : ""}>
+        <span className="input-with-unit">
+          <input
+            ref={options.inputRef}
+            type="number"
+            step={options.step ?? "0.25"}
+            min={options.min}
+            max={options.max}
+            value={form[field]}
+            placeholder={options.placeholder}
+            aria-invalid={Boolean(error)}
+            onChange={(event) => updateSettingsField(field, event.target.value)}
+          />
+          <span className="input-unit">{unit}</span>
+        </span>
+      </Field>
+    );
+  }
+
+  function timeField(field: "preferredWorkStartTime" | "preferredWorkEndTime", label: string, placeholder: string) {
+    const error = settingsErrors[field];
+    return (
+      <Field label={label} error={error} className={changedFields.has(field) ? "is-changed" : ""}>
+        <input type="text" inputMode="numeric" placeholder={placeholder} value={form[field]} aria-invalid={Boolean(error)} onChange={(event) => updateSettingsField(field, event.target.value)} onBlur={(event) => normalizeSettingsTimeField(field, event.target.value)} />
+      </Field>
+    );
+  }
+
   async function handleImport(file: File, replace: boolean) {
     setImportPreview(null);
     const payload = replace ? await importBackup(file) : await inspectBackup(file);
     setImportPreview(`Backup vom ${new Date(payload.manifest.exportedAt).toLocaleString("de-AT")} mit ${payload.data.timeEntries.length} Zeiteinträgen und ${payload.data.flexCorrections.length} Korrekturen.`);
     if (replace) {
       await data.refresh();
+      setImportPreview(null);
       showToast("Backup importiert und lokale Daten ersetzt.");
     }
   }
@@ -733,37 +797,53 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
     <section className="page-stack">
       <Header eyebrow="Einstellungen" title="Lokale Steuerzentrale" />
       <div className="settings-layout">
-        <section className="settings-column" aria-labelledby="settings-work-title">
-          <h2 id="settings-work-title" className="settings-group-title">Arbeitszeit &amp; Saldo</h2>
-          <div className="panel form-panel">
-            <span className="section-label">Arbeitszeit</span>
-            <div className="form-grid">
-              <Field label="Sollzeit pro Tag (Stunden)" error={settingsErrors.dailyTargetMinutes}><input type="number" step="0.25" value={form.dailyTargetMinutes} aria-invalid={Boolean(settingsErrors.dailyTargetMinutes)} onChange={(event) => updateSettingsField("dailyTargetMinutes", event.target.value)} /></Field>
-              <Field label="Wochenarbeitszeit (Stunden)" error={settingsErrors.weeklyTargetMinutes}><input type="number" step="0.25" value={form.weeklyTargetMinutes} aria-invalid={Boolean(settingsErrors.weeklyTargetMinutes)} onChange={(event) => updateSettingsField("weeklyTargetMinutes", event.target.value)} /></Field>
-              <Field label="Gleitzeitgrenze (Stunden)" error={settingsErrors.flexLimitMinutes}><input type="number" step="0.25" value={form.flexLimitMinutes} aria-invalid={Boolean(settingsErrors.flexLimitMinutes)} onChange={(event) => updateSettingsField("flexLimitMinutes", event.target.value)} /></Field>
-              <Field label="Gleitzeitstartwert (Stunden)" error={settingsErrors.flexStartMinutes}><input type="number" step="0.25" value={form.flexStartMinutes} aria-invalid={Boolean(settingsErrors.flexStartMinutes)} onChange={(event) => updateSettingsField("flexStartMinutes", event.target.value)} placeholder="leer" /></Field>
-              <Field label="Schnellwahl Dienstbeginn" error={settingsErrors.preferredWorkStartTime}>
-                <input type="text" inputMode="numeric" placeholder="optional, z.B. 07:30" value={form.preferredWorkStartTime} aria-invalid={Boolean(settingsErrors.preferredWorkStartTime)} onChange={(event) => updateSettingsField("preferredWorkStartTime", event.target.value)} onBlur={(event) => normalizeSettingsTimeField("preferredWorkStartTime", event.target.value)} />
-              </Field>
-              <Field label="Schnellwahl Dienstende" error={settingsErrors.preferredWorkEndTime}>
-                <input type="text" inputMode="numeric" placeholder="optional, z.B. 15:30" value={form.preferredWorkEndTime} aria-invalid={Boolean(settingsErrors.preferredWorkEndTime)} onChange={(event) => updateSettingsField("preferredWorkEndTime", event.target.value)} onBlur={(event) => normalizeSettingsTimeField("preferredWorkEndTime", event.target.value)} />
-              </Field>
-              <Field label="Urlaubsanspruch (Stunden)" error={settingsErrors.vacationEntitlementMinutes}><input type="number" step="0.25" value={form.vacationEntitlementMinutes} aria-invalid={Boolean(settingsErrors.vacationEntitlementMinutes)} onChange={(event) => updateSettingsField("vacationEntitlementMinutes", event.target.value)} placeholder="leer" /></Field>
-              <Field label="Verbrauchter Urlaub (Stunden)" error={settingsErrors.vacationUsedMinutes}><input type="number" step="0.25" value={form.vacationUsedMinutes} aria-invalid={Boolean(settingsErrors.vacationUsedMinutes)} onChange={(event) => updateSettingsField("vacationUsedMinutes", event.target.value)} /></Field>
-              <Field label="Urlaubsantrag erinnern (Tage vorher)" error={settingsErrors.absenceRequestLeadDays}><input type="number" step="1" min="1" max="90" value={form.absenceRequestLeadDays} aria-invalid={Boolean(settingsErrors.absenceRequestLeadDays)} onChange={(event) => updateSettingsField("absenceRequestLeadDays", event.target.value)} /></Field>
-              <Field label="Antrag dringend ab (Tage vorher)" error={settingsErrors.absenceRequestUrgentDays}><input type="number" step="1" min="0" max="60" value={form.absenceRequestUrgentDays} aria-invalid={Boolean(settingsErrors.absenceRequestUrgentDays)} onChange={(event) => updateSettingsField("absenceRequestUrgentDays", event.target.value)} /></Field>
+        <div className="settings-column">
+          <section className="settings-column" aria-labelledby="settings-work-title">
+            <h2 id="settings-work-title" className="settings-group-title">Arbeitszeit &amp; Saldo</h2>
+            <div className="panel form-panel">
+              <span className="section-label">Arbeitszeit</span>
+              <div className="form-grid">
+                {numberField("dailyTargetMinutes", "Sollzeit pro Tag", "Std.")}
+                {numberField("weeklyTargetMinutes", "Wochenarbeitszeit", "Std.")}
+                {timeField("preferredWorkStartTime", "Schnellwahl Dienstbeginn", "optional, z.B. 07:30")}
+                {timeField("preferredWorkEndTime", "Schnellwahl Dienstende", "optional, z.B. 15:30")}
+              </div>
             </div>
-            <button className="primary-button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
-          </div>
-          <CorrectionsPanel data={data} />
+            <div className="panel form-panel">
+              <span className="section-label">Gleitzeit</span>
+              <div className="form-grid">
+                {numberField("flexLimitMinutes", "Gleitzeitgrenze", "Std.")}
+                {numberField("flexStartMinutes", "Gleitzeitstartwert", "Std.", { placeholder: "leer", missing: flexStartMissing, inputRef: flexStartRef })}
+              </div>
+              <CorrectionsSection data={data} />
+            </div>
+            <div className="panel form-panel">
+              <span className="section-label">Urlaub</span>
+              <div className="form-grid">
+                {numberField("vacationEntitlementMinutes", "Urlaubsanspruch", "Std.", { placeholder: "leer", missing: vacationEntitlementMissing, inputRef: vacationEntitlementRef })}
+                {numberField("vacationUsedMinutes", "Verbrauchter Urlaub", "Std.")}
+                {numberField("absenceRequestLeadDays", "Urlaubsantrag erinnern", "Tage vorher", { step: "1", min: "1", max: "90" })}
+                {numberField("absenceRequestUrgentDays", "Antrag dringend ab", "Tage vorher", { step: "1", min: "0", max: "60" })}
+              </div>
+            </div>
+          </section>
           <section className="settings-column" aria-labelledby="settings-trips-title">
             <h2 id="settings-trips-title" className="settings-group-title">Reiserechnungen</h2>
-            <TripSettingsPanel data={data} showToast={showToast} />
+            <TripSettingsPanel disabledTransportTypes={disabledTransportTypes} onToggle={toggleTransportType} />
           </section>
-        </section>
+          {dirty ? (
+            <div className="settings-savebar" role="region" aria-label="Änderungen speichern">
+              <span className="settings-savebar-label"><span className="settings-savebar-dot" aria-hidden="true" />Ungespeicherte Änderungen</span>
+              <span className="settings-savebar-actions">
+                <button className="secondary-button" type="button" onClick={discardChanges}>Verwerfen</button>
+                <button className="primary-button" type="button" onClick={() => void saveSettings()}>Einstellungen speichern</button>
+              </span>
+            </div>
+          ) : null}
+        </div>
         <section className="settings-column" aria-labelledby="settings-system-title">
           <h2 id="settings-system-title" className="settings-group-title">Daten &amp; System</h2>
-          <BackupPanel importRef={importRef} importPreview={importPreview} onPreview={(file) => handleImport(file, false)} onReplace={(file) => handleImport(file, true)} onDone={showToast} refresh={data.refresh} />
+          <BackupPanel importRef={importRef} importPreview={importPreview} onPreview={(file) => handleImport(file, false)} onReplace={(file) => handleImport(file, true)} onClearPreview={() => setImportPreview(null)} onDone={showToast} refresh={data.refresh} />
           <SystemStatusPanel data={data} storageEstimate={storageEstimate} />
           <DangerPanel data={data} onDone={showToast} />
         </section>
@@ -772,17 +852,7 @@ function SettingsView({ data, showToast }: { data: WorkData; showToast: ShowToas
   );
 }
 
-function TripSettingsPanel({ data, showToast }: { data: WorkData; showToast: ShowToast }) {
-  const disabledTransportTypes = data.settings?.disabledTransportTypes ?? [];
-
-  async function toggleTransportType(transportType: TripTransportType, enabled: boolean) {
-    const nextDisabled = enabled
-      ? disabledTransportTypes.filter((type) => type !== transportType)
-      : [...disabledTransportTypes.filter((type) => type !== transportType), transportType];
-    await data.saveSettings({ disabledTransportTypes: nextDisabled });
-    showToast(`${TRANSPORT_LABELS[transportType]} ${enabled ? "aktiviert" : "deaktiviert"}.`);
-  }
-
+function TripSettingsPanel({ disabledTransportTypes, onToggle }: { disabledTransportTypes: TripTransportType[]; onToggle: (transportType: TripTransportType, enabled: boolean) => void }) {
   return (
     <div className="panel form-panel">
       <span className="section-label">Fahrtkosten</span>
@@ -793,7 +863,7 @@ function TripSettingsPanel({ data, showToast }: { data: WorkData; showToast: Sho
             <input
               type="checkbox"
               checked={isTransportTypeEnabled(transportType, disabledTransportTypes)}
-              onChange={(event) => void toggleTransportType(transportType, event.target.checked)}
+              onChange={(event) => onToggle(transportType, event.target.checked)}
             />
             {TRANSPORT_LABELS[transportType]}
           </label>
@@ -817,7 +887,7 @@ function SystemStatusPanel({ data, storageEstimate }: { data: WorkData; storageE
   );
 }
 
-function BackupPanel({ importRef, importPreview, onPreview, onReplace, onDone, refresh }: { importRef: React.RefObject<HTMLInputElement | null>; importPreview: string | null; onPreview: (file: File) => Promise<void>; onReplace: (file: File) => Promise<void>; onDone: (message: string) => void; refresh: () => Promise<void> }) {
+function BackupPanel({ importRef, importPreview, onPreview, onReplace, onClearPreview, onDone, refresh }: { importRef: React.RefObject<HTMLInputElement | null>; importPreview: string | null; onPreview: (file: File) => Promise<void>; onReplace: (file: File) => Promise<void>; onClearPreview: () => void; onDone: (message: string) => void; refresh: () => Promise<void> }) {
   const [file, setFile] = useState<File | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
 
@@ -849,13 +919,19 @@ function BackupPanel({ importRef, importPreview, onPreview, onReplace, onDone, r
       setBackupError(null);
       await onReplace(file);
       await refresh();
+      setFile(null);
     } catch (error) {
       setBackupError(errorMessage(error, "Backup konnte nicht importiert werden."));
     }
   }
 
+  function cancelImport() {
+    setFile(null);
+    onClearPreview();
+  }
+
   return (
-    <div className="panel">
+    <div className="panel form-panel">
       <span className="section-label">Backup</span>
       <p className="muted">Exportiert wird eine ZIP-Datei mit Manifest und Daten. Import ersetzt nach Vorschau alle lokalen Daten.</p>
       <div className="button-row">
@@ -878,22 +954,30 @@ function BackupPanel({ importRef, importPreview, onPreview, onReplace, onDone, r
         }}
       />
       {backupError ? <Notice tone="danger" title="Backup-Fehler" text={backupError} /> : null}
-      {importPreview ? <Notice tone="warning" title="Import-Vorschau" text={importPreview} /> : null}
-      <div className="backup-import-actions">
-        <button className="danger-button" disabled={!file} onClick={() => void handleReplace()}>Backup importieren und ersetzen</button>
-      </div>
+      {file && importPreview ? (
+        <div className="settings-step" role="region" aria-label="Import-Vorschau">
+          <strong>Import-Vorschau</strong>
+          <span className="settings-step-file">{file.name}</span>
+          <p>{importPreview}</p>
+          <div className="button-row">
+            <button className="danger-button" type="button" onClick={() => void handleReplace()}>Backup importieren und ersetzen</button>
+            <button className="secondary-button" type="button" onClick={cancelImport}>Abbrechen</button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function CorrectionsPanel({ data }: { data: WorkData }) {
+function CorrectionsSection({ data }: { data: WorkData }) {
   const flexEntries = entriesForFlexBalance(data.timeEntries, todayKey());
   const flex = data.settings ? calculateFlexBalance(data.settings.flexStartMinutes ?? 0, flexEntries, data.flexCorrections) : 0;
   const [form, setForm] = useState({ date: todayKey(), newValueHours: minutesToHourInput(flex), note: "" });
   const [valueError, setValueError] = useState<string | undefined>();
+  const newValueMinutes = parseHoursToMinutes(form.newValueHours);
+  const diffMinutes = newValueMinutes === null ? 0 : newValueMinutes - flex;
 
   async function saveCorrection() {
-    const newValueMinutes = parseHoursToMinutes(form.newValueHours);
     if (newValueMinutes === null) {
       setValueError("Bitte Stunden eingeben, z.B. 97,34.");
       return;
@@ -905,26 +989,33 @@ function CorrectionsPanel({ data }: { data: WorkData }) {
   }
 
   return (
-    <div className="panel corrections-panel">
-      <span className="section-label">Gleitzeitkorrekturen</span>
+    <div className="corrections-panel" role="group" aria-labelledby="settings-corrections-title">
+      <span id="settings-corrections-title" className="corrections-title">Gleitzeitkorrekturen</span>
+      <div className="corrections-saldo"><span>Aktueller Saldo</span><strong>{formatMinutes(flex)}</strong></div>
       <div className="form-grid">
         <Field label="Datum"><input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></Field>
-        <Field label="Neuer Gesamtwert (Stunden)" error={valueError}>
-          <input
-            type="text"
-            inputMode="decimal"
-            placeholder="97,34"
-            value={form.newValueHours}
-            aria-invalid={Boolean(valueError)}
-            onChange={(event) => {
-              setValueError(undefined);
-              setForm({ ...form, newValueHours: event.target.value });
-            }}
-          />
+        <Field label="Neuer Gesamtwert" error={valueError}>
+          <span className="input-with-unit">
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="97,34"
+              value={form.newValueHours}
+              aria-invalid={Boolean(valueError)}
+              onChange={(event) => {
+                setValueError(undefined);
+                setForm({ ...form, newValueHours: event.target.value });
+              }}
+            />
+            <span className="input-unit">Std.</span>
+          </span>
         </Field>
       </div>
       <Field label="Grund oder Notiz"><input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
-      <button className="secondary-button" onClick={() => void saveCorrection()}>Korrektur speichern</button>
+      <div className="corrections-actions">
+        <button className="secondary-button" type="button" onClick={() => void saveCorrection()}>Korrektur speichern</button>
+        {diffMinutes !== 0 ? <span className="corrections-diff">Korrektur {formatSignedMinutes(diffMinutes)}</span> : null}
+      </div>
       <div className="correction-list">
         {data.flexCorrections.length === 0 ? <p className="muted">Noch keine Korrekturen.</p> : null}
         {data.flexCorrections.map((correction) => (
@@ -943,28 +1034,23 @@ function CorrectionsPanel({ data }: { data: WorkData }) {
 }
 
 function DangerPanel({ data, onDone }: { data: WorkData; onDone: (message: string) => void }) {
-  const [deleteUnlocked, setDeleteUnlocked] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped] = useState("");
+
+  function closeConfirm() {
+    setConfirming(false);
+    setTyped("");
+  }
 
   async function handleWipeData() {
-    if (!deleteUnlocked) return;
-
-    try {
-      if (!window.confirm("Vorher Backup exportieren. Wirklich alle lokalen Arbeitsdaten löschen?")) return;
-
-      const typed = window.prompt("Bitte LÖSCHEN eingeben, um die lokale Datenlöschung zu bestätigen.");
-      if (typed !== "LÖSCHEN") return;
-
-      if (!window.confirm("Letzte Bestätigung: Lokale Arbeitsdaten endgültig löschen?")) return;
-
-      await data.wipeData();
-      onDone("Lokale Daten gelöscht.");
-    } finally {
-      setDeleteUnlocked(false);
-    }
+    if (typed !== "LÖSCHEN") return;
+    await data.wipeData();
+    closeConfirm();
+    onDone("Lokale Daten gelöscht.");
   }
 
   return (
-    <div className="panel danger-panel">
+    <div className="panel form-panel danger-panel">
       <span className="section-label">Reset</span>
       <p className="muted">Cache und Service Worker können ohne Datenverlust entfernt werden. Die lokale Datenlöschung ist separat.</p>
       <div className="button-row">
@@ -973,12 +1059,22 @@ function DangerPanel({ data, onDone }: { data: WorkData; onDone: (message: strin
         </button>
       </div>
       <div className="locked-delete-box">
-        <button className="secondary-button" type="button" onClick={() => setDeleteUnlocked(true)} disabled={deleteUnlocked}>
-          Löschen entsperren
-        </button>
-        <button className="danger-button" type="button" disabled={!deleteUnlocked} onClick={() => void handleWipeData()}>
-          Lokale Daten löschen
-        </button>
+        {confirming ? (
+          <div className="settings-step is-danger" role="region" aria-label="Lokale Daten löschen">
+            <strong>Vorher Backup exportieren.</strong>
+            <Field label="Bitte LÖSCHEN eingeben, um die lokale Datenlöschung zu bestätigen.">
+              <input value={typed} autoComplete="off" autoFocus onChange={(event) => setTyped(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") closeConfirm(); }} />
+            </Field>
+            <div className="button-row">
+              <button className="danger-button is-solid" type="button" disabled={typed !== "LÖSCHEN"} onClick={() => void handleWipeData()}>Lokale Daten löschen</button>
+              <button className="secondary-button" type="button" onClick={closeConfirm}>Abbrechen</button>
+            </div>
+          </div>
+        ) : (
+          <button className="danger-button" type="button" aria-expanded="false" onClick={() => setConfirming(true)}>
+            <Trash size={18} /> Lokale Daten löschen …
+          </button>
+        )}
       </div>
     </div>
   );
@@ -4278,8 +4374,14 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   );
 }
 
-function Field({ label, children, error, className = "" }: { label: string; children: React.ReactNode; error?: string; className?: string }) {
-  return <label className={`field ${className}`.trim()}><span>{label}</span>{children}{error ? <small className="field-error">{error}</small> : null}</label>;
+function Field({ label, children, error, missing = false, className = "" }: { label: string; children: React.ReactNode; error?: string; missing?: boolean; className?: string }) {
+  return (
+    <label className={`field ${missing ? "is-missing" : ""} ${className}`.replace(/\s+/g, " ").trim()}>
+      <span>{label}{missing ? <em className="field-missing">fehlt</em> : null}</span>
+      {children}
+      {error ? <small className="field-error">{error}</small> : null}
+    </label>
+  );
 }
 
 export function WorkTimeField({

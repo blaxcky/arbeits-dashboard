@@ -368,22 +368,34 @@ describe("settings layout", () => {
     const workGroup = screen.getByRole("region", { name: "Arbeitszeit & Saldo" });
     const systemGroup = screen.getByRole("region", { name: "Daten & System" });
 
-    expect(workGroup.querySelectorAll(":scope > .panel")).toHaveLength(2);
+    expect(workGroup.querySelectorAll(":scope > .panel")).toHaveLength(3);
     expect(systemGroup.querySelectorAll(":scope > .panel")).toHaveLength(3);
     expect(Array.from(document.querySelectorAll(".section-label"), (label) => label.textContent)).toEqual([
       "Arbeitszeit",
-      "Gleitzeitkorrekturen",
+      "Gleitzeit",
+      "Urlaub",
       "Fahrtkosten",
       "Backup",
       "Status",
       "Reset"
     ]);
+    expect(screen.getByRole("group", { name: "Gleitzeitkorrekturen" })).toHaveTextContent("Aktueller Saldo0:00 h");
   });
 
-  it("disables a transport subsidy for trips from the travel expense settings", async () => {
+  it("marks missing setup fields directly at the field", () => {
+    render(<App />);
+
+    expect(screen.getByLabelText(/Gleitzeitstartwert/).closest(".field")).toHaveTextContent("Gleitzeitstartwertfehlt");
+    expect(screen.getByLabelText(/Urlaubsanspruch/).closest(".field")).toHaveTextContent("Urlaubsanspruchfehlt");
+    expect(screen.getByLabelText(/Sollzeit pro Tag/).closest(".field")).not.toHaveTextContent("fehlt");
+  });
+
+  it("saves fields and transport types together only after a change", async () => {
     workData.saveSettings.mockReset();
     workData.saveSettings.mockResolvedValue(undefined);
     render(<App />);
+
+    expect(screen.queryByRole("region", { name: "Änderungen speichern" })).not.toBeInTheDocument();
 
     const tripGroup = screen.getByRole("region", { name: "Reiserechnungen" });
     const standardSubsidy = within(tripGroup).getByRole("checkbox", { name: "Beförderungszuschuss" });
@@ -391,8 +403,50 @@ describe("settings layout", () => {
     expect(within(tripGroup).getByRole("checkbox", { name: "Beförderungszuschuss Öffis" })).toBeChecked();
 
     fireEvent.click(standardSubsidy);
+    fireEvent.change(screen.getByLabelText(/Wochenarbeitszeit/), { target: { value: "38.5" } });
+    expect(workData.saveSettings).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(workData.saveSettings).toHaveBeenCalledWith({ disabledTransportTypes: ["befoerderungszuschuss"] }));
+    const saveBar = screen.getByRole("region", { name: "Änderungen speichern" });
+    fireEvent.click(within(saveBar).getByRole("button", { name: "Einstellungen speichern" }));
+
+    await waitFor(() => expect(workData.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ weeklyTargetMinutes: 2310, disabledTransportTypes: ["befoerderungszuschuss"] })));
+  });
+
+  it("discards unsaved settings changes", () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText(/Sollzeit pro Tag/), { target: { value: "7" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
+
+    expect(screen.getByLabelText(/Sollzeit pro Tag/)).toHaveValue(8);
+    expect(screen.queryByRole("region", { name: "Änderungen speichern" })).not.toBeInTheDocument();
+  });
+
+  it("previews the flex correction difference against the current balance", () => {
+    render(<App />);
+
+    const corrections = screen.getByRole("group", { name: "Gleitzeitkorrekturen" });
+    expect(corrections).toHaveTextContent("Noch keine Korrekturen.");
+    fireEvent.change(within(corrections).getByLabelText(/Neuer Gesamtwert/), { target: { value: "2,5" } });
+
+    expect(corrections).toHaveTextContent("Korrektur +2:30 h");
+  });
+
+  it("deletes local data only after typing the confirmation word", async () => {
+    workData.wipeData.mockReset();
+    workData.wipeData.mockResolvedValue(undefined);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Lokale Daten löschen …/ }));
+    const step = screen.getByRole("region", { name: "Lokale Daten löschen" });
+    const confirm = within(step).getByRole("button", { name: "Lokale Daten löschen" });
+    expect(confirm).toBeDisabled();
+
+    fireEvent.change(within(step).getByLabelText(/Bitte LÖSCHEN eingeben/), { target: { value: "LÖSCHEN" } });
+    expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(workData.wipeData).toHaveBeenCalledTimes(1));
   });
 });
 
