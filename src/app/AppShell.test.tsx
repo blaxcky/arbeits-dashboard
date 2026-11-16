@@ -169,7 +169,7 @@ describe("vacation planning", () => {
     expect(screen.getByRole("button", { name: "Sa 15.08.: Feiertag (Mariä Himmelfahrt)" })).toBeDisabled();
   });
 
-  it("jumps from the open days answer to the calendar in the matching mode", () => {
+  it("answers the header with whole days to plan and where they come from", () => {
     const settings = workData.settings as { vacationEntitlementMinutes: number | null };
     const entitlement = settings.vacationEntitlementMinutes;
     settings.vacationEntitlementMinutes = 960;
@@ -178,12 +178,8 @@ describe("vacation planning", () => {
 
       const hero = screen.getByRole("article", { name: "Bis 31.12. noch einplanen" });
       expect(within(hero).getByText("2 Tage", { selector: "strong" })).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole("button", { name: /Gleittag/, pressed: false }));
-      fireEvent.click(within(hero).getByRole("button", { name: "2 Urlaubstage eintragen" }));
-      const modes = screen.getByRole("group", { name: "Eintragen als" });
-      expect(within(modes).getByRole("button", { name: /Urlaub/ })).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByRole("region", { name: /Kalender/ })).toHaveFocus();
+      expect(within(hero).getByText("2 Urlaubstage")).toBeInTheDocument();
+      expect(within(hero).queryByRole("button")).not.toBeInTheDocument();
     } finally {
       settings.vacationEntitlementMinutes = entitlement;
     }

@@ -1,5 +1,5 @@
-import { ArrowDown, BellRinging, CalendarCheck, CaretLeft, CaretRight, CheckCircle, Clock, DownloadSimple, WarningCircle } from "@phosphor-icons/react";
-import { useMemo, useRef, useState } from "react";
+import { BellRinging, CalendarCheck, CaretLeft, CaretRight, CheckCircle, Clock, DownloadSimple, WarningCircle } from "@phosphor-icons/react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { PlannedAbsence, PlannedAbsenceType } from "../../db/schema";
 import { todayKey } from "../../lib/dates";
@@ -102,49 +102,38 @@ export function dayAmountLabel(minutes: number, dailyTargetMinutes: number): str
   return Number.isInteger(days) ? daysLabel(days) : `${dayAmount(minutes, dailyTargetMinutes)} Tage`;
 }
 
-export interface AbsencePlanAction {
-  type: PlannedAbsenceType;
-  label: string;
-}
-
 export interface AbsencePlanHero {
   title: string;
   value: string;
   detail: string;
   tone: "done" | "open" | "danger";
-  actions: AbsencePlanAction[];
 }
 
-function openDayActions(open: AbsenceOpenDays): AbsencePlanAction[] {
-  const actions: AbsencePlanAction[] = [];
-  if (open.vacationDays > 0) actions.push({ type: "vacation", label: open.vacationDays === 1 ? "1 Urlaubstag" : `${open.vacationDays} Urlaubstage` });
-  if (open.flexDays > 0) actions.push({ type: "flex", label: open.flexDays === 1 ? "1 Gleittag" : `${open.flexDays} Gleittage` });
-  return actions;
+function openDayParts(open: AbsenceOpenDays): string[] {
+  const parts: string[] = [];
+  if (open.vacationDays > 0) parts.push(open.vacationDays === 1 ? "1 Urlaubstag" : `${open.vacationDays} Urlaubstage`);
+  if (open.flexDays > 0) parts.push(open.flexDays === 1 ? "1 Gleittag" : `${open.flexDays} Gleittage`);
+  if (open.vacationRestMinutes > 0) parts.push(`${formatMinutes(open.vacationRestMinutes)} Resturlaub`);
+  return parts;
 }
 
 export function absencePlanHero(summary: AbsencePlanSummary, dailyTargetMinutes: number): AbsencePlanHero {
   if (summary.status === "overplanned") {
-    return { title: "Zu viel geplant", value: daysLabel(Math.round(-summary.vacationAfterMinutes / dailyTargetMinutes)), detail: "mehr Urlaub geplant als vorhanden", tone: "danger", actions: [] };
+    return { title: "Zu viel geplant", value: daysLabel(Math.round(-summary.vacationAfterMinutes / dailyTargetMinutes)), detail: "mehr Urlaub geplant als vorhanden", tone: "danger" };
   }
   if (summary.status === "flex-too-low") {
-    return { title: "Gleitzeit zu niedrig", value: formatSignedMinutes(summary.flexAfterMinutes), detail: "Gleitzeit fällt nach Planung unter -10:00 h", tone: "danger", actions: [] };
+    return { title: "Gleitzeit zu niedrig", value: formatSignedMinutes(summary.flexAfterMinutes), detail: "Gleitzeit fällt nach Planung unter -10:00 h", tone: "danger" };
   }
-  if (summary.status === "done") return { title: "Alles verplant", value: daysLabel(0), detail: "am 31.12. verfällt nichts", tone: "done", actions: [] };
-  const open = absenceOpenDays(summary, dailyTargetMinutes);
+  if (summary.status === "done") return { title: "Alles verplant", value: daysLabel(0), detail: "am 31.12. verfällt nichts", tone: "done" };
   if (summary.status === "almost") {
-    return { title: "Fast geschafft", value: formatMinutes(summary.flexOverLimitAfterMinutes), detail: "Gleitzeit über der Grenze – ein Gleittag reicht", tone: "open", actions: openDayActions(open) };
+    return { title: "Fast geschafft", value: formatMinutes(summary.flexOverLimitAfterMinutes), detail: "Gleitzeit über der Grenze – ein Gleittag reicht", tone: "open" };
   }
+  const open = absenceOpenDays(summary, dailyTargetMinutes);
   const days = open.vacationDays + open.flexDays;
   if (days === 0) {
-    return { title: "Bis 31.12. noch einplanen", value: formatMinutes(summary.openMinutes), detail: "Resturlaub – weniger als ein Tag", tone: "open", actions: [] };
+    return { title: "Bis 31.12. noch einplanen", value: formatMinutes(summary.openMinutes), detail: "Resturlaub – weniger als ein Tag", tone: "open" };
   }
-  return {
-    title: "Bis 31.12. noch einplanen",
-    value: daysLabel(days),
-    detail: open.vacationRestMinutes > 0 ? `dazu ${formatMinutes(open.vacationRestMinutes)} Resturlaub` : "",
-    tone: "open",
-    actions: openDayActions(open)
-  };
+  return { title: "Bis 31.12. noch einplanen", value: daysLabel(days), detail: openDayParts(open).join(" · "), tone: "open" };
 }
 
 function planCounts(planned: number, requested: number): string {
@@ -263,7 +252,6 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
   const requestedDays = summary.vacationRequestedDays + summary.flexRequestedDays;
   const plannedDays = summary.vacationPlannedDays + summary.flexPlannedDays;
   const openDays = open.vacationDays + open.flexDays;
-  const calendarRef = useRef<HTMLElement>(null);
   const groups = groupOpenAbsences(planning.absences, planning.today).map((group) => ({ group, info: absenceRequestInfo(group, planning.today, planning.leadDays, planning.urgentDays) }));
   const missedGroups = groupOpenAbsences(planning.missed).map((group) => ({ group, info: absenceRequestInfo(group, planning.today, planning.leadDays, planning.urgentDays) }));
   const allGroups = [...missedGroups, ...groups];
@@ -273,17 +261,6 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
   function exportCalendar() {
     downloadAbsenceIcs(planning.absences, planning.today);
     showToast(`Kalenderdatei mit ${exportEvents.length} ${exportEvents.length === 1 ? "Eintrag" : "Einträgen"} erstellt – in Outlook öffnen.`);
-  }
-
-  function startPlanning(type: PlannedAbsenceType) {
-    setMode(type);
-    const calendar = calendarRef.current;
-    if (calendar) {
-      const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-      calendar.scrollIntoView?.({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
-      calendar.focus({ preventScroll: true });
-    }
-    showToast(`Freie Arbeitstage anklicken, um sie als ${ABSENCE_TYPE_LABELS[type]} zu planen.`);
   }
 
   async function toggleDay(date: string) {
@@ -353,15 +330,6 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
             <strong>{hero.value}</strong>
             {hero.detail ? <span>{hero.detail}</span> : null}
           </div>
-          {hero.actions.length > 0 ? (
-            <div className="absence-hero-actions">
-              {hero.actions.map((action) => (
-                <button key={action.type} className="secondary-button" type="button" onClick={() => startPlanning(action.type)}>
-                  {action.label} eintragen <ArrowDown size={15} weight="bold" aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-          ) : null}
           <div className="absence-hero-plan">
             <PlanBar requested={requestedDays} planned={plannedDays} total={requestedDays + plannedDays + openDays} label={`${daysLabel(requestedDays)} beantragt, ${daysLabel(plannedDays)} geplant, ${daysLabel(openDays)} offen`} />
             <div className="absence-hero-legend" aria-hidden="true">
@@ -413,7 +381,7 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
       </section>
 
       <div className="absence-layout">
-        <section ref={calendarRef} tabIndex={-1} className="panel absence-calendar" aria-labelledby="absence-calendar-title">
+        <section className="panel absence-calendar" aria-labelledby="absence-calendar-title">
           <div className="absence-calendar-toolbar">
             <span id="absence-calendar-title" className="section-label">Kalender {year}</span>
             <div className="trip-tabs absence-mode" role="group" aria-label="Eintragen als">

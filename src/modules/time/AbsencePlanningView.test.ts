@@ -17,22 +17,21 @@ describe("absence plan hero", () => {
     expect(absencePlanHero(summary, 480)).toEqual({
       title: "Bis 31.12. noch einplanen",
       value: "5 Tage",
-      detail: "",
-      tone: "open",
-      actions: [{ type: "vacation", label: "2 Urlaubstage" }, { type: "flex", label: "3 Gleittage" }]
+      detail: "2 Urlaubstage · 3 Gleittage",
+      tone: "open"
     });
   });
 
   it("switches to done, almost and overplanned wording", () => {
     const twoDays = threeVacationDays.slice(0, 2);
-    expect(absencePlanHero(summarizeAbsencePlan({ ...base, absences: twoDays, vacationRemainingMinutes: 960, flexBalanceMinutes: 6000 }), 480)).toMatchObject({ title: "Alles verplant", value: "0 Tage", tone: "done", actions: [] });
-    expect(absencePlanHero(summarizeAbsencePlan({ ...base, absences: twoDays, vacationRemainingMinutes: 960, flexBalanceMinutes: 6180 }), 480)).toMatchObject({ title: "Fast geschafft", value: "3:00 h", tone: "open", actions: [{ type: "flex", label: "1 Gleittag" }] });
-    expect(absencePlanHero(summarizeAbsencePlan({ ...base, absences: threeVacationDays, vacationRemainingMinutes: 960, flexBalanceMinutes: 6000 }), 480)).toMatchObject({ title: "Zu viel geplant", value: "1 Tag", tone: "danger", actions: [] });
+    expect(absencePlanHero(summarizeAbsencePlan({ ...base, absences: twoDays, vacationRemainingMinutes: 960, flexBalanceMinutes: 6000 }), 480)).toMatchObject({ title: "Alles verplant", value: "0 Tage", tone: "done" });
+    expect(absencePlanHero(summarizeAbsencePlan({ ...base, absences: twoDays, vacationRemainingMinutes: 960, flexBalanceMinutes: 6180 }), 480)).toMatchObject({ title: "Fast geschafft", value: "3:00 h", tone: "open" });
+    expect(absencePlanHero(summarizeAbsencePlan({ ...base, absences: threeVacationDays, vacationRemainingMinutes: 960, flexBalanceMinutes: 6000 }), 480)).toMatchObject({ title: "Zu viel geplant", value: "1 Tag", tone: "danger" });
   });
 
   it("keeps a vacation remainder below one day out of the plannable days", () => {
     const summary = summarizeAbsencePlan({ ...base, absences: [], vacationRemainingMinutes: 1200, flexBalanceMinutes: 6000 });
-    expect(absencePlanHero(summary, 480)).toMatchObject({ value: "2 Tage", detail: "dazu 4:00 h Resturlaub", actions: [{ type: "vacation", label: "2 Urlaubstage" }] });
+    expect(absencePlanHero(summary, 480)).toMatchObject({ value: "2 Tage", detail: "2 Urlaubstage · 4:00 h Resturlaub" });
   });
 
   it("labels whole and fractional day amounts", () => {
