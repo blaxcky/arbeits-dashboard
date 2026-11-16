@@ -153,7 +153,7 @@ describe("vacation planning", () => {
 
   it("describes what still has to be used this year without zero parts", () => {
     expect(consumptionDetail(10080, 0, 480)).toBe("21 Tage Urlaub");
-    expect(consumptionDetail(3360, 1050, 480)).toBe("7 Tage Urlaub + 17:30 h Gleitzeit über Grenze");
+    expect(consumptionDetail(3360, 1050, 480)).toBe("7 Tage Urlaub + 17:30 h Gleitzeit");
     expect(consumptionDetail(0, 0, 480)).toBe("Nichts mehr offen");
   });
 

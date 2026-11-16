@@ -497,7 +497,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
         <Metric
           title="Woche"
           value={formatMinutes(week.workedMinutes)}
-          detail={weekDeltaToTarget >= 0 ? `${formatMinutes(weekDeltaToTarget)} über Wochensoll` : `noch ${formatMinutes(Math.abs(weekDeltaToTarget))} bis Wochensoll`}
+          detail={weekDeltaToTarget >= 0 ? `${formatMinutes(weekDeltaToTarget)} über Soll` : `noch ${formatMinutes(Math.abs(weekDeltaToTarget))} bis Soll`}
           progress={{ value: week.workedMinutes / weeklyTargetMinutes }}
         />
         <Metric
@@ -513,14 +513,14 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
         >
           {plannedFlexDays > 0 ? (
             <p className={`absence-metric-note${absenceSummary.status === "flex-too-low" ? " is-danger" : ""}`}>
-              Nach Planung <b>{formatSignedMinutes(absenceSummary.flexAfterMinutes)}</b> · {plannedFlexDays === 1 ? "1 Gleittag" : `${plannedFlexDays} Gleittage`} verplant
+              {plannedFlexDays === 1 ? "1 Gleittag" : `${plannedFlexDays} Gleittage`} geplant · danach <b>{formatSignedMinutes(absenceSummary.flexAfterMinutes)}</b>
             </p>
           ) : null}
         </Metric>
         <Metric
           title="Resturlaub"
           value={vacation ? formatWholeDays(vacation.remainingMinutes, dailyTargetMinutes) : "0 Tage"}
-          detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}
+          detail={vacation && vacationEntitlementMinutes > 0 ? `${formatMinutes(vacation.remainingMinutes)} von ${formatMinutes(vacationEntitlementMinutes)}` : "Noch nicht eingerichtet"}
           icon={<CalendarCheck size={18} />}
           editableDetail={vacationEditValue !== null ? (
             <span className="inline-edit">
@@ -553,7 +553,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
         >
           {plannedVacationDays > 0 ? (
             <p className={`absence-metric-note${absenceSummary.vacationAfterMinutes < 0 ? " is-danger" : ""}`}>
-              Nach Planung <b>{absenceSummary.vacationAfterMinutes >= 0 ? `${daysLabel(Math.round(absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} übrig` : `${daysLabel(Math.round(-absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} zu viel`}</b> · {daysLabel(plannedVacationDays)} verplant
+              {daysLabel(plannedVacationDays)} geplant · danach <b>{absenceSummary.vacationAfterMinutes >= 0 ? `${daysLabel(Math.round(absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} übrig` : `${daysLabel(Math.round(-absenceSummary.vacationAfterMinutes / dailyTargetMinutes))} zu viel`}</b>
             </p>
           ) : null}
         </Metric>
@@ -564,7 +564,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           progressBar={<PlanBar requested={absenceSummary.coveredRequestedMinutes} planned={absenceSummary.coveredPlannedMinutes} total={absenceSummary.neededMinutes} label={absenceHeadline.text} />}
         >
           <p className="absence-metric-note absence-metric-note-row">
-            <span>{formatDays(absenceSummary.scheduledMinutes, dailyTargetMinutes)} verplant · {formatDays(absenceSummary.openMinutes, dailyTargetMinutes)} offen</span>
+            <span>{daysLabel(Math.round(absenceSummary.scheduledMinutes / dailyTargetMinutes))} geplant · <b>{formatDays(absenceSummary.openMinutes, dailyTargetMinutes)} offen</b></span>
             <Link className="absence-metric-link" to="/urlaub">Jahresplanung</Link>
           </p>
         </Metric>
@@ -654,7 +654,7 @@ export function consumptionDetail(vacationRemainingMinutes: number, flexOverLimi
   };
   const parts: string[] = [];
   if (vacationRemainingMinutes > 0) parts.push(`${formatPart(vacationRemainingMinutes)} Urlaub`);
-  if (flexOverLimitMinutes > 0) parts.push(`${formatMinutes(flexOverLimitMinutes)} Gleitzeit über Grenze`);
+  if (flexOverLimitMinutes > 0) parts.push(`${formatMinutes(flexOverLimitMinutes)} Gleitzeit`);
   return parts.length ? parts.join(" + ") : "Nichts mehr offen";
 }
 
