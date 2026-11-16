@@ -393,7 +393,6 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
               ))}
             </div>
           </div>
-          <p className="absence-hint">Freien Arbeitstag anklicken, um ihn als {ABSENCE_TYPE_LABELS[mode]} zu planen. Nochmal anklicken entfernt ihn. Abgezogen wird erst am Tag selbst.</p>
           <div className="absence-months">
             {months.map((month) => (
               <div key={month.key} className="absence-month">
