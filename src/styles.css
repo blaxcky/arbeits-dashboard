@@ -779,11 +779,11 @@ button:disabled {
 }
 
 .metric {
-  min-height: 104px;
-  padding: 14px 15px;
+  min-height: 112px;
+  padding: 18px 16px;
   display: grid;
   align-content: space-between;
-  gap: 7px;
+  gap: 10px;
 }
 
 .metric-title {
@@ -2961,7 +2961,7 @@ button:disabled {
 }
 
 .dashboard-page {
-  gap: 18px;
+  gap: 24px;
   container-type: inline-size;
 }
 
@@ -3099,18 +3099,20 @@ button:disabled {
   color: var(--accent-dark);
 }
 
+/* Heute- und Wochenkarte stehen nebeneinander gleich hoch. */
 .dashboard-workflow {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 16px;
 }
 
 .day-card {
   flex: 1 1 340px;
   min-width: 0;
-  display: grid;
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .day-card-missing-end {
@@ -3146,7 +3148,7 @@ button:disabled {
 
 .day-summary {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .day-summary-label {
@@ -3341,7 +3343,8 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-top: 14px;
+  margin-top: auto;
+  padding-top: 18px;
   border-top: 1px solid #eef0f3;
 }
 
@@ -3455,8 +3458,9 @@ button:disabled {
 .week-card {
   flex: 3 1 520px;
   min-width: 0;
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   container-type: inline-size;
 }
 
@@ -3474,8 +3478,9 @@ button:disabled {
 }
 
 .week-grid {
+  flex: 1;
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .week-line {
@@ -3483,7 +3488,7 @@ button:disabled {
   grid-template-columns: minmax(76px, 92px) minmax(96px, 112px) minmax(60px, 1fr) minmax(56px, 64px) minmax(72px, 84px) 16px;
   align-items: center;
   gap: 10px;
-  min-height: 46px;
+  min-height: 50px;
   padding: 0 10px;
   border: 0;
   border-radius: 8px;
