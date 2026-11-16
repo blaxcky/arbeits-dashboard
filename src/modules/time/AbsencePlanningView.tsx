@@ -262,7 +262,6 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
   const open = absenceOpenDays(summary, dailyTargetMinutes);
   const requestedDays = summary.vacationRequestedDays + summary.flexRequestedDays;
   const plannedDays = summary.vacationPlannedDays + summary.flexPlannedDays;
-  const openDays = open.vacationDays + open.flexDays;
   const calendarRef = useRef<HTMLElement>(null);
   const groups = groupOpenAbsences(planning.absences, planning.today).map((group) => ({ group, info: absenceRequestInfo(group, planning.today, planning.leadDays, planning.urgentDays) }));
   const missedGroups = groupOpenAbsences(planning.missed).map((group) => ({ group, info: absenceRequestInfo(group, planning.today, planning.leadDays, planning.urgentDays) }));
@@ -362,14 +361,9 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
               ))}
             </div>
           ) : null}
-          <div className="absence-hero-plan">
-            <PlanBar requested={requestedDays} planned={plannedDays} total={requestedDays + plannedDays + openDays} label={`${daysLabel(requestedDays)} beantragt, ${daysLabel(plannedDays)} geplant, ${daysLabel(openDays)} offen`} />
-            <div className="absence-hero-legend" aria-hidden="true">
-              <span><i className="is-requested" />{daysLabel(requestedDays)} beantragt</span>
-              <span><i className="is-planned" />{daysLabel(plannedDays)} geplant</span>
-              <span><i className="is-open" /><b>{daysLabel(openDays)} offen</b></span>
-            </div>
-          </div>
+          <p className="absence-hero-note">
+            {plannedDays + requestedDays > 0 ? `${daysLabel(plannedDays)} geplant${requestedDays > 0 ? ` · ${daysLabel(requestedDays)} beantragt` : ""}` : "Noch nichts geplant"}
+          </p>
         </article>
 
         <article className="metric absence-source">
