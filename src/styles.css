@@ -6003,10 +6003,10 @@ button.week-line:focus-visible {
   background: #fff3da;
 }
 
-.absence-hero .absence-hero-note {
-  margin: auto 0 0;
-  color: #4b5563;
-  font-size: 0.82rem;
+.absence-hero-plan {
+  display: grid;
+  gap: 7px;
+  margin-top: auto;
 }
 
 .absence-calendar:focus {
@@ -6016,6 +6016,42 @@ button.week-line:focus-visible {
 .absence-calendar:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+.absence-hero-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: #4b5563;
+  font-size: 0.78rem;
+}
+
+.absence-hero-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.absence-hero-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.absence-hero-legend i.is-requested {
+  background: var(--accent);
+}
+
+.absence-hero-legend i.is-planned {
+  background: repeating-linear-gradient(135deg, var(--accent) 0 2px, #9cc3c5 2px 4px);
+}
+
+.absence-hero-legend i.is-open {
+  background: #e2bd6c;
+}
+
+.absence-hero-legend b {
+  color: #5c4214;
 }
 
 .absence-source-value {
