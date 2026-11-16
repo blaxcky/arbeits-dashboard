@@ -447,18 +447,7 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
       <div className="absence-layout">
         <section className="panel absence-calendar" aria-labelledby="absence-calendar-title">
           <div className="absence-calendar-toolbar">
-            <div className="absence-calendar-nav">
-              <span id="absence-calendar-title" className="section-label">Kalender {year}</span>
-              <div className="year-stepper month-stepper" role="group" aria-label="Monate wählen">
-                <button className="icon-button" type="button" title="Vorheriger Monat (Pfeil links)" aria-label="Vorheriger Monat" disabled={!canGoBack} onClick={() => shiftMonths(-1)}>
-                  <CaretLeft size={17} aria-hidden="true" />
-                </button>
-                <span className="month-stepper-label" aria-live="polite">{monthRangeLabel}</span>
-                <button className="icon-button" type="button" title="Nächster Monat (Pfeil rechts)" aria-label="Nächster Monat" disabled={!canGoForward} onClick={() => shiftMonths(1)}>
-                  <CaretRight size={17} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
+            <span id="absence-calendar-title" className="section-label">Kalender {year}</span>
             <div className="trip-tabs absence-mode" role="group" aria-label="Eintragen als">
               {(["vacation", "flex"] as PlannedAbsenceType[]).map((type) => (
                 <button key={type} type="button" aria-pressed={mode === type} onClick={() => setMode(type)}>
@@ -468,6 +457,10 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
               ))}
             </div>
           </div>
+          <div className="absence-months-nav" role="group" aria-label={`Monate ${monthRangeLabel}`}>
+            <button className="icon-button absence-month-arrow" type="button" title="Vorheriger Monat (Pfeil links)" aria-label="Vorheriger Monat" disabled={!canGoBack} onClick={() => shiftMonths(-1)}>
+              <CaretLeft size={18} weight="bold" aria-hidden="true" />
+            </button>
           <div className="absence-months">
             {months.map((month) => (
               <div key={month.key} className="absence-month">
@@ -483,6 +476,10 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
                 </div>
               </div>
             ))}
+          </div>
+            <button className="icon-button absence-month-arrow" type="button" title="Nächster Monat (Pfeil rechts)" aria-label="Nächster Monat" disabled={!canGoForward} onClick={() => shiftMonths(1)}>
+              <CaretRight size={18} weight="bold" aria-hidden="true" />
+            </button>
           </div>
           <div className="absence-legend">
             <span><i className="absence-swatch is-vacation" aria-hidden="true">U</i>Urlaub geplant</span>

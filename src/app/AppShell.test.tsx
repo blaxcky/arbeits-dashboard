@@ -172,7 +172,7 @@ describe("vacation planning", () => {
   it("shows two months at a time and moves through them with the arrow buttons and keys", () => {
     render(<App />);
 
-    expect(screen.getByText("August – September")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Monate August – September" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Oktober 2026" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Nächster Monat" }));
@@ -181,7 +181,7 @@ describe("vacation planning", () => {
 
     fireEvent.keyDown(window, { key: "ArrowLeft" });
     fireEvent.keyDown(window, { key: "ArrowLeft" });
-    expect(screen.getByText("Juli – August")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Monate Juli – August" })).toBeInTheDocument();
   });
 
   it("answers the header with whole days to plan and where they come from", () => {

@@ -6137,31 +6137,44 @@ button.week-line:focus-visible {
   margin-top: 22px;
 }
 
-.absence-calendar-nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
+.absence-months-nav {
+  position: relative;
+  margin-top: 22px;
 }
 
-.month-stepper .icon-button {
-  width: 32px;
-  min-height: 32px;
+.absence-months-nav .absence-months {
+  margin-top: 0;
+}
+
+.absence-months-nav .absence-month:first-child h3 {
+  padding-left: 40px;
+}
+
+.absence-month-arrow {
+  position: absolute;
+  top: -7px;
+  z-index: 1;
+  width: 30px;
+  min-height: 30px;
   padding: 0;
   justify-content: center;
 }
 
-.month-stepper .icon-button svg {
+.absence-month-arrow:first-child {
+  left: 0;
+}
+
+.absence-month-arrow:last-child {
+  right: 0;
+}
+
+.absence-month-arrow svg {
   flex: 0 0 auto;
 }
 
-.month-stepper-label {
-  min-width: 150px;
-  padding: 0 6px;
-  color: #1f2937;
-  font-size: 0.88rem;
-  font-weight: 700;
-  text-align: center;
+.absence-month-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .absence-calendar-toolbar {
