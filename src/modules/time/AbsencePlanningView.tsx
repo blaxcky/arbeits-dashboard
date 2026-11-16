@@ -1,4 +1,4 @@
-import { BellRinging, CalendarCheck, CaretLeft, CaretRight, CheckCircle, Clock, DownloadSimple, WarningCircle } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, BellRinging, BellSimple, CalendarCheck, CaretLeft, CaretRight, Check, CheckCircle, Clock, DownloadSimple, WarningCircle } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { PlannedAbsence, PlannedAbsenceType } from "../../db/schema";
@@ -189,6 +189,30 @@ export function AbsenceRequestAlert({ data, showToast }: { data: PlanningData; s
   );
 }
 
+function shortDate(date: string): string {
+  return `${date.slice(8, 10)}.${date.slice(5, 7)}.`;
+}
+
+export function compactAbsenceRange(group: Pick<AbsenceRequestGroup, "start" | "end">): string {
+  if (group.start === group.end) return formatShortDayLabel(group.start);
+  if (group.start.slice(0, 7) === group.end.slice(0, 7)) return `${group.start.slice(8, 10)}.–${shortDate(group.end)}`;
+  return `${shortDate(group.start)} – ${shortDate(group.end)}`;
+}
+
+export function requestStatusLabel(info: AbsenceRequestInfo): string {
+  switch (info.state) {
+    case "missed":
+      return "vorbei";
+    case "urgent":
+    case "open":
+      return info.daysUntil === 0 ? "heute" : `noch ${daysLabel(info.daysUntil)}`;
+    case "requested":
+      return "wird am Tag gebucht";
+    default:
+      return `ab ${formatShortDayLabel(info.opensOn)}`;
+  }
+}
+
 function requestCopy(group: AbsenceRequestGroup, info: AbsenceRequestInfo, leadDays: number) {
   switch (info.state) {
     case "requested":
@@ -255,6 +279,10 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
   const groups = groupOpenAbsences(planning.absences, planning.today).map((group) => ({ group, info: absenceRequestInfo(group, planning.today, planning.leadDays, planning.urgentDays) }));
   const missedGroups = groupOpenAbsences(planning.missed).map((group) => ({ group, info: absenceRequestInfo(group, planning.today, planning.leadDays, planning.urgentDays) }));
   const allGroups = [...missedGroups, ...groups];
+  const dueGroups = allGroups.filter(({ info }) => info.state === "missed" || info.state === "urgent" || info.state === "open");
+  const laterGroups = allGroups.filter(({ info }) => info.state === "later");
+  const requestedGroups = allGroups.filter(({ info }) => info.state === "requested");
+  const nextReminder = laterGroups.map(({ info }) => info.opensOn).sort()[0];
 
   const exportEvents = absenceCalendarEvents(planning.absences, planning.today);
 
@@ -422,40 +450,84 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
         <section className="panel absence-requests" aria-labelledby="absence-requests-title">
           <div className="absence-requests-heading">
             <span id="absence-requests-title" className="section-label">Anträge</span>
-            <span>{planning.due.length > 0 ? `${planning.due.length} fällig · ` : ""}{allGroups.length} gesamt</span>
+            <span className={dueGroups.length > 0 ? "is-due" : undefined}>{dueGroups.length > 0 ? `${dueGroups.length} fällig` : `${allGroups.length} gesamt`}</span>
           </div>
-          <p className="absence-hint">Zusammenhängende Tage ergeben einen Antrag. Erinnert wird {planning.leadDays} Tage vorher, dringend ab {planning.urgentDays} Tagen.</p>
           {allGroups.length === 0 ? <p className="absence-empty">Noch nichts geplant. Tage im Kalender anklicken.</p> : null}
-          <ul className="absence-request-list">
-            {allGroups.map(({ group, info }) => {
-              const copy = requestCopy(group, info, planning.leadDays);
-              return (
-                <li key={`${group.start}-${group.type}-${group.status}`} className={`absence-request is-${info.state}`}>
-                  <div className="absence-request-head">
+          {allGroups.length > 0 && dueGroups.length === 0 ? (
+            <p className="absence-requests-calm">
+              <BellSimple size={17} aria-hidden="true" />
+              {nextReminder ? `Nichts fällig. Nächste Erinnerung am ${formatShortDayLabel(nextReminder)}` : "Nichts fällig."}
+            </p>
+          ) : null}
+          {dueGroups.length > 0 ? (
+            <div className="absence-request-group">
+              <h3>Jetzt beantragen</h3>
+              <ul className="absence-request-cards">
+                {dueGroups.map(({ group, info }) => (
+                  <li key={`${group.start}-${group.type}-${group.status}`} className={`absence-request-card is-${info.state}`}>
+                    <div className="absence-request-row">
+                      <span className={`absence-letter is-${group.type}`} aria-hidden="true">{ABSENCE_TYPE_LETTERS[group.type]}</span>
+                      <div className="absence-request-text">
+                        <strong>{compactAbsenceRange(group)}</strong>
+                        <small>{ABSENCE_TYPE_LABELS[group.type]} · {daysLabel(group.dates.length)}</small>
+                      </div>
+                      <span className="absence-request-status">{requestStatusLabel(info)}</span>
+                    </div>
+                    <div className="absence-request-actions">
+                      {info.state === "missed" ? (
+                        <>
+                          <button className="secondary-button" type="button" onClick={() => void bookGroup(group)}>Jetzt buchen</button>
+                          <button className="link-button" type="button" onClick={() => void removeGroup(group)}>Entfernen</button>
+                        </>
+                      ) : (
+                        <button className="secondary-button" type="button" onClick={() => void markGroup(group, "requested")}>Als beantragt markieren</button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {laterGroups.length > 0 ? (
+            <div className="absence-request-group">
+              <h3>Später beantragen</h3>
+              <ul className="absence-request-rows">
+                {laterGroups.map(({ group, info }) => (
+                  <li key={`${group.start}-${group.type}-${group.status}`} className="absence-request-row">
                     <span className={`absence-letter is-${group.type}`} aria-hidden="true">{ABSENCE_TYPE_LETTERS[group.type]}</span>
-                    <div>
-                      <strong>{formatAbsenceRange(group)}</strong>
+                    <div className="absence-request-text">
+                      <strong>{compactAbsenceRange(group)}</strong>
                       <small>{ABSENCE_TYPE_LABELS[group.type]} · {daysLabel(group.dates.length)}</small>
                     </div>
-                    <span className={`absence-pill is-${info.state}`}>{copy.pill}</span>
-                  </div>
-                  <p>{copy.detail}</p>
-                  <div className="absence-request-actions">
-                    {info.state === "missed" ? (
-                      <>
-                        <button className="secondary-button" type="button" onClick={() => void bookGroup(group)}>Jetzt buchen</button>
-                        <button className="link-button" type="button" onClick={() => void removeGroup(group)}>Entfernen</button>
-                      </>
-                    ) : info.state === "requested" ? (
-                      <button className="link-button" type="button" onClick={() => void markGroup(group, "planned")}>Zurück auf geplant</button>
-                    ) : (
-                      <button className="secondary-button" type="button" onClick={() => void markGroup(group, "requested")}>Als beantragt markieren</button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                    <span className="absence-request-status">{requestStatusLabel(info)}</span>
+                    <button className="icon-button absence-request-icon" type="button" title="Als beantragt markieren" aria-label={`${compactAbsenceRange(group)} als beantragt markieren`} onClick={() => void markGroup(group, "requested")}>
+                      <Check size={16} weight="bold" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {requestedGroups.length > 0 ? (
+            <div className="absence-request-group">
+              <h3>Beantragt</h3>
+              <ul className="absence-request-rows">
+                {requestedGroups.map(({ group, info }) => (
+                  <li key={`${group.start}-${group.type}-${group.status}`} className="absence-request-row is-requested">
+                    <span className="absence-letter is-requested" aria-hidden="true"><Check size={14} weight="bold" /></span>
+                    <div className="absence-request-text">
+                      <strong>{compactAbsenceRange(group)}</strong>
+                      <small>{ABSENCE_TYPE_LABELS[group.type]} · {daysLabel(group.dates.length)}</small>
+                    </div>
+                    <span className="absence-request-status">{requestStatusLabel(info)}</span>
+                    <button className="icon-button absence-request-icon" type="button" title="Zurück auf geplant" aria-label={`${compactAbsenceRange(group)} zurück auf geplant`} onClick={() => void markGroup(group, "planned")}>
+                      <ArrowCounterClockwise size={16} weight="bold" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
       </div>
     </section>

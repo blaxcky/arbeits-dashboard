@@ -227,10 +227,26 @@ describe("vacation planning", () => {
     ];
     render(<App />);
 
-    const request = screen.getByText("Mo 21.12. – Di 22.12.").closest("li") as HTMLElement;
+    const request = screen.getByText("21.–22.12.").closest("li") as HTMLElement;
     expect(request).toHaveTextContent("Urlaub · 2 Tage");
-    expect(request).toHaveTextContent("Ab Mo 07.12.");
-    expect(screen.queryByText(/jetzt beantragen/)).not.toBeInTheDocument();
+    expect(request).toHaveTextContent("ab Mo 07.12.");
+    expect(screen.getByText("Nichts fällig. Nächste Erinnerung am Mo 07.12.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Jetzt beantragen" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(request).getByRole("button", { name: "21.–22.12. als beantragt markieren" }));
+    expect(workData.setAbsenceStatus).toHaveBeenCalledWith(["a1", "a2"], "requested");
+  });
+
+  it("lists due requests first with a labelled action", () => {
+    workData.plannedAbsences = [{ id: "a1", date: "2026-08-14", type: "vacation", status: "planned", createdAt: "", updatedAt: "" }];
+    render(<App />);
+
+    const panel = screen.getByRole("region", { name: "Anträge" });
+    expect(within(panel).getByText("1 fällig")).toBeInTheDocument();
+    const card = within(panel).getByText("Fr 14.08.").closest("li") as HTMLElement;
+    expect(card).toHaveTextContent("noch 6 Tage");
+    fireEvent.click(within(card).getByRole("button", { name: "Als beantragt markieren" }));
+    expect(workData.setAbsenceStatus).toHaveBeenCalledWith(["a1"], "requested");
   });
 });
 

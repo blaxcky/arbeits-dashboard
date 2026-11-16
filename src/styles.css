@@ -6068,6 +6068,9 @@ button.week-line:focus-visible {
 .absence-requests {
   flex: 1 1 300px;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 .absence-calendar-toolbar,
@@ -6108,13 +6111,6 @@ button.week-line:focus-visible {
 
 .absence-letter.is-flex {
   background: #2e6648;
-}
-
-.absence-hint {
-  margin: 12px 0 0;
-  color: #4b5563;
-  font-size: 0.84rem;
-  line-height: 1.45;
 }
 
 .absence-months {
@@ -6304,96 +6300,150 @@ button.week-line:focus-visible {
   color: #4b5563;
 }
 
-.absence-request-list {
+.absence-requests-heading > span.is-due {
+  color: #5c4214;
+  font-weight: 700;
+}
+
+.absence-requests-calm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.84rem;
+}
+
+.absence-request-group {
   display: grid;
-  gap: 10px;
-  margin: 14px 0 0;
+  gap: 8px;
+}
+
+.absence-request-group h3 {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.absence-request-cards,
+.absence-request-rows {
+  display: grid;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.absence-request {
-  display: grid;
+.absence-request-cards {
   gap: 8px;
+}
+
+.absence-request-card {
+  display: grid;
+  gap: 10px;
   padding: 12px;
   border: 1px solid #e3e7ee;
   border-radius: 8px;
   background: #fff;
 }
 
-.absence-request.is-open {
+.absence-request-card.is-open {
   border-color: #b7d3d4;
   background: #f2f8f8;
 }
 
-.absence-request.is-urgent,
-.absence-request.is-missed {
+.absence-request-card.is-urgent,
+.absence-request-card.is-missed {
   border-color: #ddc58d;
   background: #fffaf0;
 }
 
-.absence-request p {
-  margin: 0;
-  color: #4b5563;
-  font-size: 0.82rem;
-  line-height: 1.4;
-}
-
-.absence-request-head {
-  display: flex;
+.absence-request-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
 }
 
-.absence-request-head .absence-letter {
-  width: 28px;
-  height: 28px;
+.absence-request-card .absence-request-row {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+}
+
+.absence-request-rows .absence-request-row {
+  padding: 10px 0;
+  border-top: 1px solid #eef0f3;
+}
+
+.absence-request-row .absence-letter {
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
 }
 
-.absence-request-head > div {
+.absence-letter.is-requested {
+  background: #e7f2ea;
+  color: #1f4a33;
+}
+
+.absence-request-text {
   display: grid;
-  flex: 1 1 auto;
   gap: 2px;
   min-width: 0;
 }
 
-.absence-request-head strong {
+.absence-request-text strong {
   font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.86rem;
 }
 
-.absence-request-head small {
+.absence-request-text small {
   color: #4b5563;
   font-size: 0.76rem;
 }
 
-.absence-pill {
-  flex: 0 0 auto;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: #eef1f5;
+.absence-request-row.is-requested strong {
   color: #4b5563;
-  font-size: 0.74rem;
-  font-weight: 800;
+}
+
+.absence-request-status {
+  color: #4b5563;
+  font-size: 0.78rem;
   white-space: nowrap;
 }
 
-.absence-pill.is-open {
-  background: var(--accent);
-  color: #fff;
-}
-
-.absence-pill.is-urgent,
-.absence-pill.is-missed {
-  border: 1px solid #c39239;
-  background: #fbecc9;
+.absence-request-card.is-urgent .absence-request-status,
+.absence-request-card.is-missed .absence-request-status {
   color: #5c4214;
+  font-weight: 700;
 }
 
-.absence-pill.is-requested {
-  background: #e7f2ea;
+.absence-request-card.is-open .absence-request-status {
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.absence-request-row.is-requested .absence-request-status {
   color: #1f4a33;
+}
+
+.absence-request-icon {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: var(--accent-dark);
+}
+
+.absence-request-row.is-requested .absence-request-icon {
+  color: #4b5563;
+}
+
+@media (pointer: coarse) {
+  .absence-request-icon {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
 }
 
 .absence-request-actions,

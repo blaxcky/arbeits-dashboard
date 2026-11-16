@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlannedAbsence } from "../../db/schema";
 import { summarizeAbsencePlan } from "./absencePlanning";
-import { absencePlanHero, dayAmountLabel } from "./AbsencePlanningView";
+import { absencePlanHero, compactAbsenceRange, dayAmountLabel, requestStatusLabel } from "./AbsencePlanningView";
 
 function absence(date: string, type: PlannedAbsence["type"]): PlannedAbsence {
   return { id: `${type}-${date}`, date, type, status: "planned", createdAt: "", updatedAt: "" };
@@ -38,5 +38,21 @@ describe("absence plan hero", () => {
     expect(dayAmountLabel(480, 480)).toBe("1 Tag");
     expect(dayAmountLabel(960, 480)).toBe("2 Tage");
     expect(dayAmountLabel(1200, 480)).toBe("2,5 Tage");
+  });
+});
+
+describe("absence request labels", () => {
+  it("shortens ranges and keeps the weekday for single days", () => {
+    expect(compactAbsenceRange({ start: "2026-12-07", end: "2026-12-07" })).toBe("Mo 07.12.");
+    expect(compactAbsenceRange({ start: "2026-12-21", end: "2026-12-23" })).toBe("21.–23.12.");
+    expect(compactAbsenceRange({ start: "2026-12-30", end: "2027-01-04" })).toBe("30.12. – 04.01.");
+  });
+
+  it("names the request state in a few words", () => {
+    expect(requestStatusLabel({ state: "later", opensOn: "2026-12-07", daysUntil: 28 })).toBe("ab Mo 07.12.");
+    expect(requestStatusLabel({ state: "urgent", opensOn: "2026-11-09", daysUntil: 7 })).toBe("noch 7 Tage");
+    expect(requestStatusLabel({ state: "urgent", opensOn: "2026-11-02", daysUntil: 0 })).toBe("heute");
+    expect(requestStatusLabel({ state: "missed", opensOn: "2026-10-30", daysUntil: -3 })).toBe("vorbei");
+    expect(requestStatusLabel({ state: "requested", opensOn: "2026-11-23", daysUntil: 21 })).toBe("wird am Tag gebucht");
   });
 });
