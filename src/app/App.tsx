@@ -561,16 +561,12 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           title="Dieses Jahr verbrauchen"
           value={formatDays(requiredConsumption, dailyTargetMinutes)}
           detail={consumptionDetail(vacationRemainingMinutes, flexOverLimitMinutes, dailyTargetMinutes)}
+          progressBar={<PlanBar requested={absenceSummary.coveredRequestedMinutes} planned={absenceSummary.coveredPlannedMinutes} total={absenceSummary.neededMinutes} label={absenceHeadline.text} />}
         >
-          <div className="absence-metric-plan is-compact">
-            {absenceSummary.neededMinutes > 0 ? (
-              <PlanBar requested={absenceSummary.coveredRequestedMinutes} planned={absenceSummary.coveredPlannedMinutes} total={absenceSummary.neededMinutes} label={absenceHeadline.text} />
-            ) : null}
-            <div className="absence-metric-row">
-              <span>{formatDays(absenceSummary.scheduledMinutes, dailyTargetMinutes)} verplant · {formatDays(absenceSummary.openMinutes, dailyTargetMinutes)} offen</span>
-              <Link className="absence-metric-link" to="/urlaub">Jahresplanung</Link>
-            </div>
-          </div>
+          <p className="absence-metric-note absence-metric-note-row">
+            <span>{formatDays(absenceSummary.scheduledMinutes, dailyTargetMinutes)} verplant · {formatDays(absenceSummary.openMinutes, dailyTargetMinutes)} offen</span>
+            <Link className="absence-metric-link" to="/urlaub">Jahresplanung</Link>
+          </p>
         </Metric>
       </section>
       <div className="dashboard-workflow">
@@ -4290,7 +4286,7 @@ type MetricProgress = {
   tone?: "default" | "warning" | "vacation";
 };
 
-function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, icon, action, tone = "default", progress, children }: { title: string; value: string; detail: string; editableDetail?: React.ReactNode; onDetailDoubleClick?: () => void; icon?: React.ReactNode; action?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress; children?: React.ReactNode }) {
+function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, icon, action, tone = "default", progress, progressBar, children }: { title: string; value: string; detail: string; editableDetail?: React.ReactNode; onDetailDoubleClick?: () => void; icon?: React.ReactNode; action?: React.ReactNode; tone?: "default" | "warning" | "danger"; progress?: MetricProgress; progressBar?: React.ReactNode; children?: React.ReactNode }) {
   const progressValue = progress ? clampProgress(progress.value) : 0;
   const overflowValue = progress?.overflow ? clampProgress(progress.overflow) : 0;
 
@@ -4305,6 +4301,8 @@ function Metric({ title, value, detail, editableDetail, onDetailDoubleClick, ico
             <span className="metric-progress-fill" style={{ width: `${progressValue * 100}%` }} />
           </span>
         </div>
+      ) : progressBar ? (
+        <div className="metric-progress metric-progress-plan">{progressBar}</div>
       ) : null}
       <div className="metric-footer">
         <p onDoubleClick={onDetailDoubleClick} className={onDetailDoubleClick ? "metric-editable-detail" : undefined}>{editableDetail ?? detail}</p>

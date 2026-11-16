@@ -5817,58 +5817,6 @@ button.week-line:focus-visible {
   font-weight: 700;
 }
 
-.absence-metric-plan {
-  display: grid;
-  gap: 6px;
-  padding-top: 8px;
-  border-top: 1px solid #eef0f3;
-  color: #4b5563;
-  font-size: 0.82rem;
-}
-
-.metric-warning .absence-metric-plan {
-  border-top-color: #efe4c8;
-}
-
-.absence-metric-plan small {
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.absence-metric-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.absence-metric-row strong,
-.absence-metric-row b {
-  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
-  font-size: 0.9rem;
-  color: #1f2937;
-}
-
-.absence-metric-plan .is-done,
-.absence-headline.is-done {
-  color: #1f4a33;
-}
-
-.absence-metric-plan .is-open,
-.absence-headline.is-open {
-  color: #5c4214;
-}
-
-.absence-metric-plan .is-danger,
-.absence-headline.is-danger {
-  color: var(--danger);
-}
-
-.absence-headline {
-  font-weight: 700;
-}
-
 .absence-metric-link {
   justify-self: start;
   font-size: 0.82rem;
@@ -6561,31 +6509,15 @@ button.week-line:focus-visible {
   color: var(--danger);
 }
 
-.absence-metric-plan.is-compact {
-  gap: 6px;
-  padding-top: 0;
-  border-top: 0;
-  color: var(--muted);
-  font-size: 0.78rem;
+.absence-metric-note-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
 }
 
-.absence-metric-plan.is-compact .absence-plan-bar {
-  height: 4px;
-}
-
-.absence-metric-plan.is-compact .absence-plan-bar-requested {
-  background: #7fa9ab;
-}
-
-.absence-metric-plan.is-compact .absence-plan-bar-planned {
-  background: repeating-linear-gradient(135deg, #7fa9ab 0 3px, #d3e4e5 3px 7px);
-}
-
-.absence-metric-plan.is-compact .absence-plan-bar-open {
-  background: #eedfb9;
-}
-
-.absence-metric-plan.is-compact .absence-metric-link {
+.absence-metric-note-row .absence-metric-link {
   color: var(--accent-dark);
   font-size: 0.78rem;
   font-weight: 600;
