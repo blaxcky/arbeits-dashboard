@@ -6147,6 +6147,12 @@ button.week-line:focus-visible {
 .month-stepper .icon-button {
   width: 32px;
   min-height: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+.month-stepper .icon-button svg {
+  flex: 0 0 auto;
 }
 
 .month-stepper-label {
