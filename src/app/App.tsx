@@ -1,5 +1,6 @@
 import {
   ArrowClockwise,
+  ArrowRight,
   Briefcase,
   CalendarBlank,
   CalendarCheck,
@@ -563,10 +564,13 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
           detail={consumptionDetail(vacationRemainingMinutes, flexOverLimitMinutes, dailyTargetMinutes)}
           progressBar={<PlanBar requested={absenceSummary.coveredRequestedMinutes} planned={absenceSummary.coveredPlannedMinutes} total={absenceSummary.neededMinutes} label={absenceHeadline.text} />}
         >
-          <p className="absence-metric-note absence-metric-note-row">
-            <span>{daysLabel(Math.round(absenceSummary.scheduledMinutes / dailyTargetMinutes))} geplant · <b>{formatDays(absenceSummary.openMinutes, dailyTargetMinutes)} offen</b></span>
-            <Link className="absence-metric-link" to="/urlaub">Jahresplanung</Link>
+          <p className="absence-metric-note">
+            {daysLabel(Math.round(absenceSummary.scheduledMinutes / dailyTargetMinutes))} geplant · <b>{formatDays(absenceSummary.openMinutes, dailyTargetMinutes)} offen</b>
           </p>
+          <Link className="metric-footer-link" to="/urlaub">
+            <span>Jahresplanung</span>
+            <ArrowRight size={15} weight="bold" aria-hidden="true" />
+          </Link>
         </Metric>
       </section>
       <div className="dashboard-workflow">
