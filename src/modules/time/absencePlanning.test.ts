@@ -11,6 +11,7 @@ import {
   groupOpenAbsences,
   isWorkday,
   missedAbsences,
+  defaultPlanningMonthStart,
   planningMonths,
   summarizeAbsencePlan
 } from "./absencePlanning";
@@ -47,13 +48,21 @@ describe("absence planning", () => {
     expect(isWorkday("2026-12-12")).toBe(false);
   });
 
-  it("lists the remaining months of the current year and all months of later years", () => {
-    const current = planningMonths(2026, "2026-11-15");
-    expect(current.map((month) => month.key)).toEqual(["2026-11", "2026-12"]);
-    expect(current[0].leadingBlanks).toBe(6);
-    expect(current[1].leadingBlanks).toBe(1);
-    expect(current[1].days).toHaveLength(31);
-    expect(planningMonths(2027, "2026-11-15")).toHaveLength(12);
+  it("lists all months of a year with their weekday offsets", () => {
+    const months = planningMonths(2026);
+    expect(months).toHaveLength(12);
+    expect(months[0].key).toBe("2026-01");
+    expect(months[10].key).toBe("2026-11");
+    expect(months[10].leadingBlanks).toBe(6);
+    expect(months[11].leadingBlanks).toBe(1);
+    expect(months[11].days).toHaveLength(31);
+  });
+
+  it("starts the two-month window at the current month and keeps it inside the year", () => {
+    expect(defaultPlanningMonthStart(2026, "2026-11-15")).toBe(10);
+    expect(defaultPlanningMonthStart(2026, "2026-12-03")).toBe(10);
+    expect(defaultPlanningMonthStart(2026, "2026-03-01")).toBe(2);
+    expect(defaultPlanningMonthStart(2027, "2026-11-15")).toBe(0);
   });
 
   it("decides whether a calendar click creates, removes or changes a plan", () => {

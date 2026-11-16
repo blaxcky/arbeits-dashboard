@@ -1,5 +1,5 @@
 import { ArrowCounterClockwise, BellRinging, BellSimple, CalendarCheck, CaretLeft, CaretRight, Check, CheckCircle, Clock, DownloadSimple, WarningCircle } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { PlannedAbsence, PlannedAbsenceType } from "../../db/schema";
 import { todayKey } from "../../lib/dates";
@@ -15,6 +15,7 @@ import {
   absencePlanAction,
   absenceRequestInfo,
   DEFAULT_REQUEST_LEAD_DAYS,
+  defaultPlanningMonthStart,
   DEFAULT_REQUEST_URGENT_DAYS,
   dueAbsenceRequests,
   groupOpenAbsences,
@@ -26,7 +27,8 @@ import {
   type AbsenceOpenDays,
   type AbsencePlanSummary,
   type AbsenceRequestGroup,
-  type AbsenceRequestInfo
+  type AbsenceRequestInfo,
+  VISIBLE_PLANNING_MONTHS
 } from "./absencePlanning";
 
 type PlanningData = ReturnType<typeof useWorkData>;
@@ -268,8 +270,42 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
   const yearOptions = [todayYear, todayYear + 1];
   const requestedYear = params.year && /^\d{4}$/.test(params.year) ? Number(params.year) : todayYear;
   const year = yearOptions.includes(requestedYear) ? requestedYear : todayYear;
-  const months = useMemo(() => planningMonths(year, planning.today), [year, planning.today]);
+  const allMonths = useMemo(() => planningMonths(year), [year]);
+  const [monthWindow, setMonthWindow] = useState<{ year: number; start: number } | null>(null);
+  const monthStart = monthWindow?.year === year ? monthWindow.start : defaultPlanningMonthStart(year, planning.today);
+  const months = allMonths.slice(monthStart, monthStart + VISIBLE_PLANNING_MONTHS);
+  const lastMonthStart = 12 - VISIBLE_PLANNING_MONTHS;
+  const canGoBack = monthStart > 0 || year > yearOptions[0];
+  const canGoForward = monthStart < lastMonthStart || year < yearOptions[yearOptions.length - 1];
+  const monthRangeLabel = months.map((month) => month.label.split(" ")[0]).join(" – ");
   const [mode, setMode] = useModeState();
+
+  function shiftMonths(step: -1 | 1) {
+    const next = monthStart + step;
+    if (next >= 0 && next <= lastMonthStart) {
+      setMonthWindow({ year, start: next });
+      return;
+    }
+    const nextYear = year + step;
+    if (!yearOptions.includes(nextYear)) return;
+    setMonthWindow({ year: nextYear, start: step > 0 ? 0 : lastMonthStart });
+    navigate(`/urlaub/${nextYear}`);
+  }
+
+  const shiftMonthsRef = useRef(shiftMonths);
+  shiftMonthsRef.current = shiftMonths;
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName))) return;
+      event.preventDefault();
+      shiftMonthsRef.current(event.key === "ArrowLeft" ? -1 : 1);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   const { summary, dailyTargetMinutes } = planning;
   const hero = absencePlanHero(summary, dailyTargetMinutes);
   const open = absenceOpenDays(summary, dailyTargetMinutes);
@@ -411,7 +447,18 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
       <div className="absence-layout">
         <section className="panel absence-calendar" aria-labelledby="absence-calendar-title">
           <div className="absence-calendar-toolbar">
-            <span id="absence-calendar-title" className="section-label">Kalender {year}</span>
+            <div className="absence-calendar-nav">
+              <span id="absence-calendar-title" className="section-label">Kalender {year}</span>
+              <div className="year-stepper month-stepper" role="group" aria-label="Monate wählen">
+                <button className="icon-button" type="button" title="Vorheriger Monat (Pfeil links)" aria-label="Vorheriger Monat" disabled={!canGoBack} onClick={() => shiftMonths(-1)}>
+                  <CaretLeft size={17} aria-hidden="true" />
+                </button>
+                <span className="month-stepper-label" aria-live="polite">{monthRangeLabel}</span>
+                <button className="icon-button" type="button" title="Nächster Monat (Pfeil rechts)" aria-label="Nächster Monat" disabled={!canGoForward} onClick={() => shiftMonths(1)}>
+                  <CaretRight size={17} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
             <div className="trip-tabs absence-mode" role="group" aria-label="Eintragen als">
               {(["vacation", "flex"] as PlannedAbsenceType[]).map((type) => (
                 <button key={type} type="button" aria-pressed={mode === type} onClick={() => setMode(type)}>

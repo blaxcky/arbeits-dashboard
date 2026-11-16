@@ -6137,6 +6137,27 @@ button.week-line:focus-visible {
   margin-top: 22px;
 }
 
+.absence-calendar-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.month-stepper .icon-button {
+  width: 32px;
+  min-height: 32px;
+}
+
+.month-stepper-label {
+  min-width: 150px;
+  padding: 0 6px;
+  color: #1f2937;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .absence-calendar-toolbar {
   padding-bottom: 18px;
   border-bottom: 1px solid #eef0f3;

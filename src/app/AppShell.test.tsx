@@ -169,6 +169,21 @@ describe("vacation planning", () => {
     expect(screen.getByRole("button", { name: "Sa 15.08.: Feiertag (Mariä Himmelfahrt)" })).toBeDisabled();
   });
 
+  it("shows two months at a time and moves through them with the arrow buttons and keys", () => {
+    render(<App />);
+
+    expect(screen.getByText("August – September")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Oktober 2026" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nächster Monat" }));
+    expect(screen.getByRole("heading", { name: "Oktober 2026" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "August 2026" })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(screen.getByText("Juli – August")).toBeInTheDocument();
+  });
+
   it("answers the header with whole days to plan and where they come from", () => {
     const settings = workData.settings as { vacationEntitlementMinutes: number | null };
     const entitlement = settings.vacationEntitlementMinutes;

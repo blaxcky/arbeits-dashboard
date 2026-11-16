@@ -90,12 +90,18 @@ export interface PlanningMonth {
   days: string[];
 }
 
-export function planningMonths(year: number, today: string): PlanningMonth[] {
+export const VISIBLE_PLANNING_MONTHS = 2;
+
+export function defaultPlanningMonthStart(year: number, today: string): number {
   const todayYear = Number(today.slice(0, 4));
-  const firstMonth = year === todayYear ? Number(today.slice(5, 7)) : 1;
+  if (year !== todayYear) return 0;
+  return Math.min(Number(today.slice(5, 7)) - 1, 12 - VISIBLE_PLANNING_MONTHS);
+}
+
+export function planningMonths(year: number): PlanningMonth[] {
   const formatter = new Intl.DateTimeFormat("de-AT", { month: "long", year: "numeric" });
   const months: PlanningMonth[] = [];
-  for (let month = firstMonth; month <= 12; month += 1) {
+  for (let month = 1; month <= 12; month += 1) {
     const first = new Date(year, month - 1, 1);
     const count = new Date(year, month, 0).getDate();
     months.push({
