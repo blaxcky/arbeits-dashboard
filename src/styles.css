@@ -3265,24 +3265,56 @@ button:disabled {
 }
 
 .time-quick-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 34px;
-  border-radius: 999px;
+  border-radius: 8px;
+  padding: 5px 10px 5px 8px;
   font-weight: 600;
+}
+
+.time-quick-select svg {
+  flex: none;
 }
 
 .time-quick-select b {
   font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
+.time-quick-select span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+/* Fester Wert aus den Einstellungen: gefuellt, mit Pin. */
 .time-quick-select-preferred {
-  border-color: #b9d3d4;
-  background: #f4f9f9;
+  border-color: transparent;
+  background: #e3efef;
   color: var(--accent-dark);
 }
 
 .time-quick-select-preferred:hover {
+  border-color: transparent;
+  background: #d3e6e6;
+  color: var(--accent-dark);
+}
+
+/* Aus dem heutigen Beginn berechnet: gestrichelt, mit Ziel-Symbol. */
+.time-quick-select-target {
+  border: 1px dashed #9fb7b8;
+  background: transparent;
+  color: var(--accent-dark);
+}
+
+.time-quick-select-target:hover {
   border-color: var(--accent);
-  background: #e9f3f3;
+  border-style: solid;
+  background: #f4f9f9;
   color: var(--accent-dark);
 }
 

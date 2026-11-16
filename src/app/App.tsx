@@ -31,6 +31,8 @@ import {
   Plus,
   Receipt,
   Printer,
+  PushPin,
+  Target,
   Trash,
   X,
   UploadSimple,
@@ -471,7 +473,7 @@ function Dashboard({ data, showToast }: { data: WorkData; showToast: ShowToast }
     ? { startTime: preferredStartTime, endTime: calculateDay({ ...previewEntry, startTime: preferredStartTime, endTime: undefined }, data.clock).targetEndTime ?? null }
     : null;
   const targetEndQuickTimes = !form.endTime.trim() && day.hasStart && day.targetEndTime
-    ? [{ value: day.targetEndTime, label: `${day.targetEndTime} Soll`, ariaLabel: `Soll-Ende ${day.targetEndTime} als Dienstende eintragen` }]
+    ? [{ value: day.targetEndTime, label: "Soll", ariaLabel: `Soll-Ende ${day.targetEndTime} als Dienstende eintragen` }]
     : [];
 
   return (
@@ -4435,19 +4437,23 @@ export function WorkTimeField({
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => onPreferredTime(preferredTime)}
             >
-              <b>{preferredTime}</b> bevorzugt
+              <PushPin size={14} weight="fill" aria-hidden="true" />
+              <b>{preferredTime}</b>
+              <span>bevorzugt</span>
             </button>
           ) : null}
           {extraQuickTimes.map((option) => (
             <button
               key={option.value}
-              className="time-quick-select"
+              className="time-quick-select time-quick-select-target"
               type="button"
               aria-label={option.ariaLabel}
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => onPreferredTime(option.value)}
             >
-              {option.label}
+              <Target size={14} weight="bold" aria-hidden="true" />
+              <b>{option.value}</b>
+              <span>{option.label}</span>
             </button>
           ))}
         </div>
