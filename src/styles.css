@@ -6147,6 +6147,10 @@ button.week-line:focus-visible {
   margin: 22px -10px 0;
 }
 
+.absence-months-nav .absence-grid:not(.absence-weekdays) {
+  grid-template-rows: repeat(6, minmax(56px, auto));
+}
+
 .absence-months-nav .absence-months {
   grid-area: months;
   grid-template-columns: repeat(2, minmax(0, 1fr));
