@@ -459,7 +459,7 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
           </div>
           <div className="absence-months-nav" role="group" aria-label={`Monate ${monthRangeLabel}`}>
             <button className="icon-button absence-month-arrow" type="button" title="Vorheriger Monat (Pfeil links)" aria-label="Vorheriger Monat" disabled={!canGoBack} onClick={() => shiftMonths(-1)}>
-              <CaretLeft size={18} weight="bold" aria-hidden="true" />
+              <CaretLeft size={26} aria-hidden="true" />
             </button>
           <div className="absence-months">
             {months.map((month) => (
@@ -478,7 +478,7 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
             ))}
           </div>
             <button className="icon-button absence-month-arrow" type="button" title="Nächster Monat (Pfeil rechts)" aria-label="Nächster Monat" disabled={!canGoForward} onClick={() => shiftMonths(1)}>
-              <CaretRight size={18} weight="bold" aria-hidden="true" />
+              <CaretRight size={26} aria-hidden="true" />
             </button>
           </div>
           <div className="absence-legend">
