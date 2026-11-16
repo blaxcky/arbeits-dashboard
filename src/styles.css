@@ -3345,35 +3345,48 @@ button:disabled {
   border-top: 1px solid #eef0f3;
 }
 
+/* Pause wird selten angepasst: zurueckhaltend, Rahmen erst bei Hover/Fokus. */
 .break-stepper {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
+  gap: 4px 6px;
 }
 
 .break-stepper label {
-  color: #374151;
-  font-size: 0.86rem;
-  font-weight: 700;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .break-stepper-control {
   display: flex;
   align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.break-stepper-control:hover,
+.break-stepper-control:focus-within {
+  border-color: var(--line);
   background: #fff;
 }
 
 .break-stepper-control button {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 28px;
+  height: 28px;
   border: 0;
   background: transparent;
-  color: #4b5563;
+  color: #9aa3af;
+}
+
+.break-stepper-control button svg {
+  width: 13px;
+  height: 13px;
 }
 
 .break-stepper-control button:hover:not(:disabled) {
@@ -3381,14 +3394,14 @@ button:disabled {
 }
 
 .break-stepper-control input {
-  width: 46px;
+  width: 26px;
   border: 0;
   padding: 0;
   background: transparent;
-  color: #1f2937;
+  color: var(--muted);
   font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 600;
   text-align: right;
   -moz-appearance: textfield;
 }
@@ -3409,9 +3422,16 @@ button:disabled {
 }
 
 .break-stepper-unit {
-  padding: 0 4px 0 3px;
+  padding: 0 2px 0 3px;
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.74rem;
+}
+
+@media (max-width: 920px) {
+  .break-stepper-control button {
+    width: 34px;
+    height: 34px;
+  }
 }
 
 .ghost-danger-button {
