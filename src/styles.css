@@ -5919,14 +5919,20 @@ button.week-line:focus-visible {
   .absence-year-metrics {
     grid-template-columns: 1fr;
   }
+
+  .absence-year-metrics .absence-hero,
+  .absence-year-metrics .absence-source {
+    min-height: 0;
+  }
 }
 
 .absence-hero,
 .absence-source {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
+  gap: 14px;
+  min-height: 184px;
+  padding: 22px 24px;
 }
 
 .absence-hero.is-open {
