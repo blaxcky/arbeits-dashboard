@@ -3261,54 +3261,61 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  min-height: 34px;
+  min-height: 30px;
+  margin-top: 5px;
 }
 
+/* Schnellwahl ist eine Nebenfunktion: leise im Ruhezustand, Akzent erst bei Hover/Fokus. */
 .time-quick-select {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  border-radius: 8px;
-  padding: 5px 10px 5px 8px;
+  gap: 5px;
+  min-height: 28px;
+  border-radius: 7px;
+  padding: 3px 8px 3px 7px;
+  color: var(--muted);
   font-weight: 600;
 }
 
 .time-quick-select svg {
   flex: none;
+  opacity: 0.7;
 }
 
 .time-quick-select b {
   font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
-  font-size: 0.86rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .time-quick-select span {
-  font-size: 0.72rem;
-  font-weight: 600;
-  opacity: 0.72;
+  font-size: 0.7rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.time-quick-select:hover svg,
+.time-quick-select:focus-visible svg {
+  opacity: 1;
 }
 
 /* Fester Wert aus den Einstellungen: gefuellt, mit Pin. */
 .time-quick-select-preferred {
   border-color: transparent;
-  background: #e3efef;
-  color: var(--accent-dark);
+  background: #f1f4f6;
 }
 
 .time-quick-select-preferred:hover {
   border-color: transparent;
-  background: #d3e6e6;
+  background: #e3efef;
   color: var(--accent-dark);
 }
 
 /* Aus dem heutigen Beginn berechnet: gestrichelt, mit Ziel-Symbol. */
 .time-quick-select-target {
-  border: 1px dashed #9fb7b8;
+  border: 1px dashed #c9d2dc;
   background: transparent;
-  color: var(--accent-dark);
 }
 
 .time-quick-select-target:hover {
@@ -3316,6 +3323,16 @@ button:disabled {
   border-style: solid;
   background: #f4f9f9;
   color: var(--accent-dark);
+}
+
+@media (max-width: 920px) {
+  .time-quick-row {
+    min-height: 34px;
+  }
+
+  .time-quick-select {
+    min-height: 34px;
+  }
 }
 
 .day-card-footer {
