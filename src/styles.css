@@ -6117,7 +6117,12 @@ button.week-line:focus-visible {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 32px 28px;
-  margin-top: 26px;
+  margin-top: 22px;
+}
+
+.absence-calendar-toolbar {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #eef0f3;
 }
 
 .absence-month h3 {
