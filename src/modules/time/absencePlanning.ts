@@ -261,3 +261,22 @@ export function summarizeAbsencePlan(input: {
     status
   };
 }
+
+export interface AbsenceOpenDays {
+  vacationDays: number;
+  vacationRestMinutes: number;
+  flexDays: number;
+}
+
+// Calendar clicks plan whole days: vacation rounds down (one more day would overplan),
+// flex rounds up (only whole flex days bring the balance back under the limit).
+export function absenceOpenDays(summary: AbsencePlanSummary, dailyTargetMinutes: number): AbsenceOpenDays {
+  if (dailyTargetMinutes <= 0) return { vacationDays: 0, vacationRestMinutes: 0, flexDays: 0 };
+  const vacationOpenMinutes = Math.max(summary.vacationAfterMinutes, 0);
+  const vacationDays = Math.floor(vacationOpenMinutes / dailyTargetMinutes);
+  return {
+    vacationDays,
+    vacationRestMinutes: vacationOpenMinutes - vacationDays * dailyTargetMinutes,
+    flexDays: Math.ceil(summary.flexOverLimitAfterMinutes / dailyTargetMinutes)
+  };
+}

@@ -5944,21 +5944,6 @@ button.week-line:focus-visible {
   background: #fff6f4;
 }
 
-.absence-hero-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-  color: var(--muted);
-  font-size: 0.84rem;
-}
-
-.absence-hero-head b {
-  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
-  color: #1f2937;
-}
-
 .absence-hero.is-done .metric-title {
   color: #1f4a33;
   font-weight: 700;
@@ -5990,10 +5975,47 @@ button.week-line:focus-visible {
   font-size: 0.82rem;
 }
 
+.absence-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.absence-hero-actions .secondary-button {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.84rem;
+}
+
+@media (pointer: coarse) {
+  .absence-hero-actions .secondary-button {
+    min-height: 44px;
+  }
+}
+
+.absence-hero.is-open .absence-hero-actions .secondary-button {
+  border-color: #ddc58d;
+  color: #5c4214;
+}
+
+.absence-hero.is-open .absence-hero-actions .secondary-button:hover {
+  border-color: #c39239;
+  background: #fff3da;
+}
+
 .absence-hero-plan {
   display: grid;
   gap: 7px;
   margin-top: auto;
+}
+
+.absence-calendar:focus {
+  outline: none;
+}
+
+.absence-calendar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .absence-hero-legend {

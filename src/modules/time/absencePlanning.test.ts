@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlannedAbsence } from "../../db/schema";
 import {
+  absenceOpenDays,
   absencePlanAction,
   absenceRequestInfo,
   absencesDueForBooking,
@@ -111,6 +112,12 @@ describe("absence planning", () => {
     expect(summary.coveredPlannedMinutes).toBe(3360);
     expect(summary.openMinutes).toBe(570);
     expect(summary.status).toBe("open");
+  });
+
+  it("counts open whole days per type: vacation rounded down, flex days rounded up", () => {
+    const summary = summarizeAbsencePlan({ absences: [], today: "2026-11-16", vacationRemainingMinutes: 1200, flexBalanceMinutes: 7200, flexLimitMinutes: 6000, dailyTargetMinutes: 480 });
+    expect(absenceOpenDays(summary, 480)).toEqual({ vacationDays: 2, vacationRestMinutes: 240, flexDays: 3 });
+    expect(absenceOpenDays(summary, 0)).toEqual({ vacationDays: 0, vacationRestMinutes: 0, flexDays: 0 });
   });
 
   it("marks the plan as done, almost done or overplanned", () => {
