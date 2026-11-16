@@ -1,4 +1,4 @@
-import { BellRinging, CalendarCheck, CaretLeft, CaretRight, DownloadSimple } from "@phosphor-icons/react";
+import { BellRinging, CalendarCheck, CaretLeft, CaretRight, CheckCircle, Clock, DownloadSimple, WarningCircle } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { PlannedAbsence, PlannedAbsenceType } from "../../db/schema";
@@ -88,6 +88,44 @@ export function absencePlanHeadline(summary: AbsencePlanSummary, dailyTargetMinu
   }
   if (summary.flexOverLimitAfterMinutes > 0) parts.push(`${formatMinutes(summary.flexOverLimitAfterMinutes)} Gleitzeit über der Grenze`);
   return { text: `Noch offen: ${parts.join(" · ")}`, tone: "open" };
+}
+
+export function dayAmount(minutes: number, dailyTargetMinutes: number): string {
+  const days = dailyTargetMinutes > 0 ? minutes / dailyTargetMinutes : 0;
+  return days.toLocaleString("de-AT", { maximumFractionDigits: 1 });
+}
+
+export function dayAmountLabel(minutes: number, dailyTargetMinutes: number): string {
+  const days = dailyTargetMinutes > 0 ? minutes / dailyTargetMinutes : 0;
+  return Number.isInteger(days) ? daysLabel(days) : `${dayAmount(minutes, dailyTargetMinutes)} Tage`;
+}
+
+export interface AbsencePlanHero {
+  title: string;
+  value: string;
+  detail: string;
+  tone: "done" | "open" | "danger";
+}
+
+export function absencePlanHero(summary: AbsencePlanSummary, dailyTargetMinutes: number): AbsencePlanHero {
+  if (summary.status === "overplanned") {
+    return { title: "Zu viel geplant", value: daysLabel(Math.round(-summary.vacationAfterMinutes / dailyTargetMinutes)), detail: "mehr Urlaub geplant als vorhanden", tone: "danger" };
+  }
+  if (summary.status === "flex-too-low") {
+    return { title: "Gleitzeit zu niedrig", value: formatSignedMinutes(summary.flexAfterMinutes), detail: "Gleitzeit fällt nach Planung unter -10:00 h", tone: "danger" };
+  }
+  if (summary.status === "done") return { title: "Alles verplant", value: daysLabel(0), detail: "am 31.12. verfällt nichts", tone: "done" };
+  if (summary.status === "almost") {
+    return { title: "Fast geschafft", value: formatMinutes(summary.flexOverLimitAfterMinutes), detail: "Gleitzeit über der Grenze – weniger als ein Gleittag", tone: "open" };
+  }
+  const parts: string[] = [];
+  if (summary.vacationAfterMinutes > 0) parts.push(`${dayAmountLabel(summary.vacationAfterMinutes, dailyTargetMinutes)} Urlaub`);
+  if (summary.flexOverLimitAfterMinutes > 0) parts.push(`${formatMinutes(summary.flexOverLimitAfterMinutes)} Gleitzeit über der Grenze`);
+  return { title: "Bis 31.12. noch einplanen", value: dayAmountLabel(summary.openMinutes, dailyTargetMinutes), detail: parts.join(" · "), tone: "open" };
+}
+
+function planCounts(planned: number, requested: number): string {
+  return requested > 0 ? `${planned} geplant · ${requested} beantragt` : `${planned} geplant`;
 }
 
 function percent(part: number, total: number): number {
@@ -197,12 +235,10 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
   const months = useMemo(() => planningMonths(year, planning.today), [year, planning.today]);
   const [mode, setMode] = useModeState();
   const { summary, dailyTargetMinutes } = planning;
-  const headline = absencePlanHeadline(summary, dailyTargetMinutes);
+  const hero = absencePlanHero(summary, dailyTargetMinutes);
   const groups = groupOpenAbsences(planning.absences, planning.today).map((group) => ({ group, info: absenceRequestInfo(group, planning.today, planning.leadDays, planning.urgentDays) }));
   const missedGroups = groupOpenAbsences(planning.missed).map((group) => ({ group, info: absenceRequestInfo(group, planning.today, planning.leadDays, planning.urgentDays) }));
   const allGroups = [...missedGroups, ...groups];
-  const warn = summary.openMinutes > 0 || summary.status === "overplanned" || summary.status === "flex-too-low";
-  const vacationOpenDays = Math.max(summary.vacationAfterMinutes, 0) / dailyTargetMinutes;
 
   const exportEvents = absenceCalendarEvents(planning.absences, planning.today);
 
@@ -268,56 +304,66 @@ export function AbsencePlanningView({ data, showToast }: { data: PlanningData; s
         </div>
       </header>
 
-      <section className="dashboard-metrics points-year-metrics" aria-label="Jahresende">
-        <article className="metric">
-          <div className="metric-title"><CalendarCheck size={18} />Resturlaub</div>
-          <strong>{daysLabel(Math.round(planning.vacationRemainingMinutes / dailyTargetMinutes))}</strong>
-          <div className="metric-progress metric-progress-vacation">
-            <span className="metric-progress-track"><span className="metric-progress-fill" style={{ width: `${percent(planning.vacationRemainingMinutes, planning.vacationEntitlementMinutes)}%` }} /></span>
+      <section className="absence-year-metrics" aria-label="Jahresende">
+        <article className={`metric absence-hero is-${hero.tone}`}>
+          <div className="absence-hero-head">
+            <span className="metric-title">
+              {hero.tone === "done" ? <CheckCircle size={18} weight="bold" /> : hero.tone === "danger" ? <WarningCircle size={18} weight="bold" /> : null}
+              {hero.title}
+            </span>
+            {summary.neededMinutes > 0 ? <span>von <b>{dayAmount(summary.neededMinutes, dailyTargetMinutes)}</b> {summary.neededMinutes === dailyTargetMinutes ? "Tag" : "Tagen"}</span> : null}
           </div>
-          <div className="metric-footer"><p>{planning.vacationEntitlementMinutes > 0 ? `${formatMinutes(planning.vacationRemainingMinutes)} von ${formatMinutes(planning.vacationEntitlementMinutes)} übrig` : "Noch nicht eingerichtet"}</p></div>
-          <div className="absence-metric-plan">
-            <div className="absence-metric-row">
-              <span>Nach Planung</span>
-              <strong className={summary.vacationAfterMinutes === 0 ? "is-done" : summary.vacationAfterMinutes < 0 ? "is-danger" : "is-open"}>
-                {summary.vacationAfterMinutes >= 0 ? `${daysLabel(Math.round(summary.vacationAfterMinutes / dailyTargetMinutes))} übrig` : `${daysLabel(Math.round(-summary.vacationAfterMinutes / dailyTargetMinutes))} zu viel`}
-              </strong>
+          <div className="absence-hero-value">
+            <strong>{hero.value}</strong>
+            {hero.detail ? <span>{hero.detail}</span> : null}
+          </div>
+          <div className="absence-hero-plan">
+            <PlanBar requested={summary.coveredRequestedMinutes} planned={summary.coveredPlannedMinutes} total={summary.neededMinutes} label={`${dayAmount(summary.coveredRequestedMinutes, dailyTargetMinutes)} beantragt, ${dayAmount(summary.coveredPlannedMinutes, dailyTargetMinutes)} geplant, ${dayAmount(summary.openMinutes, dailyTargetMinutes)} offen`} />
+            <div className="absence-hero-legend" aria-hidden="true">
+              <span><i className="is-requested" />{dayAmount(summary.coveredRequestedMinutes, dailyTargetMinutes)} beantragt</span>
+              <span><i className="is-planned" />{dayAmount(summary.coveredPlannedMinutes, dailyTargetMinutes)} geplant</span>
+              <span><i className="is-open" /><b>{dayAmount(summary.openMinutes, dailyTargetMinutes)} offen</b></span>
             </div>
-            <PlanBar requested={summary.vacationRequestedDays * dailyTargetMinutes} planned={summary.vacationPlannedDays * dailyTargetMinutes} total={summary.vacationRemainingMinutes} label={`Urlaub: ${summary.vacationRequestedDays} beantragt, ${summary.vacationPlannedDays} geplant`} />
-            <small>{summary.vacationRequestedDays} beantragt · {summary.vacationPlannedDays} geplant · {vacationOpenDays.toLocaleString("de-AT", { maximumFractionDigits: 1 })} offen</small>
           </div>
         </article>
 
-        <article className={`metric${planning.flexBalanceMinutes > planning.flexLimitMinutes ? " metric-warning" : ""}`}>
-          <div className="metric-title">Gleitzeit</div>
-          <strong>{formatSignedMinutes(planning.flexBalanceMinutes)}</strong>
-          <div className={`metric-progress${planning.flexBalanceMinutes > planning.flexLimitMinutes ? " metric-progress-warning" : ""}`}>
-            {planning.flexBalanceMinutes > planning.flexLimitMinutes ? <span className="metric-progress-overflow" style={{ width: `${percent(planning.flexBalanceMinutes - planning.flexLimitMinutes, planning.flexLimitMinutes)}%` }} /> : null}
-            <span className="metric-progress-track"><span className="metric-progress-fill" style={{ width: `${percent(planning.flexBalanceMinutes, planning.flexLimitMinutes)}%` }} /></span>
-          </div>
-          <div className="metric-footer"><p>{planning.flexBalanceMinutes > planning.flexLimitMinutes ? `${formatMinutes(planning.flexBalanceMinutes - planning.flexLimitMinutes)} über Grenze` : `noch ${formatMinutes(planning.flexLimitMinutes - planning.flexBalanceMinutes)} bis Grenze`}</p></div>
-          <div className="absence-metric-plan">
-            <div className="absence-metric-row">
-              <span>Nach Planung</span>
-              <strong className={summary.status === "flex-too-low" ? "is-danger" : summary.flexOverLimitAfterMinutes > 0 ? "is-open" : "is-done"}>{formatSignedMinutes(summary.flexAfterMinutes)}</strong>
-            </div>
-            <PlanBar requested={summary.flexRequestedDays * dailyTargetMinutes} planned={summary.flexPlannedDays * dailyTargetMinutes} total={summary.flexOverLimitMinutes} label={`Gleittage: ${summary.flexRequestedDays} beantragt, ${summary.flexPlannedDays} geplant`} />
-            <small>{summary.flexRequestedDays} beantragt · {summary.flexPlannedDays} geplant · {summary.flexOverLimitAfterMinutes > 0 ? `${formatMinutes(summary.flexOverLimitAfterMinutes)} über Grenze` : `${formatMinutes(planning.flexLimitMinutes - summary.flexAfterMinutes)} unter Grenze`}</small>
-          </div>
+        <article className="metric absence-source">
+          <div className="metric-title"><CalendarCheck size={18} />Urlaub</div>
+          {planning.vacationEntitlementMinutes > 0 ? (
+            <>
+              <div className="absence-source-value">
+                <strong>{summary.vacationAfterMinutes < 0 ? daysLabel(Math.round(-summary.vacationAfterMinutes / dailyTargetMinutes)) : dayAmountLabel(summary.vacationAfterMinutes, dailyTargetMinutes)}</strong>
+                <span className={summary.vacationAfterMinutes < 0 ? "is-danger" : summary.vacationAfterMinutes === 0 ? "is-done" : "is-open"}>{summary.vacationAfterMinutes < 0 ? "zu viel" : "offen"}</span>
+              </div>
+              <p>Resturlaub {dayAmountLabel(planning.vacationRemainingMinutes, dailyTargetMinutes)} · {planCounts(summary.vacationPlannedDays, summary.vacationRequestedDays)}</p>
+            </>
+          ) : (
+            <>
+              <div className="absence-source-value"><strong>–</strong></div>
+              <p>Noch nicht eingerichtet</p>
+            </>
+          )}
         </article>
 
-        <article className={`metric${warn ? " metric-warning" : ""}`}>
-          <div className="metric-title">Dieses Jahr verbrauchen</div>
-          <strong>{formatDays(summary.neededMinutes, dailyTargetMinutes)}</strong>
-          <div className="metric-footer"><p>Resturlaub {formatDays(summary.vacationRemainingMinutes, dailyTargetMinutes)} · Gleitzeit über Grenze {formatDays(summary.flexOverLimitMinutes, dailyTargetMinutes)}</p></div>
-          <div className="absence-metric-plan">
-            <div className="absence-metric-row">
-              <span>Verplant <b>{formatDays(summary.scheduledMinutes, dailyTargetMinutes)}</b></span>
-              <span>Offen <b className={summary.openMinutes > 0 ? "is-open" : "is-done"}>{formatDays(summary.openMinutes, dailyTargetMinutes)}</b></span>
-            </div>
-            <PlanBar requested={summary.coveredRequestedMinutes} planned={summary.coveredPlannedMinutes} total={summary.neededMinutes} label={`${formatDays(summary.coveredRequestedMinutes, dailyTargetMinutes)} beantragt, ${formatDays(summary.coveredPlannedMinutes, dailyTargetMinutes)} geplant, ${formatDays(summary.openMinutes, dailyTargetMinutes)} offen`} />
-            <small className={`absence-headline is-${headline.tone}`}>{headline.text}</small>
+        <article className="metric absence-source">
+          <div className="metric-title"><Clock size={18} />Gleitzeit</div>
+          <div className="absence-source-value">
+            {summary.status === "flex-too-low" ? (
+              <>
+                <strong>{formatSignedMinutes(summary.flexAfterMinutes)}</strong>
+                <span className="is-danger">nach Planung</span>
+              </>
+            ) : (
+              <>
+                <strong>{formatMinutes(summary.flexOverLimitAfterMinutes)}</strong>
+                <span className={summary.flexOverLimitAfterMinutes > 0 ? "is-open" : "is-done"}>offen</span>
+              </>
+            )}
           </div>
+          <p>
+            Saldo {formatSignedMinutes(planning.flexBalanceMinutes)} · Grenze {formatMinutes(planning.flexLimitMinutes)}
+            {summary.flexPlannedDays + summary.flexRequestedDays > 0 ? ` · ${planCounts(summary.flexPlannedDays, summary.flexRequestedDays)}` : ""}
+          </p>
         </article>
       </section>
 

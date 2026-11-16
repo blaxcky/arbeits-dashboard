@@ -5899,6 +5899,169 @@ button.week-line:focus-visible {
   background: #e2bd6c;
 }
 
+.absence-year-metrics {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@container (max-width: 900px) {
+  .absence-year-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .absence-year-metrics .absence-hero {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (max-width: 440px) {
+  .absence-year-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+.absence-hero,
+.absence-source {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.absence-hero.is-open {
+  border-color: #ddc58d;
+  background: #fffaf0;
+}
+
+.absence-hero.is-done {
+  border-color: #b9d3c1;
+  background: #f3f8f4;
+}
+
+.absence-hero.is-danger {
+  border-color: #dfb1ad;
+  background: #fff6f4;
+}
+
+.absence-hero-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.absence-hero-head b {
+  font-family: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  color: #1f2937;
+}
+
+.absence-hero.is-done .metric-title {
+  color: #1f4a33;
+  font-weight: 700;
+}
+
+.absence-hero.is-danger .metric-title {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.absence-hero-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+
+.absence-hero-value strong {
+  font-size: clamp(1.7rem, 2.6vw, 2.15rem);
+  line-height: 1.05;
+}
+
+.absence-hero.is-danger .absence-hero-value strong {
+  color: var(--danger);
+}
+
+.absence-hero-value span {
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
+.absence-hero-plan {
+  display: grid;
+  gap: 7px;
+  margin-top: auto;
+}
+
+.absence-hero-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: #4b5563;
+  font-size: 0.78rem;
+}
+
+.absence-hero-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.absence-hero-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.absence-hero-legend i.is-requested {
+  background: var(--accent);
+}
+
+.absence-hero-legend i.is-planned {
+  background: repeating-linear-gradient(135deg, var(--accent) 0 2px, #9cc3c5 2px 4px);
+}
+
+.absence-hero-legend i.is-open {
+  background: #e2bd6c;
+}
+
+.absence-hero-legend b {
+  color: #5c4214;
+}
+
+.absence-source-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.absence-source-value span {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.absence-source-value .is-open {
+  color: #5c4214;
+}
+
+.absence-source-value .is-done {
+  color: #1f4a33;
+}
+
+.absence-source-value .is-danger {
+  color: var(--danger);
+}
+
+.absence-source p {
+  margin-top: auto;
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
 .absence-layout {
   display: flex;
   flex-wrap: wrap;
